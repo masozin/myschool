@@ -25,8 +25,8 @@ class SemesterController extends Controller
   {
     $validator = Validator::make($request->all(), [
       'kode_semester'   => 'required|unique:tabel_semester,kode_semester',
-      'semester'        => 'required|string|max:255',
-      'tahun_pelajaran' => 'required',
+      'semester'        => 'required|string|in:Ganjil,Genap',
+      'tahun_pelajaran' => 'required|regex:/^\d{4}\/\d{4}$/',
       'is_active'       => 'boolean',
     ]);
 
@@ -63,8 +63,8 @@ class SemesterController extends Controller
 
     $validator = Validator::make($request->all(), [
       'kode_semester'   => 'required|unique:tabel_semester,kode_semester,' . $id,
-      'semester'        => 'required|string|max:255',
-      'tahun_pelajaran' => 'required',
+      'semester'        => 'required|string|in:Ganjil,Genap',
+      'tahun_pelajaran' => 'required|regex:/^\d{4}\/\d{4}$/',
       'is_active'       => 'boolean',
     ]);
 
@@ -92,6 +92,37 @@ class SemesterController extends Controller
     } catch (\Exception $e) {
       DB::rollBack();
       return response()->json(['message' => 'Gagal memperbarui data.', 'error' => $e->getMessage()], 500);
+    }
+  }
+  public function destroy($id)
+  {
+    try {
+      $semester = Semester::findOrFail($id);
+
+      // Semester yang sedang aktif tidak boleh dihapus
+      if ($semester->is_active) {
+        return response()->json([
+          'message' => 'Semester aktif tidak bisa dihapus. Aktifkan semester lain terlebih dahulu.'
+        ], 422);
+      }
+
+      // Cek relasi: semester yang sudah dipakai tidak boleh dihapus
+      $hasRelations = $semester->rombel()->exists()
+        || $semester->sekolahDetail()->exists()
+        || $semester->riwayatSiswa()->exists();
+
+      if ($hasRelations) {
+        return response()->json([
+          'message' => 'Data semester tidak bisa dihapus karena sudah dipakai oleh data rombel, sekolah, atau siswa.'
+        ], 422);
+      }
+
+      // Soft delete (model memakai trait SoftDeletes)
+      $semester->delete();
+
+      return response()->json(['message' => 'Data semester berhasil dihapus!']);
+    } catch (\Exception $e) {
+      return response()->json(['message' => 'Gagal menghapus data.', 'error' => $e->getMessage()], 500);
     }
   }
 }

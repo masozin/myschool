@@ -15,6 +15,12 @@ class Semester extends Model
   protected $table = 'tabel_semester';
   protected $fillable = ['kode_semester', 'semester', 'tahun_pelajaran', 'is_active', 'tanggal_mulai', 'tanggal_selesai'];
 
+  protected $casts = [
+    'is_active' => 'boolean',
+    // tanggal_mulai & tanggal_selesai TIDAK di-cast di sini:
+    // keduanya sudah ditangani accessor khusus dengan fallback hitung.
+  ];
+
   public function rombel(): HasMany
   {
     return $this->hasMany(Rombel::class, 'semester_id');
