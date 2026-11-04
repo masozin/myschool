@@ -409,7 +409,6 @@ Route::middleware(['fitur:elearning'])->group(function () {
   // Manajemen Topik/Modul Ajar
   Route::controller(LearningTopicController::class)->group(function () {
     Route::get('/learning/topics/create', 'create')->name('learning.topics.create');
-    Route::post('/learning/topics', 'store')->name('learning.topics.store');
     Route::get('/learning/topics', 'index')->name('learning.topics.index');
     Route::get('/learning/topics/{topic}/edit', 'edit')->name('learning.topics.edit');
     Route::put('/learning/topics/{topic}', 'updateInfo')->name('learning.topics.updateInfo');
@@ -502,11 +501,6 @@ Route::get('/sekolah-belum-aktif', function () {
   return view('errors.sekolah-belum-aktif');
 })->middleware('auth:sanctum')->name('sekolah.belum-aktif');
 
-// routes/web.php
-// Route::post('/learning-modules/generate-test', [LearningModuleController::class, 'generateTest']);
-// routes/web.php
-Route::get('/learning-modules/generate-test', [App\Http\Controllers\LearningModuleController::class, 'generateTest']);
-Route::get('/listmodel', [App\Http\Controllers\LearningModuleController::class, 'listModels']);
 
 
 Route::middleware(['auth'])->prefix('learning-modules')->name('learning-modules.')->group(function () {
