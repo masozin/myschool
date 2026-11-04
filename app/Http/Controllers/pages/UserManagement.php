@@ -20,7 +20,6 @@ class UserManagement extends Controller
    */
   public function UserManagement(): View
   {
-    // dd('UserManagement');
     $users = User::all();
     $userCount = $users->count();
     $verified = User::whereNotNull('email_verified_at')->get()->count();

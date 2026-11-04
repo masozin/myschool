@@ -60,7 +60,6 @@ class SekolahController extends Controller
       ];
     });
 
-    // dd($data);
     return response()->json($data);
   }
 
@@ -187,7 +186,6 @@ class SekolahController extends Controller
       'libur_mingguan.*' => 'in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
     ]);
 
-    // dd($request);
 
     if ($validator->fails()) {
       return response()->json(['errors' => $validator->errors()], 422);
