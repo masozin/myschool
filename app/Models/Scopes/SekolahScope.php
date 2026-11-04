@@ -15,9 +15,11 @@ class SekolahScope implements Scope
     if (Auth::check()) {
       $user = Auth::user();
 
-      // Jika user adalah 'operator' atau 'guru', filter datanya
-      // Sesuaikan dengan logic role di sistem Anda
-      if ($user->role !== 'admin') {
+      // Admin tidak difilter ke satu sekolah. Model User memakai Spatie,
+      // jadi pengecekan harus lewat hasRole('Admin') — atribut $user->role
+      // tidak ada dan selalu null, sehingga admin yang terhubung PTK
+      // ikut terfilter sebelumnya.
+      if (! $user->hasRole('Admin')) {
 
         // Ambil sekolah_id dari data PTK yang terhubung dengan user
         // Kita asumsikan user memiliki relasi ke ptk
