@@ -224,15 +224,19 @@ class PtkController extends Controller
       $userName = $userName . Str::lower(Str::random(3)); // Tambah angka acak jika bentrok
     }
 
+    // Password dibuat acak per akun (bukan lagi '12345678' yang seragam)
+    // dan hanya ditampilkan sekali di respons ini.
+    $plainPassword = Str::random(12);
+
     try {
       // Gunakan Database Transaction agar jika satu gagal, semua batal
-      $result = DB::transaction(function () use ($ptk, $userName) {
+      $result = DB::transaction(function () use ($ptk, $userName, $plainPassword) {
 
         // 5. Buat User Baru
         $user = User::create([
           'name'      => $ptk->nama_ptk,
           'user_name' => $userName,
-          'password'  => Hash::make('12345678'),
+          'password'  => Hash::make($plainPassword),
         ]);
 
         $role = Role::firstOrCreate(['name' => $ptk->jabatan, 'guard_name' => 'web']);
@@ -244,7 +248,7 @@ class PtkController extends Controller
 
         return [
           'username' => $userName,
-          'password' => '12345678'
+          'password' => $plainPassword
         ];
       });
 

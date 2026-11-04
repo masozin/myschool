@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class SekolahController extends Controller
@@ -283,14 +284,18 @@ class SekolahController extends Controller
     }
 
     // 3. Gunakan Transaction untuk memastikan data konsisten di kedua tabel
-    return DB::transaction(function () use ($sekolah, $namaSekolah) {
+    // Password dibuat acak per akun (bukan lagi 'admin'+NPSN yang bisa ditebak
+    // dari data publik) dan hanya ditampilkan sekali di respons ini.
+    $generatedPassword = Str::random(12);
+
+    return DB::transaction(function () use ($sekolah, $namaSekolah, $generatedPassword) {
 
 
       // Buat User Baru
       $user = User::create([
         'name'      => 'Operator' . $namaSekolah,
         'user_name' => $sekolah->npsn,
-        'password'  => Hash::make('admin' . $sekolah->npsn),
+        'password'  => Hash::make($generatedPassword),
       ]);
 
       // Jika belum ada, Spatie akan otomatis membuatnya
@@ -316,7 +321,7 @@ class SekolahController extends Controller
         'message' => 'Akun operator untuk ' . $namaSekolah . ' berhasil dibuat',
         'data' => [
           'username' => $sekolah->npsn,
-          'password' => 'admin' . $sekolah->npsn
+          'password' => $generatedPassword
         ]
       ]);
     });
