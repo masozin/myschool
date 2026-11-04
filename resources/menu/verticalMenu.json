@@ -1,0 +1,200 @@
+{
+  "menu": [
+    {
+      "url": "/",
+      "name": "Home",
+      "icon": "menu-icon icon-base ri ri-home-smile-line",
+      "slug": "home"
+    },
+    {
+      "menuHeader": "Data Master"
+    },
+    {
+      "name": "Master Data",
+      "icon": "menu-icon icon-base ri ri-database-2-line",
+      "roles": [
+        "Admin",
+        "Operator Sekolah"
+      ],
+      "submenu": [
+        {
+          "url": "/sekolah",
+          "name": "Data Sekolah",
+          "slug": "sekolah.index",
+          "roles": [
+            "Admin"
+          ]
+        },
+        {
+          "url": "/semester",
+          "name": "Data Semester",
+          "slug": "page.semester",
+          "roles": [
+            "Admin"
+          ]
+        },
+        {
+          "url": "/ptk",
+          "name": "Data PTK",
+          "slug": "ptk.index",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        },
+        {
+          "url": "/rombel",
+          "name": "Rombel",
+          "slug": "rombel.index",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        },
+        {
+          "url": "/siswa",
+          "name": "Siswa",
+          "slug": "siswa",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        }
+      ]
+    },
+    {
+      "menuHeader": "Akademik"
+    },
+    {
+      "name": "Kurikulum",
+      "icon": "menu-icon icon-base ri ri-book-open-line",
+      "slug": "mapel.index",
+      "roles": [
+        "Admin",
+        "Operator Sekolah"
+      ],
+      "submenu": [
+        {
+          "url": "/mapel",
+          "name": "Mapel",
+          "slug": "mapel.index",
+          "roles": [
+            "Admin"
+          ]
+        },
+        {
+          "url": "/mapel-mapping",
+          "name": "Mapping Mapel",
+          "slug": "mapel-mapping.index",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "/presensi",
+      "icon": "menu-icon icon-base ri ri-table-line",
+      "name": "Presensi",
+      "slug": "Presensi"
+    },
+    {
+      "url": "/kalender-pendidikan",
+      "icon": "menu-icon icon-base ri ri-calendar-2-line",
+      "name": "Kalender Pendidikan",
+      "slug": "Kalender-pendidikan"
+    },
+    {
+      "menuHeader": "Kelulusan"
+    },
+    {
+      "name": "Dokumen Kelulusan",
+      "icon": "menu-icon icon-base ri ri-award-line",
+      "slug": "skhu",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Guru",
+        "Kepala Sekolah"
+      ],
+      "submenu": [
+        {
+          "url": "/skhu",
+          "name": "SKHU",
+          "slug": "skhu",
+          "roles": [
+            "Operator Sekolah"
+          ],
+          "fitur": "skhu"
+        },
+        {
+          "url": "/skl",
+          "name": "SKL",
+          "slug": "skl",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Guru",
+            "Kepala Sekolah"
+          ],
+          "fitur": "skl"
+        }
+      ]
+    },
+    {
+      "menuHeader": "Edukasi"
+    },
+    {
+      "url": "/learning-modules",
+      "icon": "menu-icon icon-base ri ri-book-open-line",
+      "name": "Modul Pembelajaran",
+      "slug": "learning-modules"
+    },
+    {
+      "url": "/learning/topics",
+      "icon": "menu-icon icon-base ri ri-book-open-line",
+      "name": "Media Pembelajaran",
+      "slug": "learning.topics"
+    },
+    {
+      "menuHeader": "Tools"
+    },
+    {
+      "name": "Utilitas",
+      "icon": "menu-icon icon-base ri ri-tools-line",
+      "slug": "kartu-pelajar.index",
+      "submenu": [
+        {
+          "url": "/kartu-pelajar",
+          "name": "Kartu Pelajar",
+          "slug": "kartu-pelajar.index"
+        },
+        {
+          "url": "/koreksi-soal",
+          "name": "Koreksi Soal",
+          "slug": "learning.topics.index1"
+        },
+        {
+          "url": "https://sdn01ttr.ozinsq.my.id/erapor/",
+          "name": "E-rapor",
+          "slug": "erapor",
+          "target": "_blank",
+          "fitur": "erapor"
+        }
+      ]
+    },
+    {
+      "menuHeader": "Pengaturan"
+    },
+    {
+      "url": "/logo",
+      "icon": "menu-icon icon-base ri ri-image-edit-line",
+      "name": "Aset Sekolah",
+      "slug": "logo",
+      "roles": [
+        "Operator Sekolah"
+      ]
+    }
+  ]
+}

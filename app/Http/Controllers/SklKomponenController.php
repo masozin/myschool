@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\SklKomponen;
+use App\Models\Semester;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+/**
+ * Diakses hanya oleh Admin.
+ * Kelola komponen nilai SKL per jenjang untuk semester aktif (dari session).
+ * Tidak ada input tahun pelajaran — semua mengacu ke semester_id dari session.
+ */
+class SklKomponenController extends Controller
+{
+  /**
+   * Ambil semester_id + objek Semester dari session.
+   * Abort jika tidak ditemukan (semester belum dipilih).
+   */
+  private function getSemester(): Semester
+  {
+    $semesterId = session('semester_id');
+    abort_if(!$semesterId, 403, 'Semester belum dipilih. Pilih semester terlebih dahulu.');
+    return Semester::findOrFail($semesterId);
+  }
+
+  // ── Index ─────────────────────────────────────────────────────────────
+
+  public function index(Request $request)
+  {
+    $semester = $this->getSemester();
+    $jenjang  = $request->get('jenjang', 'SD');
+
+    $komponens  = SklKomponen::untuk($semester->id, $jenjang)->with('subKomponen')->get();
+    $totalBobot = SklKomponen::totalBobot($semester->id, $jenjang);
+
+    return view('content.skl.komponen.index', compact(
+      'komponens',
+      'jenjang',
+      'semester',
+      'totalBobot'
+    ));
+  }
+
+  // ── Create ────────────────────────────────────────────────────────────
+
+  public function create(Request $request)
+  {
+    $semester   = $this->getSemester();
+    $jenjang    = $request->get('jenjang', 'SD');
+    $totalBobot = SklKomponen::totalBobot($semester->id, $jenjang);
+
+    return view('content.skl.komponen.form', compact('semester', 'jenjang', 'totalBobot'));
+  }
+
+  // ── Store ─────────────────────────────────────────────────────────────
+
+  public function store(Request $request)
+  {
+    $semester = $this->getSemester();
+
+    $data = $request->validate([
+      'jenjang'    => 'required|in:SD,SMP,SMA,SMK',
+      'kode'       => 'required|string|max:50',
+      'label'      => 'required|string|max:100',
+      'bobot'      => 'required|integer|min:1|max:100',
+      'keterangan' => 'nullable|string|max:255',
+      'urutan'     => 'required|integer|min:0',
+    ]);
+
+    // semester_id dari session, bukan dari form
+    $data['semester_id'] = $semester->id;
+
+    $totalAda = SklKomponen::totalBobot($semester->id, $data['jenjang']);
+    if ($totalAda + $data['bobot'] > 100) {
+      return back()->withInput()->withErrors([
+        'bobot' => 'Total bobot akan menjadi ' . ($totalAda + $data['bobot']) . '%. Maksimal 100%.',
+      ]);
+    }
+
+    SklKomponen::create($data);
+
+    return redirect()
+      ->route('skl.komponen.index', ['jenjang' => $data['jenjang']])
+      ->with('success', 'Komponen berhasil ditambahkan.');
+  }
+
+  // ── Edit ─────────────────────────────────────────────────────────────
+
+  public function edit(SklKomponen $komponen)
+  {
+    $semester = $this->getSemester();
+
+    // Pastikan komponen milik semester aktif
+    abort_if($komponen->semester_id !== $semester->id, 403, 'Komponen ini bukan milik semester aktif.');
+
+    // Total bobot SELAIN komponen ini (untuk progress bar sisa)
+    $totalBobot = SklKomponen::where('semester_id', $semester->id)
+      ->where('jenjang', $komponen->jenjang)
+      ->where('id', '!=', $komponen->id)
+      ->sum('bobot');
+
+    return view('content.skl.komponen.form', compact('komponen', 'semester', 'totalBobot'));
+  }
+
+  // ── Update ────────────────────────────────────────────────────────────
+
+  public function update(Request $request, SklKomponen $komponen)
+  {
+    $semester = $this->getSemester();
+    abort_if($komponen->semester_id !== $semester->id, 403, 'Komponen ini bukan milik semester aktif.');
+
+    $data = $request->validate([
+      'label'      => 'required|string|max:100',
+      'bobot'      => 'required|integer|min:1|max:100',
+      'keterangan' => 'nullable|string|max:255',
+      'urutan'     => 'required|integer|min:0',
+    ]);
+
+    $totalTanpaIni = SklKomponen::where('semester_id', $semester->id)
+      ->where('jenjang', $komponen->jenjang)
+      ->where('id', '!=', $komponen->id)
+      ->sum('bobot');
+
+    if ($totalTanpaIni + $data['bobot'] > 100) {
+      return back()->withInput()->withErrors([
+        'bobot' => 'Total bobot akan menjadi ' . ($totalTanpaIni + $data['bobot']) . '%. Maksimal 100%.',
+      ]);
+    }
+
+    $komponen->update($data);
+
+    return redirect()
+      ->route('skl.komponen.index', ['jenjang' => $komponen->jenjang])
+      ->with('success', 'Komponen berhasil diperbarui.');
+  }
+
+  // ── Destroy ───────────────────────────────────────────────────────────
+
+  public function destroy(SklKomponen $komponen)
+  {
+    $komponen->delete();
+
+    if (request()->expectsJson()) {
+      return response()->json(['message' => 'Komponen berhasil dihapus.']);
+    }
+
+    return redirect()
+      ->route('skl.komponen.index', ['jenjang' => $komponen->jenjang])
+      ->with('success', 'Komponen berhasil dihapus.');
+  }
+}
