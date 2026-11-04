@@ -59,7 +59,7 @@ class PtkController extends Controller
         'max:100',
         function ($attribute, $value, $fail) use ($sekolahId, $namaSekolah) {
           // Daftar jabatan yang dibatasi (hanya boleh 1 per sekolah)
-          $jabatanTerbatas = ['Kepala Sekolah', 'Operator sekolah'];
+          $jabatanTerbatas = ['Kepala Sekolah', 'Operator Sekolah'];
 
           if (in_array($value, $jabatanTerbatas)) {
             // Cek apakah sudah ada orang lain di sekolah ini dengan jabatan tersebut
@@ -119,7 +119,7 @@ class PtkController extends Controller
         'max:100',
         function ($attribute, $value, $fail) use ($sekolahId, $id, $namaSekolah) {
           // Daftar jabatan yang dibatasi (hanya boleh 1 per sekolah)
-          $jabatanTerbatas = ['Kepala Sekolah', 'Operator sekolah'];
+          $jabatanTerbatas = ['Kepala Sekolah', 'Operator Sekolah'];
 
           if (in_array($value, $jabatanTerbatas)) {
             // Cek apakah sudah ada orang lain di sekolah ini dengan jabatan tersebut
