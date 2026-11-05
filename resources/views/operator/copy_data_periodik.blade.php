@@ -55,6 +55,11 @@
         </select>
         <small class="text-muted">Hanya semester sebelum semester aktif yang bisa dipilih.
           Bawaan terpilih: semester sebelumnya.</small>
+        <div class="alert alert-warning mt-3 mb-0 d-none" id="info-naik-kelas">
+          <strong>Mode naik kelas aktif.</strong> Semester sumber berasal dari tahun pelajaran
+          sebelumnya: tingkat tiap rombel naik satu, rombel tingkat akhir tidak disalin
+          (siswanya lulus), dan nama rombel disesuaikan bila angka tingkatnya tertulis jelas.
+        </div>
       </div>
     </div>
 
@@ -196,9 +201,16 @@
       const adaRombel = s.rombel.length > 0;
       byId('pv-rombel-jumlah').textContent = s.rombel.length;
       byId('pv-rombel-kosong').classList.toggle('d-none', adaRombel);
-      byId('pv-rombel').innerHTML = s.rombel.map(r =>
-        `<li>${r.nama_rombel} — Tingkat ${r.tingkat} (${r.jumlah_anggota} anggota aktif)</li>`
-      ).join('');
+      byId('pv-rombel').innerHTML = s.rombel.map(r => {
+        if (r.lulus) {
+          return `<li>${r.nama_rombel} — Tingkat ${r.tingkat} — <em>tidak disalin (kelas akhir, siswa lulus)</em> (${r.jumlah_anggota} anggota aktif)</li>`;
+        }
+        if (s.naik_kelas) {
+          return `<li>${r.nama_baru} — Tingkat ${r.tingkat} → ${r.tingkat_baru} (${r.jumlah_anggota} anggota aktif)</li>`;
+        }
+        return `<li>${r.nama_rombel} — Tingkat ${r.tingkat} (${r.jumlah_anggota} anggota aktif)</li>`;
+      }).join('');
+      byId('info-naik-kelas').classList.toggle('d-none', !s.naik_kelas);
 
       // Ketersediaan checkbox
       aturCheckbox(byId('salin-detail'), byId('note-detail'),
@@ -217,7 +229,7 @@
       } else {
         cbAnggota.disabled = false;
         cbAnggota.checked = true;
-        const total = s.rombel.reduce((n, r) => n + r.jumlah_anggota, 0);
+        const total = s.rombel.filter(r => !r.lulus).reduce((n, r) => n + r.jumlah_anggota, 0);
         noteAnggota.textContent =
           `${total} siswa aktif akan dimasukkan ke rombel barunya. ` +
           'Tanggal mulai anggota = tanggal mulai semester tujuan.';
