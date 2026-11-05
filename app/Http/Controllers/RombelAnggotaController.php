@@ -159,10 +159,14 @@ class RombelAnggotaController extends Controller
       'rombel_id'   => 'required|exists:tabel_rombel,id',
       'siswa_ids'   => 'required|array',
       'siswa_ids.*' => 'exists:tabel_siswa,id',
+      'start_date'  => 'nullable|date',
     ]);
 
     $rombel   = Rombel::with('semester')->findOrFail($request->rombel_id);
     $semester = $rombel->semester;
+
+    // Tanggal mulai boleh dipilih lewat form; kosong = tanggal hari ini
+    $startDate = $request->input('start_date') ?: now()->toDateString();
 
     // Cek izin: hanya yang boleh kelola anggota rombel ini
     $this->authorize('manageMembers', $rombel);
@@ -196,7 +200,7 @@ class RombelAnggotaController extends Controller
           'siswa_id'    => $siswa_id,
           'rombel_id'   => $request->rombel_id,
           'semester_id' => $semester->id,
-          'start_date'  => now(),
+          'start_date'  => $startDate,
           'end_date'    => null,
           'created_at'  => now(),
           'updated_at'  => now(),
@@ -226,7 +230,7 @@ class RombelAnggotaController extends Controller
   // =========================================================================
   // KELUARKAN SISWA DARI ROMBEL
   // =========================================================================
-  public function destroy($id)
+  public function destroy(Request $request, $id)
   {
     $anggota = RombelAnggota::with(['siswa', 'rombel.semester'])->findOrFail($id);
 
@@ -247,8 +251,18 @@ class RombelAnggotaController extends Controller
       ], 409);
     }
 
+    // Tanggal selesai boleh dipilih lewat form; kosong = tanggal hari ini
+    $request->validate(['end_date' => 'nullable|date']);
+    $endDate = $request->input('end_date') ?: now()->toDateString();
+
+    if ($endDate < $anggota->start_date) {
+      return response()->json([
+        'message' => 'Tanggal selesai tidak boleh sebelum tanggal mulai (' . $anggota->start_date . ').'
+      ], 422);
+    }
+
     // Isi end_date — record tetap ada sebagai history perpindahan
-    $anggota->update(['end_date' => now()]);
+    $anggota->update(['end_date' => $endDate]);
 
     return response()->json([
       'message'  => "Siswa {$anggota->siswa->nama_siswa} berhasil dikeluarkan dari rombel {$anggota->rombel->nama_rombel}.",
