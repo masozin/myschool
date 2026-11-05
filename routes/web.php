@@ -182,11 +182,11 @@ Route::controller(MapelMappingController::class)
   ->group(function () {
     Route::get('/', 'index')->name('mapel-mapping.index');
     Route::get('/table', 'table');
+    Route::put('/{mapel}', 'update');
     Route::delete('/{mapel}', 'destroy');
     Route::post('/', 'store');
     Route::post('/reorder', 'reorder'); // NOTE: sebelumnya di luar group tanpa middleware sama sekali, sekarang ikut terlindungi
-    Route::post('/{mapel}/urutan-naik', 'urutanNaik');
-    Route::post('/{mapel}/urutan-turun', 'urutanTurun');
+    Route::post('/salin-semester', 'salinSemester');
     // Tambah mapel baru (quick create)
     Route::post('quick-create', 'quickCreateMapel')->name('quick-create');
   });
