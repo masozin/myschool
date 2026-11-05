@@ -527,12 +527,10 @@ class SiswaController extends Controller
       // Sinkronkan status di tabel siswa (dipakai oleh tabel())
       Siswa::where('id', $id)->update(['status' => $request->status]);
 
-      // Siswa yang keluar/lulus/mutasi/meninggal dikeluarkan dari rombel aktif
-      if (!$isAktif) {
-        RombelAnggota::where('siswa_id', $id)
-          ->whereNull('end_date')
-          ->update(['end_date' => $request->tanggal_keluar]);
-      }
+      // Keanggotaan rombel tidak disentuh: barisnya berlaku untuk
+      // semesternya masing-masing. Siswa yang keluar/lulus hilang
+      // dari daftar siswa lewat saringan registrasi terbaru aktif,
+      // dan dari roster presensi lewat batas tanggal_keluar ini.
 
       DB::commit();
 

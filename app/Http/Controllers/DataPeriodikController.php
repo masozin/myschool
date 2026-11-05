@@ -127,7 +127,7 @@ class DataPeriodikController extends Controller
               ? $this->namaNaikKelas($r->nama_rombel, (int) $r->tingkat, $selisih)
               : $r->nama_rombel,
             'lulus'          => (bool) $lulus,
-            'jumlah_anggota' => $r->rombelAnggota()->whereNull('end_date')->count(),
+            'jumlah_anggota' => $r->rombelAnggota()->whereHas('siswa.registrasiTerbaru', fn($q) => $q->where('status', 'aktif'))->count(),
           ];
         })->all(),
       ];
@@ -309,14 +309,8 @@ class DataPeriodikController extends Controller
         }
       }
 
-      // ── Anggota rombel (siswa yang masih aktif di rombel sumber) ────
+      // ── Anggota rombel (yang registrasinya masih aktif) ────
       if (in_array('anggota', $pilihan)) {
-        // Keanggotaan di semester baru berlaku sejak semester itu mulai
-        $startDate = $semesterTarget?->tanggal_mulai?->format('Y-m-d')
-          ?? now()->toDateString();
-        // Keanggotaan lama ditutup di akhir semester sumber
-        $endDateSumber = Semester::find($semesterLalu)?->tanggal_selesai?->format('Y-m-d')
-          ?? $startDate;
 
         if (empty($petaRombel)) {
           $catatan[] = 'anggota tidak disalin karena rombel tidak tersalin';
@@ -325,14 +319,16 @@ class DataPeriodikController extends Controller
           $dilewati = 0;
 
           foreach ($petaRombel as $rombelLamaId => $rombelBaruId) {
+            // Yang disalin: anggota rombel sumber yang registrasinya
+            // di sekolah ini masih aktif — yang sudah keluar/lulus
+            // tidak dihidupkan lagi di semester baru
             $anggotaAktif = RombelAnggota::where('rombel_id', $rombelLamaId)
-              ->whereNull('end_date')
+              ->whereHas('siswa.registrasiTerbaru', fn($q) => $q->where('sekolah_id', $sekolahId)->where('status', 'aktif'))
               ->get();
 
             foreach ($anggotaAktif as $anggota) {
               $sudahAktif = RombelAnggota::where('siswa_id', $anggota->siswa_id)
                 ->where('semester_id', $semesterSekarang)
-                ->whereNull('end_date')
                 ->exists();
 
               if ($sudahAktif) {
@@ -344,17 +340,8 @@ class DataPeriodikController extends Controller
                 'siswa_id'    => $anggota->siswa_id,
                 'rombel_id'   => $rombelBaruId,
                 'semester_id' => $semesterSekarang,
-                'start_date'  => $startDate,
-                'end_date'    => null,
               ]);
 
-              // Tutup keanggotaan di semester sumber supaya riwayat siswa
-              // tidak menampilkan dua keanggotaan berstatus Aktif sekaligus
-              $anggota->update([
-                'end_date' => $endDateSumber < $anggota->start_date
-                  ? $anggota->start_date
-                  : $endDateSumber,
-              ]);
               $tersalin++;
             }
           }
@@ -363,7 +350,7 @@ class DataPeriodikController extends Controller
             $hasil[] = $tersalin . ' anggota rombel';
           }
           if ($dilewati) {
-            $catatan[] = $dilewati . ' anggota dilewati (sudah punya rombel aktif di semester ini)';
+            $catatan[] = $dilewati . ' anggota dilewati (sudah punya rombel di semester ini)';
           }
         }
       }
@@ -373,8 +360,8 @@ class DataPeriodikController extends Controller
       // pelajaran — tidak tergantung centang anggota rombel. Siswa di
       // rombel sumber yang tingkatnya melewati tingkat akhir setelah
       // kenaikan diluluskan penuh seperti jalur registrasi(): registrasi
-      // ditutup sebagai lulus per akhir semester sumber, status siswa
-      // disinkronkan, keanggotaan aktif ditutup.
+      // ditutup sebagai lulus per akhir semester sumber dan status
+      // siswa disinkronkan. Keanggotaan rombel tidak disentuh.
       if ($selisih >= 1 && in_array('rombel', $pilihan)) {
         $tingkatAkhirLulus = $this->tingkatAkhirSekolah($sekolahId);
 
@@ -383,7 +370,6 @@ class DataPeriodikController extends Controller
             ?? now()->toDateString();
 
           $calonLulus = RombelAnggota::where('semester_id', $semesterLalu)
-            ->whereNull('end_date')
             ->whereHas('rombel', fn($q) => $q
               ->where('sekolah_id', $sekolahId)
               ->where('tingkat', '>', $tingkatAkhirLulus - $selisih))
@@ -409,11 +395,6 @@ class DataPeriodikController extends Controller
             ]);
 
             Siswa::where('id', $siswaId)->update(['status' => 'lulus']);
-
-            RombelAnggota::where('siswa_id', $siswaId)
-              ->whereNull('end_date')
-              ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $tanggalLulus))
-              ->update(['end_date' => $tanggalLulus]);
 
             $jumlahLulus++;
           }

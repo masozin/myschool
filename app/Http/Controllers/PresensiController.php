@@ -74,12 +74,27 @@ class PresensiController extends Controller
 
     $rombel = Rombel::findOrFail($rombelId);
 
+    // Roster = anggota rombel itu pada semesternya, dibatasi hari
+    // efektif siswa dari tanggal registrasinya di sekolah rombel
+    // ini: belum bisa dipresensi sebelum tanggal_diterima dan tidak
+    // lagi sesudah tanggal_keluar. Keanggotaan rombel sendiri tidak
+    // bertanggal — ia berlaku untuk semester rombel itu, jadi guru
+    // rombel yang terdaftar pada semester tanggal inilah yang
+    // mengelola presensinya.
     $anggota = RombelAnggota::with('siswa')
       ->where('rombel_id', $rombelId)
-      ->whereDate('start_date', '<=', $tanggal)
-      ->where(function ($q) use ($tanggal) {
-        $q->whereNull('end_date')
-          ->orWhereDate('end_date', '>=', $tanggal);
+      ->whereHas('siswa', function ($q) use ($rombel, $tanggal) {
+        $q->whereHas('siswaRegistrasi', function ($qr) use ($rombel, $tanggal) {
+          $qr->where('sekolah_id', $rombel->sekolah_id)
+            ->where(function ($qw) use ($tanggal) {
+              $qw->whereNull('tanggal_diterima')
+                ->orWhereDate('tanggal_diterima', '<=', $tanggal);
+            })
+            ->where(function ($qw) use ($tanggal) {
+              $qw->whereNull('tanggal_keluar')
+                ->orWhereDate('tanggal_keluar', '>=', $tanggal);
+            });
+        });
       })
       ->get();
 
