@@ -53,8 +53,8 @@
           </option>
           @endforeach
         </select>
-        <small class="text-muted">Bawaan terpilih: semester sebelumnya. Ganti bila ingin menyalin
-          dari semester lain.</small>
+        <small class="text-muted">Hanya semester sebelum semester aktif yang bisa dipilih.
+          Bawaan terpilih: semester sebelumnya.</small>
       </div>
     </div>
 

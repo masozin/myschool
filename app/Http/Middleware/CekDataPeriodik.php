@@ -37,9 +37,22 @@ class CekDataPeriodik
         return $next($request);
       }
 
-      // Ada data semester lama yang bisa disalin?
-      $adaDataLama = Rombel::where('sekolah_id', $sekolahId)
-        ->where('semester_id', '!=', $semesterId)
+      // Ada data semester lama yang bisa disalin? Yang dihitung hanya
+      // semester sebelum semester aktif (secara kronologis) — semester
+      // masa depan bukan sumber salin, jadi tidak boleh memicu
+      // pengalihan ke halaman salin.
+      $semuaSemester = Semester::all()
+        ->sortBy(fn(Semester $s) => Semester::kunciKronologis($s))
+        ->values();
+      $posisiAktif = $semuaSemester->search(
+        fn(Semester $s) => (int) $s->id === (int) $semesterId
+      );
+      $idsSebelumnya = $posisiAktif === false
+        ? []
+        : $semuaSemester->slice(0, $posisiAktif)->pluck('id')->all();
+
+      $adaDataLama = !empty($idsSebelumnya) && Rombel::where('sekolah_id', $sekolahId)
+        ->whereIn('semester_id', $idsSebelumnya)
         ->exists();
 
       // Sekolah baru: detail ada, rombel kosong, dan tidak ada data lama.
@@ -51,8 +64,8 @@ class CekDataPeriodik
       // Tidak ada data lama sama sekali yang bisa disalin (detail maupun
       // rombel kosong di semua semester lain): jangan jebak operator di
       // halaman salin — biarkan ia mengisi data secara manual.
-      $adaDetailLama = SekolahDetail::where('sekolah_id', $sekolahId)
-        ->where('semester_id', '!=', $semesterId)
+      $adaDetailLama = !empty($idsSebelumnya) && SekolahDetail::where('sekolah_id', $sekolahId)
+        ->whereIn('semester_id', $idsSebelumnya)
         ->exists();
 
       if (!$adaDataLama && !$adaDetailLama) {

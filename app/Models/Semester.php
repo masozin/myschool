@@ -59,6 +59,21 @@ class Semester extends Model
   }
 
   /**
+   * Kunci urutan kronologis semester, untuk membandingkan dua semester.
+   * [tahun awal tahun pelajaran, 1 untuk Ganjil, 2 untuk Genap].
+   * Dipakai salin data periodik: semester sumber harus lebih dulu
+   * dari semester aktif — menyalin dari semester sesudahnya akan
+   * menutup keanggotaan yang belum berjalan.
+   */
+  public static function kunciKronologis(self $s): array
+  {
+    return [
+      (int) substr((string) $s->tahun_pelajaran, 0, 4),
+      strtolower((string) $s->semester) === 'ganjil' ? 1 : 2,
+    ];
+  }
+
+  /**
    * Accessor: $semester->tanggal_mulai
    * Kalau kolom `tanggal_mulai` di tabel sudah diisi manual, itu yang dipakai
    * (sumber kebenaran utama). Kalau masih NULL (mis. data lama / belum diisi),

@@ -17,6 +17,9 @@ class DataPeriodikController extends Controller
    *
    * Pengguna memilih sendiri semester sumbernya (bawaan: semester
    * persis sebelum semester aktif) dan data apa saja yang disalin.
+   * Semester sumber dibatasi hanya untuk semester sebelum semester
+   * aktif: menyalin dari semester sesudahnya akan menutup
+   * keanggotaan yang belum berjalan.
    */
   public function showCopyForm()
   {
@@ -32,24 +35,30 @@ class DataPeriodikController extends Controller
 
     // Urutan kronologis semester: tahun awal tahun pelajaran,
     // lalu Ganjil sebelum Genap dalam tahun yang sama.
-    $kunciUrut = fn(Semester $s) => [
-      (int) substr((string) $s->tahun_pelajaran, 0, 4),
-      strtolower((string) $s->semester) === 'ganjil' ? 1 : 2,
-    ];
-    $semuaSemester = Semester::all()->sortBy($kunciUrut)->values();
+    $semuaSemester = Semester::all()
+      ->sortBy(fn(Semester $s) => Semester::kunciKronologis($s))
+      ->values();
+
+    // Posisi semester aktif dalam urutan kronologis; semester
+    // sesudahnya (termasuk yang aktif sendiri) bukan sumber salin.
+    $posisiSekarang = $semuaSemester->search(
+      fn(Semester $s) => (int) $s->id === (int) $semesterSekarang
+    );
+    if ($posisiSekarang === false) {
+      $posisiSekarang = null;
+    }
 
     $statusTarget = $semesterSekarang
       ? SekolahDetail::status($sekolahId, (int) $semesterSekarang)
       : ['hasDetail' => false, 'hasRombel' => false];
 
-    // Kandidat semester sumber: semester selain yang aktif yang
-    // punya detail sekolah atau rombel untuk sekolah ini.
-    $sumber         = [];
-    $posisiSekarang = null;
+    // Kandidat semester sumber: semester sebelum semester aktif
+    // yang punya detail sekolah atau rombel untuk sekolah ini.
+    // Semester sesudah aktif tidak ditampilkan sama sekali.
+    $sumber = [];
 
     foreach ($semuaSemester as $i => $smt) {
-      if ((int) $smt->id === (int) $semesterSekarang) {
-        $posisiSekarang = $i;
+      if ($posisiSekarang !== null && $i >= $posisiSekarang) {
         continue;
       }
 
@@ -94,7 +103,7 @@ class DataPeriodikController extends Controller
 
     // Bawaan semester asal: semester persis sebelum semester aktif
     // (secara kronologis) yang punya data; bila tidak ada, kandidat
-    // paling baru yang punya data.
+    // paling baru sebelum semester aktif yang punya data.
     $defaultAsalId = null;
     if ($posisiSekarang !== null && $posisiSekarang > 0) {
       $idSebelumnya = (int) $semuaSemester[$posisiSekarang - 1]->id;
@@ -147,6 +156,16 @@ class DataPeriodikController extends Controller
 
     $status         = SekolahDetail::status($sekolahId, $semesterSekarang);
     $semesterTarget = Semester::find($semesterSekarang);
+
+    // Penjaga sisi server (dropdown sudah menyaring, tapi request
+    // bisa dibuat manual): sumber harus semester sebelum aktif.
+    // Menyalin dari semester sesudah aktif akan menutup keanggotaan
+    // siswa di semester yang belum berjalan.
+    $semesterAsal = Semester::find($semesterLalu);
+    if ($semesterAsal && $semesterTarget
+      && Semester::kunciKronologis($semesterAsal) >= Semester::kunciKronologis($semesterTarget)) {
+      return back()->with('error', 'Semester asal harus sebelum semester aktif. Semester yang sama dengan atau sesudah semester aktif tidak bisa dijadikan sumber salin.');
+    }
 
     DB::beginTransaction();
     try {
