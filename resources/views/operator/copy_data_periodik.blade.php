@@ -58,7 +58,7 @@
         <div class="alert alert-warning mt-3 mb-0 d-none" id="info-naik-kelas">
           <strong>Mode naik kelas aktif.</strong> Semester sumber berasal dari tahun pelajaran
           sebelumnya: tingkat tiap rombel naik satu, rombel tingkat akhir tidak disalin
-          (siswanya lulus), dan nama rombel disesuaikan bila angka tingkatnya tertulis jelas.
+          (siswanya diluluskan otomatis), dan nama rombel disesuaikan bila angka tingkatnya tertulis jelas.
         </div>
       </div>
     </div>
@@ -79,7 +79,8 @@
           </div>
           <div class="col-md-6">
             <label class="form-label text-muted">Kepala Sekolah</label>
-            <input type="text" class="form-control" id="pv-kepala" readonly>
+            <input type="text" name="kepala_sekolah" class="form-control" id="pv-kepala">
+            <small class="text-muted d-block" id="note-kepala"></small>
           </div>
           <div class="col-md-6">
             <label class="form-label text-muted">NIP Kepala Sekolah</label>
@@ -120,14 +121,10 @@
         <h6 class="mb-0">Data yang Disalin</h6>
       </div>
       <div class="card-body">
-        <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" name="salin[]" value="detail"
-            id="salin-detail" checked>
-          <label class="form-check-label" for="salin-detail">
-            Detail Sekolah
-            <small class="text-muted d-block" id="note-detail"></small>
-          </label>
-        </div>
+        <p class="text-muted mb-3">
+          Detail sekolah <strong>selalu disalin</strong> bila semester ini belum memilikinya —
+          nama kepala sekolah wajib diisi pada pratinjau detail di atas.
+        </p>
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" name="salin[]" value="rombel"
             id="salin-rombel" checked>
@@ -190,11 +187,29 @@
       byId('pv-detail-isi').classList.toggle('d-none', !adaDetail);
       if (adaDetail) {
         byId('pv-nama').value = s.detail.nama_sekolah || '-';
-        byId('pv-kepala').value = s.detail.kepala_sekolah || '-';
+        byId('pv-kepala').value = s.detail.kepala_sekolah || '';
         byId('pv-nip').value = s.detail.nip || '-';
         byId('pv-telp').value = s.detail.no_telp || '-';
         byId('pv-alamat').value = s.detail.alamat_sekolah || '-';
         byId('pv-wilayah').value = s.detail.wilayah || '-';
+      }
+
+      // Kepala sekolah: wajib diisi bila detail akan disalin
+      const inputKepala = byId('pv-kepala');
+      const noteKepala = byId('note-kepala');
+      if (!adaDetail) {
+        inputKepala.value = '';
+        inputKepala.disabled = true;
+        inputKepala.required = false;
+        noteKepala.textContent = 'Tidak tersedia di semester sumber.';
+      } else if (statusTarget.hasDetail) {
+        inputKepala.disabled = true;
+        inputKepala.required = false;
+        noteKepala.textContent = 'Detail sekolah sudah ada di semester ini — tidak disalin ulang.';
+      } else {
+        inputKepala.disabled = false;
+        inputKepala.required = true;
+        noteKepala.textContent = 'Wajib diisi — nama kepala sekolah untuk semester ini (sesuaikan bila sudah berganti).';
       }
 
       // Pratinjau rombel
@@ -213,9 +228,6 @@
       byId('info-naik-kelas').classList.toggle('d-none', !s.naik_kelas);
 
       // Ketersediaan checkbox
-      aturCheckbox(byId('salin-detail'), byId('note-detail'),
-        adaDetail, statusTarget.hasDetail,
-        'Tidak tersedia di semester sumber ini.');
       aturCheckbox(byId('salin-rombel'), byId('note-rombel'),
         adaRombel, statusTarget.hasRombel,
         'Tidak tersedia di semester sumber ini.');

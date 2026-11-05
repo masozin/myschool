@@ -47,9 +47,18 @@ class CekDataPeriodik
       $posisiAktif = $semuaSemester->search(
         fn(Semester $s) => (int) $s->id === (int) $semesterId
       );
+      $tahunAktif = $posisiAktif === false
+        ? null
+        : (int) substr((string) $semuaSemester[$posisiAktif]->tahun_pelajaran, 0, 4);
+      // Hanya semester dalam jendela salin (maksimal 1 tahun pelajaran
+      // di bawah semester aktif) yang dihitung sebagai data lama
       $idsSebelumnya = $posisiAktif === false
         ? []
-        : $semuaSemester->slice(0, $posisiAktif)->pluck('id')->all();
+        : $semuaSemester->slice(0, $posisiAktif)
+            ->filter(fn(Semester $s) => $tahunAktif === null
+              || (int) substr((string) $s->tahun_pelajaran, 0, 4) >= $tahunAktif - 1)
+            ->pluck('id')
+            ->all();
 
       $adaDataLama = !empty($idsSebelumnya) && Rombel::where('sekolah_id', $sekolahId)
         ->whereIn('semester_id', $idsSebelumnya)
