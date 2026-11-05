@@ -91,28 +91,6 @@ class ValidasiKelulusan extends Controller
     ]);
   }
 
-  public function validasiSkl1($nisn)
-  {
-    // Cari data SKL berdasarkan NISN siswa dan HANYA yang statusnya 'disetujui'
-    $skl_list = Skl::with(['siswa', 'sekolah.detailTerbaru'])
-      ->whereHas('siswa', function ($query) use ($nisn) {
-        $query->where('nisn', $nisn);
-      })
-      ->where('status', 'disetujui') // KUNCI UTAMA: Hanya yang disetujui
-      ->get();
-
-    if ($skl_list->isEmpty()) {
-      return response()->json([
-        'message' => 'Data SKL tidak ditemukan atau belum disetujui.'
-      ], 404);
-    }
-
-    return response()->json([
-      'jenis' => 'SKL',
-      'data_list' => $skl_list
-    ]);
-  }
-
   // ── Helper: format nilai per kelompok ────────────────────────────────────
   private function formatNilai($skhu): array
   {

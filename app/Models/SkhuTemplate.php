@@ -15,11 +15,6 @@ class SkhuTemplate extends Model
 
   protected $casts = ['is_active' => 'boolean'];
 
-  public function skhus(): HasMany
-  {
-    return $this->hasMany(Skhu::class, 'skhu_templater_id');
-  }
-
   public function getViewNameAttribute(): string
   {
     // Sesuaikan prefix dengan lokasi folder di resources/views/
