@@ -139,6 +139,26 @@
             "Kepala Sekolah"
           ],
           "fitur": "skl"
+        },
+        {
+          "url": "/siswa/kelulusan",
+          "name": "Proses Kelulusan",
+          "slug": "siswa.kelulusan",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        },
+        {
+          "url": "/siswa/alumni",
+          "name": "Alumni",
+          "slug": "siswa.alumni",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Guru",
+            "Kepala Sekolah"
+          ]
         }
       ]
     },
