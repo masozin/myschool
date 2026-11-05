@@ -214,7 +214,7 @@ class SiswaController extends Controller
       'tgl_lahir'      => 'required|date',
       'nik'            => 'nullable|digits:16|unique:tabel_siswa,nik',
       'agama'          => 'required|string',
-      'alamat'         => 'nullable|string',
+      'alamat'         => 'required|string',
       'photo'          => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
 
       // Validasi Tabel Registrasi
@@ -227,7 +227,7 @@ class SiswaController extends Controller
       'jenis_pendaftaran' => 'required|in:Baru,Pindahan',
       'tingkat'           => 'required|integer',
       'tanggal_diterima'  => 'required|date',
-      'status_registrasi' => 'nullable|in:aktif,mutasi,lulus,meninggal',
+      'status_registrasi' => 'nullable|in:aktif,mutasi,lulus,keluar,meninggal',
     ]);
 
     $photoPath = null;
@@ -373,7 +373,7 @@ class SiswaController extends Controller
       'tgl_lahir'     => 'required|date',
       'nik'           => 'nullable|digits:16|unique:tabel_siswa,nik,' . $id,
       'agama'         => 'required|string',
-      'alamat'        => 'nullable|string',
+      'alamat'        => 'required|string',
 
       // Data Ortu
       'nama_ayah'     => 'required|string',
