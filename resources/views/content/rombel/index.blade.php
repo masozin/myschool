@@ -610,15 +610,17 @@
               render: (d, t, r, m) => m.row + 1
             },
             {
-              // Avatar + Nama (keduanya link ke detail siswa)
-              data: 'siswa',
-              render: d => renderSiswaCell(d.nama_siswa, d.id)
+              // Avatar + Nama (keduanya link ke detail siswa).
+              // Data kolom berupa string nama — bukan objek siswa —
+              // supaya pengurutan dan pencarian bekerja pada namanya
+              data: 'siswa.nama_siswa',
+              render: (nama, t, row) => renderSiswaCell(nama, row.siswa.id)
             },
             {
               // NIS / NISN
-              data: 'siswa',
-              render: d =>
-                `<small class="text-muted">${d.nisn || '-'} / ${d.nis || '-'}</small>`
+              data: 'siswa.nisn',
+              render: (nisn, t, row) =>
+                `<small class="text-muted">${nisn || '-'} / ${row.siswa.nis || '-'}</small>`
             },
             {
               // Jenis Kelamin

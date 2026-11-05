@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use App\Models\RombelAnggota;
+use App\Models\Semester;
 
 class RombelController extends Controller
 {
@@ -62,18 +63,27 @@ class RombelController extends Controller
       return response()->json(['data' => [], 'statistik_tingkat' => []]);
     }
 
+    // Di semester aktif, hitungan anggota hanya mencakup siswa
+    // berregistrasi aktif — yang sudah keluar/lulus tidak dihitung
+    // sebagai anggota berjalan. Semester lampau dihitung apa
+    // adanya sebagai catatan historis.
+    $semesterAktifId = Semester::where('is_active', true)->value('id');
+    $hanyaAktif = $semesterAktifId && (int) $semesterId === (int) $semesterAktifId;
+    $saringAktif = fn($q) => $q->when($hanyaAktif, fn($q2) => $q2->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')));
+
     $rombel = Rombel::with(['ptk', 'semester', 'kurikulum'])
       ->where('semester_id', $semesterId)
       ->where('sekolah_id', $sekolahId)
-      ->withCount('rombelAnggota as jumlah_siswa')
-      ->withCount(['rombelAnggota as jumlah_l' => fn($q) => $q
+      ->withCount(['rombelAnggota as jumlah_siswa' => $saringAktif])
+      ->withCount(['rombelAnggota as jumlah_l' => fn($q) => $saringAktif($q)
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'L'))])
-      ->withCount(['rombelAnggota as jumlah_p' => fn($q) => $q
+      ->withCount(['rombelAnggota as jumlah_p' => fn($q) => $saringAktif($q)
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'P'))])
       ->get();
 
     // Breakdown gender per tingkat (untuk chart)
     $anggotaAktif = RombelAnggota::with(['siswa:id,jenis_kelamin', 'rombel:id,tingkat,sekolah_id,semester_id'])
+      ->when($hanyaAktif, fn($q) => $q->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')))
       ->whereHas('rombel', fn($q) => $q->where('sekolah_id', $sekolahId)->where('semester_id', $semesterId))
       ->get();
 

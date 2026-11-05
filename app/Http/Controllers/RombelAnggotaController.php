@@ -26,8 +26,15 @@ class RombelAnggotaController extends Controller
     // Satu baris keanggotaan berlaku untuk semester pada baris itu
     // sendiri: daftar anggota rombel adalah seluruh barisnya, sama
     // untuk semester aktif maupun semester lampau
+    // Di semester aktif, daftar anggota adalah daftar rombel yang
+    // sedang berjalan: siswa yang registrasinya sudah ditutup
+    // (keluar/mutasi/lulus/meninggal) tidak ditampilkan lagi, sama
+    // seperti di daftar siswa — baris keanggotaannya tetap
+    // tersimpan sebagai catatan semester itu. Di semester lampau
+    // daftarnya adalah daftar historis apa adanya.
     $anggota = RombelAnggota::with('siswa.registrasiTerbaru')
       ->where('rombel_id', $rombel_id)
+      ->when($rombel->semester?->is_active, fn($q) => $q->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')))
       ->get()
       ->map(function ($item) {
         return [
@@ -36,7 +43,7 @@ class RombelAnggotaController extends Controller
             'id'           => $item->siswa->id,
             'nama_siswa'   => $item->siswa->nama_siswa,
             'jenis_kelamin' => $item->siswa->jenis_kelamin,
-            'nisn'         => $item->siswa->registrasiTerbaru->nisn ?? '-',
+            'nisn'         => $item->siswa->nisn ?: '-',
             'nis'          => $item->siswa->registrasiTerbaru->nis  ?? '-',
           ],
         ];

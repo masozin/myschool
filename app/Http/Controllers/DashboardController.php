@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\RombelAnggota;
+use App\Models\Semester;
 
 class DashboardController extends Controller
 {
@@ -81,7 +82,9 @@ class DashboardController extends Controller
         $data['logo']            = $sekolah->aset('logo');
 
         // Statistik penyebaran gender
+        $semesterAktifId = Semester::where('is_active', true)->value('id');
         $anggotaAktif = RombelAnggota::with(['siswa:id,jenis_kelamin', 'rombel:id,tingkat,sekolah_id,semester_id'])
+          ->when($semesterAktifId && (int) $semesterId === (int) $semesterAktifId, fn($q) => $q->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')))
           ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId) {
             $q->where('sekolah_id', $sekolahId)
               ->when($semesterId, fn($qq) => $qq->where('semester_id', $semesterId));

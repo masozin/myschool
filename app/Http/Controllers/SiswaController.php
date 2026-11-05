@@ -723,7 +723,9 @@ class SiswaController extends Controller
 
     $agamaList = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya'];
 
+    $semesterAktifId = Semester::where('is_active', true)->value('id');
     $anggota = RombelAnggota::with(['siswa:id,agama', 'rombel:id,tingkat,sekolah_id,semester_id'])
+      ->when($semesterAktifId && (int) $semesterId === (int) $semesterAktifId, fn($q) => $q->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')))
       ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId) {
         $q->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId))
           ->when($semesterId, fn($qq) => $qq->where('semester_id', $semesterId));
