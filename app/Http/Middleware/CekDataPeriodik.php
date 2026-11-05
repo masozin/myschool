@@ -48,6 +48,17 @@ class CekDataPeriodik
         return $next($request);
       }
 
+      // Tidak ada data lama sama sekali yang bisa disalin (detail maupun
+      // rombel kosong di semua semester lain): jangan jebak operator di
+      // halaman salin — biarkan ia mengisi data secara manual.
+      $adaDetailLama = SekolahDetail::where('sekolah_id', $sekolahId)
+        ->where('semester_id', '!=', $semesterId)
+        ->exists();
+
+      if (!$adaDataLama && !$adaDetailLama) {
+        return $next($request);
+      }
+
       if ($user->hasRole('Operator Sekolah')) {
         return redirect()->route('periodic.copy-form');
       }
