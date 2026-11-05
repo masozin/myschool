@@ -813,7 +813,7 @@ class SklController extends Controller
           ->where('semester_id', $semester->id)
           ->where('tingkat', $tingkatAkhir)
       )
-      ->whereNull('end_date')
+      ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->get()
       ->sortBy('siswa.nama_siswa');
 

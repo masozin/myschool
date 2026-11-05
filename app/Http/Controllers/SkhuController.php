@@ -86,7 +86,7 @@ class SkhuController extends Controller
       },
       'rombel',
     ])
-      ->whereNull('end_date')
+      ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId, $tingkatAkhir) {
         $q->where('sekolah_id', $sekolahId)
           ->where('semester_id', $semesterId)
@@ -138,7 +138,7 @@ class SkhuController extends Controller
 
     // Validasi siswa memang berada di kelas akhir sekolah ini
     $anggota = RombelAnggota::with(['siswa.registrasiTerbaru', 'rombel'])
-      ->whereNull('end_date')
+      ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->whereHas('rombel', function ($q) use ($sekolah, $semester, $jenjang) {
         $q->where('sekolah_id', $sekolah->id)
           ->where('semester_id', $semester->id)
@@ -530,7 +530,7 @@ class SkhuController extends Controller
           ->where('semester_id', $semester->id)
           ->where('tingkat', $tingkatAkhir)
       )
-      ->whereNull('end_date')
+      ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->get()
       ->sortBy('siswa.nama_siswa');
 

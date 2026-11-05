@@ -82,7 +82,6 @@ class DashboardController extends Controller
 
         // Statistik penyebaran gender
         $anggotaAktif = RombelAnggota::with(['siswa:id,jenis_kelamin', 'rombel:id,tingkat,sekolah_id,semester_id'])
-          ->whereNull('end_date')
           ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId) {
             $q->where('sekolah_id', $sekolahId)
               ->when($semesterId, fn($qq) => $qq->where('semester_id', $semesterId));

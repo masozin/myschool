@@ -64,7 +64,6 @@ class SiswaExport extends DefaultValueBinder implements
       },
       'rombelAnggota' => function ($q) {
         $q->where('semester_id', $this->semesterId)
-          ->whereNull('end_date')
           ->with('rombel');
       }
     ])->whereHas('siswaRegistrasi');
@@ -77,11 +76,11 @@ class SiswaExport extends DefaultValueBinder implements
 
     if ($this->rombelId === 'Tanpa Rombel') {
       $query->whereDoesntHave('rombelAnggota', function ($q) {
-        $q->where('semester_id', $this->semesterId)->whereNull('end_date');
+        $q->where('semester_id', $this->semesterId);
       });
     } elseif ($this->rombelId) {
       $query->whereHas('rombelAnggota', function ($q) {
-        $q->where('rombel_id', $this->rombelId)->whereNull('end_date');
+        $q->where('rombel_id', $this->rombelId);
       });
     }
 
