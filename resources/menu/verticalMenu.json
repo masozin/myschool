@@ -141,18 +141,20 @@
           "fitur": "skl"
         },
         {
-          "url": "/siswa/kelulusan",
-          "name": "Proses Kelulusan",
-          "slug": "siswa.kelulusan",
-          "roles": [
-            "Admin",
-            "Operator Sekolah"
-          ]
-        },
-        {
           "url": "/siswa/alumni",
           "name": "Alumni",
           "slug": "siswa.alumni",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Guru",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/siswa/keluar",
+          "name": "Siswa Keluar",
+          "slug": "siswa.keluar",
           "roles": [
             "Admin",
             "Operator Sekolah",
