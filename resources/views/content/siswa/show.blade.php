@@ -275,14 +275,12 @@
                 <th>Rombel</th>
                 <th class="text-center">Tingkat</th>
                 <th>Semester</th>
-                <th>Masuk</th>
-                <th>Keluar</th>
                 <th class="text-center">Status</th>
               </tr>
             </thead>
             <tbody id="tbody-riwayat-rombel">
               <tr>
-                <td colspan="7" class="text-center py-3 text-muted">
+                <td colspan="5" class="text-center py-3 text-muted">
                   <span class="spinner-border spinner-border-sm me-2"></span> Memuat riwayat...
                 </td>
               </tr>
@@ -316,7 +314,7 @@
           if (!riwayat.length) {
             tbody.innerHTML = `
               <tr>
-                <td colspan="7" class="text-center py-3 text-muted">
+                <td colspan="5" class="text-center py-3 text-muted">
                   <i class="ri ri-inbox-line me-1"></i> Belum pernah terdaftar di rombel manapun.
                 </td>
               </tr>`;
@@ -326,29 +324,12 @@
           tbody.innerHTML = riwayat.map((item, i) => {
             const isAktif = item.status === 'Aktif';
             const badgeClass = isAktif ? 'bg-label-success' : 'bg-label-secondary';
-            const masuk = item.start_date ?
-              new Date(item.start_date).toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              }) :
-              '-';
-            const keluar = item.end_date ?
-              new Date(item.end_date).toLocaleDateString('id-ID', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              }) :
-              '-';
-
             return `
               <tr>
                 <td class="text-center">${i + 1}</td>
                 <td class="fw-medium">${item.rombel}</td>
                 <td class="text-center">${item.tingkat}</td>
                 <td><small>${item.semester}</small></td>
-                <td><small>${masuk}</small></td>
-                <td><small>${keluar}</small></td>
                 <td class="text-center">
                   <span class="badge ${badgeClass}">${item.status}</span>
                 </td>
@@ -358,7 +339,7 @@
         .catch(err => {
           document.getElementById('tbody-riwayat-rombel').innerHTML = `
             <tr>
-              <td colspan="7" class="text-center py-3 text-danger">
+              <td colspan="5" class="text-center py-3 text-danger">
                 <i class="ri ri-error-warning-line me-1"></i> Gagal memuat riwayat rombel.
               </td>
             </tr>`;
