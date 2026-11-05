@@ -23,7 +23,6 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     'tempat_lahir',
     'tgl_lahir',
     'agama',
-    'nama_ayah',
     'nama_ibu',
     'nis',
     'jenis_pendaftaran',
@@ -140,6 +139,8 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     $errors = [];
     $val    = fn($key) => trim((string)($row[$key] ?? ''));
 
+    // nama_ayah sengaja TIDAK wajib diisi: boleh kosong (kolom database
+    // memang nullable), misalnya bila nama ayah tidak diketahui.
     $wajib = [
       'nama_siswa'        => 'Nama Siswa',
       'nisn'              => 'NISN',
@@ -147,7 +148,6 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
       'tempat_lahir'      => 'Tempat Lahir',
       'tgl_lahir'         => 'Tanggal Lahir',
       'agama'             => 'Agama',
-      'nama_ayah'         => 'Nama Ayah',
       'nama_ibu'          => 'Nama Ibu',
       'nis'               => 'NIS',
       'jenis_pendaftaran' => 'Jenis Pendaftaran',
