@@ -137,7 +137,16 @@ class MapelMasterController extends Controller
       return response()->json(['message' => 'Akses ditolak.'], 403);
     }
 
+    // Master yang masih dipakai mapping tidak boleh dihapus: mapping-nya
+    // akan yatim dan nama mapel pada dokumen/nilai tampil kosong.
+    if ($mapelMaster->mapelMapping()->exists()) {
+      return response()->json([
+        'message' => 'Mapel ini masih digunakan pada mapping. Hapus mapping-nya terlebih dahulu.'
+      ], 422);
+    }
+
     $mapelMaster->mapelJenjang()->delete();
+    $mapelMaster->kurikulum()->detach();
     $mapelMaster->delete();
 
     return response()->json(['message' => 'Mata pelajaran berhasil dihapus.']);

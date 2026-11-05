@@ -68,7 +68,7 @@ class MapelMaster extends Model
       ->whereHas('mapelJenjang', function ($q) use ($jenjang) {
         $q->where('jenjang', $jenjang);
       })
-      ->when(auth()->user()->hasRole('Operator Sekolah'), function ($q) {
+      ->when(auth()->user()?->hasRole('Operator Sekolah'), function ($q) {
         $sekolahId = auth()->user()->ptk->sekolah_id ?? null;
         if ($sekolahId) {
           $q->where(function ($sub) use ($sekolahId) {
