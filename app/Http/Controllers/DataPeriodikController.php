@@ -23,7 +23,7 @@ class DataPeriodikController extends Controller
     $user = Auth::user();
 
     if (!$user->ptk) {
-      return redirect()->route('dashboard')
+      return redirect()->route('home')
         ->with('error', 'Halaman salin data periodik hanya untuk akun yang terhubung ke PTK (operator sekolah).');
     }
 
@@ -209,6 +209,9 @@ class DataPeriodikController extends Controller
           // Keanggotaan di semester baru berlaku sejak semester itu mulai
           $startDate = $semesterTarget?->tanggal_mulai?->format('Y-m-d')
             ?? now()->toDateString();
+          // Keanggotaan lama ditutup di akhir semester sumber
+          $endDateSumber = Semester::find($semesterLalu)?->tanggal_selesai?->format('Y-m-d')
+            ?? $startDate;
           $tersalin = 0;
           $dilewati = 0;
 
@@ -235,6 +238,14 @@ class DataPeriodikController extends Controller
                 'start_date'  => $startDate,
                 'end_date'    => null,
               ]);
+
+              // Tutup keanggotaan di semester sumber supaya riwayat siswa
+              // tidak menampilkan dua keanggotaan berstatus Aktif sekaligus
+              $anggota->update([
+                'end_date' => $endDateSumber < $anggota->start_date
+                  ? $anggota->start_date
+                  : $endDateSumber,
+              ]);
               $tersalin++;
             }
           }
@@ -249,20 +260,22 @@ class DataPeriodikController extends Controller
       }
 
       DB::commit();
-
-      if (empty($hasil)) {
-        return back()->with('error', 'Tidak ada data yang disalin. ' . implode('; ', $catatan) . '.');
-      }
-
-      $pesan = 'Data berhasil disalin ke semester ini: ' . implode(', ', $hasil) . '.';
-      if (!empty($catatan)) {
-        $pesan .= ' Catatan: ' . implode('; ', $catatan) . '.';
-      }
-
-      return redirect()->route('dashboard')->with('success', $pesan);
     } catch (\Exception $e) {
       DB::rollBack();
       return back()->with('error', 'Gagal menyalin data: ' . $e->getMessage());
     }
+
+    // Redirect dilakukan di luar try/catch: kegagalan menyusun redirect
+    // tidak boleh dilaporkan seolah-olah penyalinan datanya yang gagal.
+    if (empty($hasil)) {
+      return back()->with('error', 'Tidak ada data yang disalin. ' . implode('; ', $catatan) . '.');
+    }
+
+    $pesan = 'Data berhasil disalin ke semester ini: ' . implode(', ', $hasil) . '.';
+    if (!empty($catatan)) {
+      $pesan .= ' Catatan: ' . implode('; ', $catatan) . '.';
+    }
+
+    return redirect()->route('home')->with('success', $pesan);
   }
 }
