@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\RombelAnggota;
 use App\Models\Sekolah;
+use App\Models\Siswa;
+use App\Models\SiswaRegistrasi;
 use App\Models\SekolahDetail;
 use App\Models\Rombel;
 use App\Models\Semester;
@@ -69,6 +71,13 @@ class DataPeriodikController extends Controller
         continue;
       }
 
+      // Jendela sumber: maksimal 1 tahun pelajaran di bawah semester
+      // aktif — tahun pelajaran yang sama atau sebelumnya persis
+      if ($tahunAktif !== null
+        && (int) substr((string) $smt->tahun_pelajaran, 0, 4) < $tahunAktif - 1) {
+        continue;
+      }
+
       $detail = SekolahDetail::with(['province', 'regency', 'district', 'village'])
         ->where('sekolah_id', $sekolahId)
         ->where('semester_id', $smt->id)
@@ -84,13 +93,16 @@ class DataPeriodikController extends Controller
         continue;
       }
 
-      $naikKelas = $tahunAktif !== null
-        && (int) substr((string) $smt->tahun_pelajaran, 0, 4) < $tahunAktif;
+      $selisih = $tahunAktif !== null
+        ? $tahunAktif - (int) substr((string) $smt->tahun_pelajaran, 0, 4)
+        : 0;
+      $naikKelas = $selisih > 0;
 
       $sumber[] = [
         'id'     => $smt->id,
         'label'  => $smt->tahun_pelajaran . ' — Semester ' . $smt->semester,
         'naik_kelas' => $naikKelas,
+        'selisih' => $selisih,
         'detail' => $detail ? [
           'nama_sekolah'   => $detail->nama_sekolah,
           'kepala_sekolah' => $detail->kepala_sekolah,
@@ -104,14 +116,15 @@ class DataPeriodikController extends Controller
             $detail->province?->name,
           ])->filter()->implode(', '),
         ] : null,
-        'rombel' => $rombels->map(function ($r) use ($naikKelas, $tingkatAkhir) {
-          $lulus = $naikKelas && $tingkatAkhir && (int) $r->tingkat >= $tingkatAkhir;
+        'rombel' => $rombels->map(function ($r) use ($naikKelas, $selisih, $tingkatAkhir) {
+          $lulus = $naikKelas && $tingkatAkhir
+            && (int) $r->tingkat + $selisih > $tingkatAkhir;
           return [
             'nama_rombel'    => $r->nama_rombel,
             'tingkat'        => $r->tingkat,
-            'tingkat_baru'   => $naikKelas && !$lulus ? (int) $r->tingkat + 1 : (int) $r->tingkat,
+            'tingkat_baru'   => $naikKelas && !$lulus ? (int) $r->tingkat + $selisih : (int) $r->tingkat,
             'nama_baru'      => $naikKelas && !$lulus
-              ? $this->namaNaikKelas($r->nama_rombel, (int) $r->tingkat)
+              ? $this->namaNaikKelas($r->nama_rombel, (int) $r->tingkat, $selisih)
               : $r->nama_rombel,
             'lulus'          => (bool) $lulus,
             'jumlah_anggota' => $r->rombelAnggota()->whereNull('end_date')->count(),
@@ -148,10 +161,8 @@ class DataPeriodikController extends Controller
   {
     $request->validate([
       'semester_asal' => 'required|exists:tabel_semester,id',
-      'salin'         => 'required|array|min:1',
-      'salin.*'       => 'in:detail,rombel,anggota',
-    ], [
-      'salin.required' => 'Pilih minimal satu data yang akan disalin.',
+      'salin'         => 'nullable|array',
+      'salin.*'       => 'in:rombel,anggota',
     ]);
 
     $user = Auth::user();
@@ -186,30 +197,55 @@ class DataPeriodikController extends Controller
       return back()->with('error', 'Semester asal harus sebelum semester aktif. Semester yang sama dengan atau sesudah semester aktif tidak bisa dijadikan sumber salin.');
     }
 
+    // Jendela sumber yang sama seperti di form: maksimal 1 tahun
+    // pelajaran di bawah semester aktif
+    $selisih = $semesterAsal && $semesterTarget
+      ? (int) substr((string) $semesterTarget->tahun_pelajaran, 0, 4)
+        - (int) substr((string) $semesterAsal->tahun_pelajaran, 0, 4)
+      : 0;
+    if ($selisih > 1) {
+      return back()->with('error', 'Semester asal terlalu jauh: yang bisa disalin maksimal 1 tahun pelajaran di bawah semester aktif.');
+    }
+
+    // Nama kepala sekolah wajib diisi bila detail sekolah akan disalin
+    if (!$status['hasDetail']) {
+      $adaDetailSumber = SekolahDetail::where('sekolah_id', $sekolahId)
+        ->where('semester_id', $semesterLalu)
+        ->exists();
+      if ($adaDetailSumber) {
+        $request->validate([
+          'kepala_sekolah' => 'required|string|max:255',
+        ], [
+          'kepala_sekolah.required' => 'Nama kepala sekolah wajib diisi untuk detail sekolah semester ini.',
+        ]);
+      }
+    }
+
     DB::beginTransaction();
     try {
       $hasil   = [];
       $catatan = [];
 
-      // ── Detail sekolah ──────────────────────────────────────────────
-      if (in_array('detail', $pilihan)) {
-        if ($status['hasDetail']) {
-          $catatan[] = 'detail sekolah sudah ada di semester ini';
-        } else {
-          $oldDetail = SekolahDetail::where('sekolah_id', $sekolahId)
-            ->where('semester_id', $semesterLalu)
-            ->first();
+      // ── Detail sekolah: selalu disalin bila tujuan belum punya ────
+      if ($status['hasDetail']) {
+        $catatan[] = 'detail sekolah sudah ada di semester ini';
+      } else {
+        $oldDetail = SekolahDetail::where('sekolah_id', $sekolahId)
+          ->where('semester_id', $semesterLalu)
+          ->first();
 
-          if (!$oldDetail) {
-            $catatan[] = 'detail sekolah tidak ditemukan di semester asal';
-          } else {
-            $data = $oldDetail->toArray();
-            unset($data['id'], $data['created_at'], $data['updated_at']);
-            $data['sekolah_id']  = $sekolahId;
-            $data['semester_id'] = $semesterSekarang;
-            SekolahDetail::create($data);
-            $hasil[] = 'detail sekolah';
-          }
+        if (!$oldDetail) {
+          $catatan[] = 'detail sekolah tidak ditemukan di semester asal';
+        } else {
+          $data = $oldDetail->toArray();
+          unset($data['id'], $data['created_at'], $data['updated_at']);
+          $data['sekolah_id']  = $sekolahId;
+          $data['semester_id'] = $semesterSekarang;
+          // Nama kepala sekolah mengikuti isian form (wajib diisi di form)
+          $data['kepala_sekolah'] = $request->input('kepala_sekolah')
+            ?: $oldDetail->kepala_sekolah;
+          SekolahDetail::create($data);
+          $hasil[] = 'detail sekolah';
         }
       }
 
@@ -227,17 +263,14 @@ class DataPeriodikController extends Controller
           if ($oldRombels->isEmpty()) {
             $catatan[] = 'rombel tidak ditemukan di semester asal';
           } else {
-            // Mode naik kelas: tahun pelajaran sumber lebih lama dari
-            // tahun pelajaran semester aktif (mis. menyalin dari Genap
-            // 2023/2024 ke Ganjil 2024/2025)
-            $naikKelas = $semesterAsal && $semesterTarget
-              && (int) substr((string) $semesterAsal->tahun_pelajaran, 0, 4)
-                 < (int) substr((string) $semesterTarget->tahun_pelajaran, 0, 4);
+            // Mode naik kelas: tingkat naik sesuai selisih tahun
+            // pelajaran sumber ke tujuan (di sini 0 atau 1)
+            $naikKelas = $selisih > 0;
             $tingkatAkhirSumber = $naikKelas ? $this->tingkatAkhirSekolah($sekolahId) : null;
             $namaTakBerubah = [];
 
             foreach ($oldRombels as $rombel) {
-              if ($naikKelas && $tingkatAkhirSumber && (int) $rombel->tingkat >= $tingkatAkhirSumber) {
+              if ($naikKelas && $tingkatAkhirSumber && (int) $rombel->tingkat + $selisih > $tingkatAkhirSumber) {
                 // Rombel tingkat akhir tidak disalin: siswanya lulus
                 $rombelLulus[] = $rombel->id;
                 continue;
@@ -249,8 +282,8 @@ class DataPeriodikController extends Controller
               $data['semester_id'] = $semesterSekarang;
 
               if ($naikKelas) {
-                $data['tingkat']     = (int) $rombel->tingkat + 1;
-                $data['nama_rombel'] = $this->namaNaikKelas($rombel->nama_rombel, (int) $rombel->tingkat);
+                $data['tingkat']     = (int) $rombel->tingkat + $selisih;
+                $data['nama_rombel'] = $this->namaNaikKelas($rombel->nama_rombel, (int) $rombel->tingkat, $selisih);
                 if ($data['nama_rombel'] === $rombel->nama_rombel) {
                   $namaTakBerubah[] = $rombel->nama_rombel;
                 }
@@ -261,7 +294,7 @@ class DataPeriodikController extends Controller
             }
 
             if (!empty($petaRombel)) {
-              $hasil[] = count($petaRombel) . ' rombel' . ($naikKelas ? ' (naik satu tingkat)' : '');
+              $hasil[] = count($petaRombel) . ' rombel' . ($naikKelas ? ' (naik ' . $selisih . ' tingkat)' : '');
             }
             if (!empty($rombelLulus)) {
               $catatan[] = count($rombelLulus) . ' rombel tingkat akhir tidak disalin (siswa lulus)';
@@ -285,30 +318,8 @@ class DataPeriodikController extends Controller
         $endDateSumber = Semester::find($semesterLalu)?->tanggal_selesai?->format('Y-m-d')
           ?? $startDate;
 
-        // Anggota rombel tingkat akhir yang tidak disalin (mode naik
-        // kelas): keanggotaannya ditutup sebagai lulus
-        $anggotaLulus = 0;
-        if (!empty($rombelLulus)) {
-          $anggotaKelasAkhir = RombelAnggota::whereIn('rombel_id', $rombelLulus)
-            ->whereNull('end_date')
-            ->get();
-          foreach ($anggotaKelasAkhir as $anggotaAkhir) {
-            $anggotaAkhir->update([
-              'end_date' => $endDateSumber < $anggotaAkhir->start_date
-                ? $anggotaAkhir->start_date
-                : $endDateSumber,
-            ]);
-            $anggotaLulus++;
-          }
-          if ($anggotaLulus) {
-            $catatan[] = $anggotaLulus . ' anggota kelas akhir ditutup keanggotaannya (lulus)';
-          }
-        }
-
         if (empty($petaRombel)) {
-          if (!$anggotaLulus) {
-            $catatan[] = 'anggota tidak disalin karena rombel tidak tersalin';
-          }
+          $catatan[] = 'anggota tidak disalin karena rombel tidak tersalin';
         } else {
           $tersalin = 0;
           $dilewati = 0;
@@ -357,6 +368,64 @@ class DataPeriodikController extends Controller
         }
       }
 
+      // ── Kelulusan otomatis kelas akhir ────────────────────────────
+      // Berjalan bersama penyalinan rombel pada salin lintas tahun
+      // pelajaran — tidak tergantung centang anggota rombel. Siswa di
+      // rombel sumber yang tingkatnya melewati tingkat akhir setelah
+      // kenaikan diluluskan penuh seperti jalur registrasi(): registrasi
+      // ditutup sebagai lulus per akhir semester sumber, status siswa
+      // disinkronkan, keanggotaan aktif ditutup.
+      if ($selisih >= 1 && in_array('rombel', $pilihan)) {
+        $tingkatAkhirLulus = $this->tingkatAkhirSekolah($sekolahId);
+
+        if ($tingkatAkhirLulus) {
+          $tanggalLulus = $semesterAsal?->tanggal_selesai?->format('Y-m-d')
+            ?? now()->toDateString();
+
+          $calonLulus = RombelAnggota::where('semester_id', $semesterLalu)
+            ->whereNull('end_date')
+            ->whereHas('rombel', fn($q) => $q
+              ->where('sekolah_id', $sekolahId)
+              ->where('tingkat', '>', $tingkatAkhirLulus - $selisih))
+            ->pluck('siswa_id')
+            ->unique();
+
+          $jumlahLulus = 0;
+          foreach ($calonLulus as $siswaId) {
+            $registrasi = SiswaRegistrasi::where('siswa_id', $siswaId)
+              ->where('sekolah_id', $sekolahId)
+              ->where('status', 'aktif')
+              ->latest('id')
+              ->first();
+
+            if (!$registrasi) {
+              continue;
+            }
+
+            $registrasi->update([
+              'status'         => 'lulus',
+              'tanggal_keluar' => $tanggalLulus,
+              'alasan'         => 'Lulus otomatis saat salin data periodik',
+            ]);
+
+            Siswa::where('id', $siswaId)->update(['status' => 'lulus']);
+
+            RombelAnggota::where('siswa_id', $siswaId)
+              ->whereNull('end_date')
+              ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $tanggalLulus))
+              ->update(['end_date' => $tanggalLulus]);
+
+            $jumlahLulus++;
+          }
+
+          if ($jumlahLulus) {
+            $hasil[] = $jumlahLulus . ' siswa kelas akhir diluluskan otomatis';
+          }
+        } else {
+          $catatan[] = 'kelulusan otomatis dilewati: tingkat akhir jenjang ini tidak dikenal';
+        }
+      }
+
       DB::commit();
     } catch (\Exception $e) {
       DB::rollBack();
@@ -397,11 +466,11 @@ class DataPeriodikController extends Controller
    * "1.A" -> "2.A", "Kelas 10" -> "Kelas 11". Nama tanpa angka
    * tingkat yang jelas dikembalikan apa adanya.
    */
-  private function namaNaikKelas(string $nama, int $tingkatLama): string
+  private function namaNaikKelas(string $nama, int $tingkatLama, int $selisih = 1): string
   {
     $hasil = preg_replace(
       '/(?<!\d)' . $tingkatLama . '(?!\d)/',
-      (string) ($tingkatLama + 1),
+      (string) ($tingkatLama + $selisih),
       $nama,
       1
     );
