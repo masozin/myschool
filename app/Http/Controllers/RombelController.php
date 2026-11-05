@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use App\Models\RombelAnggota;
-use App\Models\Semester;
 
 class RombelController extends Controller
 {
