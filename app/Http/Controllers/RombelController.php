@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use App\Models\RombelAnggota;
+use App\Models\Semester;
 
 class RombelController extends Controller
 {
@@ -62,19 +63,26 @@ class RombelController extends Controller
       return response()->json(['data' => [], 'statistik_tingkat' => []]);
     }
 
+    // Semester lampau dibaca sebagai riwayat: hitungan anggota
+    // mencakup semua yang pernah tergabung di rombel itu, bukan
+    // hanya yang end_date-nya masih kosong (di semester lampau
+    // end_date semua anggota memang sudah ditutup kenaikan kelas)
+    $semesterAktifId = Semester::where('is_active', true)->value('id');
+    $riwayat = $semesterAktifId && (int) $semesterId !== (int) $semesterAktifId;
+
     $rombel = Rombel::with(['ptk', 'semester', 'kurikulum'])
       ->where('semester_id', $semesterId)
       ->where('sekolah_id', $sekolahId)
-      ->withCount(['rombelAnggota as jumlah_siswa' => fn($q) => $q->whereNull('end_date')])
-      ->withCount(['rombelAnggota as jumlah_l' => fn($q) => $q->whereNull('end_date')
+      ->withCount(['rombelAnggota as jumlah_siswa' => fn($q) => $q->when(!$riwayat, fn($q2) => $q2->whereNull('end_date'))])
+      ->withCount(['rombelAnggota as jumlah_l' => fn($q) => $q->when(!$riwayat, fn($q2) => $q2->whereNull('end_date'))
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'L'))])
-      ->withCount(['rombelAnggota as jumlah_p' => fn($q) => $q->whereNull('end_date')
+      ->withCount(['rombelAnggota as jumlah_p' => fn($q) => $q->when(!$riwayat, fn($q2) => $q2->whereNull('end_date'))
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'P'))])
       ->get();
 
     // Breakdown gender per tingkat (untuk chart)
     $anggotaAktif = RombelAnggota::with(['siswa:id,jenis_kelamin', 'rombel:id,tingkat,sekolah_id,semester_id'])
-      ->whereNull('end_date')
+      ->when(!$riwayat, fn($q) => $q->whereNull('end_date'))
       ->whereHas('rombel', fn($q) => $q->where('sekolah_id', $sekolahId)->where('semester_id', $semesterId))
       ->get();
 

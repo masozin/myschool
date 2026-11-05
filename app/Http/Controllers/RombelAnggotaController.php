@@ -23,14 +23,25 @@ class RombelAnggotaController extends Controller
     $rombel = Rombel::with(['semester', 'ptk'])->findOrFail($rombel_id);
     $this->authorize('view', $rombel);
 
-    $anggota = RombelAnggota::with('siswa.registrasiTerbaru') // ← ganti ini
+    // Di semester aktif, daftar anggota hanya yang masih berjalan
+    // (end_date kosong). Di semester lampau, seluruh anggota rombel
+    // adalah daftar historisnya — end_date mereka memang sudah
+    // ditutup oleh proses kenaikan kelas, jadi menyaring end_date
+    // kosong akan mengosongkan daftar.
+    $semesterAktifId = Semester::where('is_active', true)->value('id');
+    $riwayat = $semesterAktifId
+      && (int) $rombel->semester_id !== (int) $semesterAktifId;
+
+    $anggota = RombelAnggota::with('siswa.registrasiTerbaru')
       ->where('rombel_id', $rombel_id)
-      ->whereNull('end_date')
+      ->when(!$riwayat, fn($q) => $q->whereNull('end_date'))
       ->get()
-      ->map(function ($item) {                              // ← tambah map
+      ->map(function ($item) {
         return [
           'id'         => $item->id,
           'start_date' => $item->start_date,
+          'end_date'   => $item->end_date,
+          'status'     => $item->end_date ? 'Selesai' : 'Aktif',
           'siswa'      => [
             'id'           => $item->siswa->id,
             'nama_siswa'   => $item->siswa->nama_siswa,
