@@ -6,11 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Scopes\SekolahScope;
 
 class Rombel extends Model
 {
-  use HasFactory;
+  use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_rombel';
   protected $fillable = ['nama_rombel', 'tingkat', 'kurikulum_id', 'semester_id', 'ptk_id', 'sekolah_id'];

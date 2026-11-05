@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Kurikulum;
 use App\Models\Ptk;
 use App\Models\Rombel;
+use App\Models\Sekolah;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,21 +15,52 @@ use App\Models\RombelAnggota;
 
 class RombelController extends Controller
 {
-  public function index()
+  public function index(Request $request)
   {
-    $ptks    = Ptk::where('sekolah_id', Auth::user()->ptk->sekolah_id)
+    $sekolahId = $this->getSekolahId($request);
+
+    if (!$sekolahId) {
+      // Admin belum memilih sekolah (atau akun belum terhubung ke PTK):
+      // arahkan memilih sekolah dulu, jangan sampai error membaca PTK null.
+      return redirect()->route('sekolah.index')
+        ->with('error', 'Pilih sekolah terlebih dahulu untuk mengelola rombelnya.');
+    }
+
+    $sekolah   = Sekolah::findOrFail($sekolahId);
+    $ptks      = Ptk::where('sekolah_id', $sekolahId)
       ->where('jabatan', 'Guru')
       ->get();
-    $sekolah = Auth::user()->ptk->sekolah;
     $kurikulum = Kurikulum::all();
 
     return view('content.rombel.index', compact('ptks', 'sekolah', 'kurikulum'));
   }
 
-  public function tabel()
+  /**
+   * Tentukan konteks sekolah untuk request ini.
+   * - Admin: dari parameter sekolah_id (form rombel memang mengirimkannya).
+   * - Role lain: dari record PTK yang terhubung ke akun.
+   * Mengembalikan null bila konteks tidak dapat ditentukan.
+   */
+  private function getSekolahId(?Request $request = null): ?int
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      $id = $request?->input('sekolah_id');
+      return $id ? (int) $id : null;
+    }
+
+    return $user->ptk->sekolah_id ?? null;
+  }
+
+  public function tabel(Request $request)
   {
     $semesterId = session('semester_id');
-    $sekolahId  = Auth::user()->ptk->sekolah_id;
+    $sekolahId  = $this->getSekolahId($request);
+
+    if (!$sekolahId) {
+      return response()->json(['data' => [], 'statistik_tingkat' => []]);
+    }
 
     $rombel = Rombel::with(['ptk', 'semester', 'kurikulum'])
       ->where('semester_id', $semesterId)
@@ -67,7 +99,7 @@ class RombelController extends Controller
         'kurikulum'    => $r->kurikulum->nama ?? '-',
         'kurikulum_id' => $r->kurikulum_id,
         'wali_kelas'   => $r->ptk->nama_ptk ?? '-',
-        'semester'     => $r->semester->nama_semester ?? '-',
+        'semester'     => $r->semester->semester ?? '-',
         'ptk_id'       => $r->ptk_id,
         'jumlah_l'     => $r->jumlah_l,
         'jumlah_p'     => $r->jumlah_p,
@@ -84,8 +116,12 @@ class RombelController extends Controller
   {
     Gate::authorize('create', Rombel::class);
 
-    $sekolahId  = Auth::user()->ptk->sekolah_id;
+    $sekolahId  = $this->getSekolahId($request);
     $semesterId = session('semester_id');
+
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Konteks sekolah tidak ditemukan.'], 422);
+    }
 
     $validated = $request->validate([
       'nama_rombel' => 'required|string|max:50',
@@ -121,7 +157,8 @@ class RombelController extends Controller
   public function update(Request $request, $id)
   {
     $rombel = Rombel::findOrFail($id);
-    $sekolahId  = Auth::user()->ptk->sekolah_id;
+    // Konteks sekolah: Admin mengikuti rombel yang diedit, role lain dari PTK-nya
+    $sekolahId  = Auth::user()->hasRole('Admin') ? $rombel->sekolah_id : $this->getSekolahId($request);
     Gate::authorize('update', $rombel);
 
     $sudahAdaAnggota = $rombel->rombelAnggota()->whereNull('end_date')->exists();
