@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\RombelAnggota;
+use App\Models\Sekolah;
 use App\Models\SekolahDetail;
 use App\Models\Rombel;
 use App\Models\Semester;
@@ -52,6 +53,12 @@ class DataPeriodikController extends Controller
       ? SekolahDetail::status($sekolahId, (int) $semesterSekarang)
       : ['hasDetail' => false, 'hasRombel' => false];
 
+    $semesterAktifModel = $posisiSekarang !== null ? $semuaSemester[$posisiSekarang] : null;
+    $tahunAktif   = $semesterAktifModel
+      ? (int) substr((string) $semesterAktifModel->tahun_pelajaran, 0, 4)
+      : null;
+    $tingkatAkhir = $this->tingkatAkhirSekolah($sekolahId);
+
     // Kandidat semester sumber: semester sebelum semester aktif
     // yang punya detail sekolah atau rombel untuk sekolah ini.
     // Semester sesudah aktif tidak ditampilkan sama sekali.
@@ -77,9 +84,13 @@ class DataPeriodikController extends Controller
         continue;
       }
 
+      $naikKelas = $tahunAktif !== null
+        && (int) substr((string) $smt->tahun_pelajaran, 0, 4) < $tahunAktif;
+
       $sumber[] = [
         'id'     => $smt->id,
         'label'  => $smt->tahun_pelajaran . ' — Semester ' . $smt->semester,
+        'naik_kelas' => $naikKelas,
         'detail' => $detail ? [
           'nama_sekolah'   => $detail->nama_sekolah,
           'kepala_sekolah' => $detail->kepala_sekolah,
@@ -93,11 +104,19 @@ class DataPeriodikController extends Controller
             $detail->province?->name,
           ])->filter()->implode(', '),
         ] : null,
-        'rombel' => $rombels->map(fn($r) => [
-          'nama_rombel'    => $r->nama_rombel,
-          'tingkat'        => $r->tingkat,
-          'jumlah_anggota' => $r->rombelAnggota()->whereNull('end_date')->count(),
-        ])->all(),
+        'rombel' => $rombels->map(function ($r) use ($naikKelas, $tingkatAkhir) {
+          $lulus = $naikKelas && $tingkatAkhir && (int) $r->tingkat >= $tingkatAkhir;
+          return [
+            'nama_rombel'    => $r->nama_rombel,
+            'tingkat'        => $r->tingkat,
+            'tingkat_baru'   => $naikKelas && !$lulus ? (int) $r->tingkat + 1 : (int) $r->tingkat,
+            'nama_baru'      => $naikKelas && !$lulus
+              ? $this->namaNaikKelas($r->nama_rombel, (int) $r->tingkat)
+              : $r->nama_rombel,
+            'lulus'          => (bool) $lulus,
+            'jumlah_anggota' => $r->rombelAnggota()->whereNull('end_date')->count(),
+          ];
+        })->all(),
       ];
     }
 
@@ -195,7 +214,8 @@ class DataPeriodikController extends Controller
       }
 
       // ── Rombel ──────────────────────────────────────────────────────
-      $petaRombel = []; // id rombel lama => id rombel baru
+      $petaRombel  = []; // id rombel lama => id rombel baru
+      $rombelLulus = []; // id rombel tingkat akhir yang tidak disalin
       if (in_array('rombel', $pilihan)) {
         if ($status['hasRombel']) {
           $catatan[] = 'rombel sudah ada di semester ini';
@@ -207,30 +227,89 @@ class DataPeriodikController extends Controller
           if ($oldRombels->isEmpty()) {
             $catatan[] = 'rombel tidak ditemukan di semester asal';
           } else {
+            // Mode naik kelas: tahun pelajaran sumber lebih lama dari
+            // tahun pelajaran semester aktif (mis. menyalin dari Genap
+            // 2023/2024 ke Ganjil 2024/2025)
+            $naikKelas = $semesterAsal && $semesterTarget
+              && (int) substr((string) $semesterAsal->tahun_pelajaran, 0, 4)
+                 < (int) substr((string) $semesterTarget->tahun_pelajaran, 0, 4);
+            $tingkatAkhirSumber = $naikKelas ? $this->tingkatAkhirSekolah($sekolahId) : null;
+            $namaTakBerubah = [];
+
             foreach ($oldRombels as $rombel) {
+              if ($naikKelas && $tingkatAkhirSumber && (int) $rombel->tingkat >= $tingkatAkhirSumber) {
+                // Rombel tingkat akhir tidak disalin: siswanya lulus
+                $rombelLulus[] = $rombel->id;
+                continue;
+              }
+
               $data = $rombel->toArray();
               unset($data['id'], $data['created_at'], $data['updated_at'], $data['deleted_at']);
               $data['sekolah_id']  = $sekolahId;
               $data['semester_id'] = $semesterSekarang;
+
+              if ($naikKelas) {
+                $data['tingkat']     = (int) $rombel->tingkat + 1;
+                $data['nama_rombel'] = $this->namaNaikKelas($rombel->nama_rombel, (int) $rombel->tingkat);
+                if ($data['nama_rombel'] === $rombel->nama_rombel) {
+                  $namaTakBerubah[] = $rombel->nama_rombel;
+                }
+              }
+
               $baru = Rombel::create($data);
               $petaRombel[$rombel->id] = $baru->id;
             }
-            $hasil[] = count($petaRombel) . ' rombel';
+
+            if (!empty($petaRombel)) {
+              $hasil[] = count($petaRombel) . ' rombel' . ($naikKelas ? ' (naik satu tingkat)' : '');
+            }
+            if (!empty($rombelLulus)) {
+              $catatan[] = count($rombelLulus) . ' rombel tingkat akhir tidak disalin (siswa lulus)';
+            }
+            if ($naikKelas && !$tingkatAkhirSumber) {
+              $catatan[] = 'tingkat akhir jenjang ini tidak dikenal — semua rombel dinaikkan tanpa pengecualian kelas akhir';
+            }
+            if (!empty($namaTakBerubah)) {
+              $catatan[] = 'nama rombel berikut tidak berubah otomatis (sesuaikan manual): ' . implode(', ', $namaTakBerubah);
+            }
           }
         }
       }
 
       // ── Anggota rombel (siswa yang masih aktif di rombel sumber) ────
       if (in_array('anggota', $pilihan)) {
+        // Keanggotaan di semester baru berlaku sejak semester itu mulai
+        $startDate = $semesterTarget?->tanggal_mulai?->format('Y-m-d')
+          ?? now()->toDateString();
+        // Keanggotaan lama ditutup di akhir semester sumber
+        $endDateSumber = Semester::find($semesterLalu)?->tanggal_selesai?->format('Y-m-d')
+          ?? $startDate;
+
+        // Anggota rombel tingkat akhir yang tidak disalin (mode naik
+        // kelas): keanggotaannya ditutup sebagai lulus
+        $anggotaLulus = 0;
+        if (!empty($rombelLulus)) {
+          $anggotaKelasAkhir = RombelAnggota::whereIn('rombel_id', $rombelLulus)
+            ->whereNull('end_date')
+            ->get();
+          foreach ($anggotaKelasAkhir as $anggotaAkhir) {
+            $anggotaAkhir->update([
+              'end_date' => $endDateSumber < $anggotaAkhir->start_date
+                ? $anggotaAkhir->start_date
+                : $endDateSumber,
+            ]);
+            $anggotaLulus++;
+          }
+          if ($anggotaLulus) {
+            $catatan[] = $anggotaLulus . ' anggota kelas akhir ditutup keanggotaannya (lulus)';
+          }
+        }
+
         if (empty($petaRombel)) {
-          $catatan[] = 'anggota tidak disalin karena rombel tidak tersalin';
+          if (!$anggotaLulus) {
+            $catatan[] = 'anggota tidak disalin karena rombel tidak tersalin';
+          }
         } else {
-          // Keanggotaan di semester baru berlaku sejak semester itu mulai
-          $startDate = $semesterTarget?->tanggal_mulai?->format('Y-m-d')
-            ?? now()->toDateString();
-          // Keanggotaan lama ditutup di akhir semester sumber
-          $endDateSumber = Semester::find($semesterLalu)?->tanggal_selesai?->format('Y-m-d')
-            ?? $startDate;
           $tersalin = 0;
           $dilewati = 0;
 
@@ -296,5 +375,37 @@ class DataPeriodikController extends Controller
     }
 
     return redirect()->route('home')->with('success', $pesan);
+  }
+
+  /**
+   * Tingkat akhir per jenjang sekolah (peta yang sama seperti yang
+   * dipakai modul SKHU): SD 6, SMP 9, SMA/SMK 12. Null bila jenjang
+   * tidak dikenal — mode naik kelas lalu menaikkan semua rombel
+   * tanpa pengecualian kelas akhir.
+   */
+  private function tingkatAkhirSekolah(int $sekolahId): ?int
+  {
+    $peta    = ['SD' => 6, 'SMP' => 9, 'SMA' => 12, 'SMK' => 12];
+    $jenjang = strtoupper((string) (Sekolah::find($sekolahId)?->jenjang ?? ''));
+
+    return $peta[$jenjang] ?? null;
+  }
+
+  /**
+   * Sesuaikan nama rombel saat naik kelas: ganti angka tingkat yang
+   * berdiri sebagai token tersendiri, mis. "Kelas 5A" -> "Kelas 6A",
+   * "1.A" -> "2.A", "Kelas 10" -> "Kelas 11". Nama tanpa angka
+   * tingkat yang jelas dikembalikan apa adanya.
+   */
+  private function namaNaikKelas(string $nama, int $tingkatLama): string
+  {
+    $hasil = preg_replace(
+      '/(?<!\d)' . $tingkatLama . '(?!\d)/',
+      (string) ($tingkatLama + 1),
+      $nama,
+      1
+    );
+
+    return $hasil ?? $nama;
   }
 }
