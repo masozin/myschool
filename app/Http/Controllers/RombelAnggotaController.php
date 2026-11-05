@@ -67,8 +67,6 @@ class RombelAnggotaController extends Controller
       ], 403);
     }
 
-    $isGanjil = substr($semesterSekarang->kode_semester, -1) === '1';
-
     $query = Siswa::query();
 
     // [A] Registrasi terbaru harus aktif & sekolahnya sama
@@ -84,57 +82,55 @@ class RombelAnggotaController extends Controller
       $q->where('semester_id', $semesterSekarang->id);
     });
 
-    // [C] Logika kelayakan tingkat
-    if ($isGanjil) {
-      $query->where(function ($q) use ($rombel, $semesterSekarang) {
+    // [C] Kelayakan tingkat — dinilai dari bukti terakhir siswa:
+    // - tingkat pada registrasinya sama dengan tingkat rombel ini, atau
+    // - keanggotaan terakhirnya SEBELUM semester ini menunjukkan ia
+    //   memang berada di tingkat ini: tingkatnya sama (pindah rombel
+    //   di tengah jalan, atau tinggal kelas), atau tingkatnya
+    //   ditambah selisih tahun pelajaran sejak keanggotaan itu sama
+    //   dengan tingkat ini (naik kelas).
+    // Penilaiannya di PHP karena "keanggotaan terakhir" mengikuti
+    // urutan kronologis semester. Mengeluarkan siswa dari rombel
+    // kini menghapus barisnya, jadi bukti yang dipakai adalah baris
+    // terakhir yang masih tersisa (semester-semester sebelumnya).
+    $semuaSemester = Semester::all()->keyBy('id');
+    $kunciSemester = function ($sem) {
+      if (!$sem) return 0;
+      $k = Semester::kunciKronologis($sem);
+      return $k[0] * 10 + $k[1];
+    };
+    $kunciTarget = $kunciSemester($semesterSekarang);
+    $tahunTarget = (int) substr($semesterSekarang->tahun_pelajaran, 0, 4);
 
-        // C1. Siswa BARU: belum pernah punya rombel sama sekali
-        $q->where(function ($qBaru) use ($rombel) {
-          $qBaru->whereDoesntHave('rombelAnggota')
-            ->whereHas('registrasiTerbaru', function ($qr) use ($rombel) {
-              $qr->where('tingkat', $rombel->tingkat);
-            });
-        })
+    $siswa = $query->with(['registrasiTerbaru', 'rombelAnggota.rombel.semester'])->get()
+      ->filter(function ($s) use ($rombel, $semuaSemester, $kunciSemester, $kunciTarget, $tahunTarget) {
+        // Tingkat yang dinyatakan pada registrasi siswa
+        if ((int) ($s->registrasiTerbaru?->tingkat ?? 0) === (int) $rombel->tingkat) {
+          return true;
+        }
 
-          // C2 & C3. Siswa NAIK KELAS atau TINGGAL KELAS
-          ->orWhereHas('rombelAnggota', function ($q) use ($rombel, $semesterSekarang) {
-            $q->whereHas('rombel', function ($qr) use ($rombel, $semesterSekarang) {
-              $qr->whereIn('tingkat', [
-                $rombel->tingkat,      // tinggal kelas
-                $rombel->tingkat - 1,  // naik kelas
-              ])
-                ->whereHas('semester', function ($qs) use ($semesterSekarang) {
-                  $qs->where('tahun_pelajaran', $semesterSekarang->tahun_pelajaran);
-                });
-            });
-          });
-      });
-    } else {
-      $idSemesterGanjil = substr($semesterSekarang->kode_semester, 0, -1) . '1';
+        // Keanggotaan terakhir sebelum semester target
+        $terakhir = $s->rombelAnggota
+          ->map(function ($a) use ($semuaSemester, $kunciSemester) {
+            $a->semester_urut = $kunciSemester($a->rombel?->semester ?? $semuaSemester->get($a->semester_id));
+            return $a;
+          })
+          ->filter(fn($a) => $a->semester_urut > 0 && $a->semester_urut < $kunciTarget)
+          ->sortByDesc('semester_urut')
+          ->first();
 
-      $query->where(function ($q) use ($rombel, $idSemesterGanjil, $semesterSekarang) {
+        if (!$terakhir || !$terakhir->rombel) {
+          return false;
+        }
 
-        // D1. Siswa REGULER: ada di rombel tingkat sama di semester ganjil ini
-        $q->whereHas('rombelAnggota', function ($qa) use ($rombel, $idSemesterGanjil) {
-          $qa->whereHas('rombel', function ($qr) use ($rombel, $idSemesterGanjil) {
-            $qr->where('tingkat', $rombel->tingkat)
-              ->whereHas('semester', function ($qs) use ($idSemesterGanjil) {
-                $qs->where('kode_semester', $idSemesterGanjil);
-              });
-          });
-        })
+        $semTerakhir = $terakhir->rombel->semester ?? $semuaSemester->get($terakhir->semester_id);
+        $selisihTp   = $tahunTarget - (int) substr($semTerakhir->tahun_pelajaran, 0, 4);
+        $tingkatLalu = (int) $terakhir->rombel->tingkat;
 
-          // D2. Siswa BARU/MUTASI: belum pernah punya rombel sama sekali
-          ->orWhere(function ($qb) use ($rombel) {
-            $qb->whereDoesntHave('rombelAnggota')
-              ->whereHas('registrasiTerbaru', function ($qr) use ($rombel) {
-                $qr->where('tingkat', $rombel->tingkat);
-              });
-          });
-      });
-    }
-
-    $siswa = $query->with(['registrasiTerbaru'])->get();
+        return $tingkatLalu === (int) $rombel->tingkat
+          || $tingkatLalu + $selisihTp === (int) $rombel->tingkat;
+      })
+      ->values();
 
     return response()->json([
       'rombel_target'  => $rombel,
