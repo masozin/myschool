@@ -414,10 +414,8 @@
         document.getElementById('view-anggota').classList.add('d-none');
         document.getElementById('view-rombel').classList.remove('d-none');
         globalRombelId = null;
-        if (dtAnggota) {
-          dtAnggota.destroy();
-          dtAnggota = null;
-        }
+        // Instance DataTable anggota sengaja TIDAK dimusnahkan di sini;
+        // ia dipakai ulang saat membuka rombel lain (lihat initDtAnggota).
       }
 
       document.getElementById('btn-kembali').addEventListener('click', function() {
@@ -585,7 +583,16 @@
 
       // ── DataTable Anggota Rombel ──────────────────────────────────────────────
       function initDtAnggota(rombelId) {
-        if (dtAnggota) dtAnggota.destroy();
+        // DataTable dibuat SEKALI saja. Pindah rombel cukup mengganti URL
+        // ajax lalu memuat ulang — pola destroy + buat baru berulang memicu
+        // warning "Cannot reinitialise DataTable" karena instance lama
+        // belum benar-benar bersih saat instance baru dibuat.
+        if (dtAnggota) {
+          dtAnggota.search('');
+          document.getElementById('search-anggota').value = '';
+          dtAnggota.ajax.url(`/anggota-rombel/${rombelId}/list`).load();
+          return;
+        }
 
         dtAnggota = new DataTable('#tabel_anggota_rombel', {
           processing: true,
