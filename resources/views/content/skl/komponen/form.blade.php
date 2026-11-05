@@ -32,7 +32,7 @@
         <div class="small">
           Komponen ini akan dibuat untuk semester
           <strong>{{ $semester->tahun_pelajaran }}</strong>
-          ({{ $semester->nama_semester ?? 'Semester ' . $semester->id }}) —
+          ({{ $semester->tahun_pelajaran . ' - ' . $semester->semester }}) —
           Jenjang <strong>{{ $jenjang }}</strong>.
           <br>
           <span class="text-muted">Semester diambil dari sesi aktif dan tidak dapat diubah di sini.</span>

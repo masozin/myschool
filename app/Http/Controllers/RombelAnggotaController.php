@@ -275,7 +275,9 @@ class RombelAnggotaController extends Controller
           'id'         => $item->id,
           'rombel'     => $item->rombel->nama_rombel,
           'tingkat'    => $item->rombel->tingkat,
-          'semester'   => $item->rombel->semester->nama_semester,
+          'semester'   => $item->rombel->semester
+            ? $item->rombel->semester->tahun_pelajaran . ' - ' . $item->rombel->semester->semester
+            : '-',
           'start_date' => $item->start_date,
           'end_date'   => $item->end_date,
           'status'     => is_null($item->end_date) ? 'Aktif' : 'Keluar',

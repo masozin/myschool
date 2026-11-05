@@ -217,7 +217,7 @@
                 <th class="text-center">Tingkat</th>
                 <th>Tahun Masuk</th>
                 <th class="text-center">Status</th>
-                <th>Tanggal Registrasi</th>
+                <th>Tanggal Diterima</th>
               </tr>
             </thead>
             <tbody>
@@ -234,11 +234,11 @@
                   <td class="text-center">{{ $loop->iteration }}</td>
                   <td><small>{{ $reg->nisn ?? '-' }} / {{ $reg->nis ?? '-' }}</small></td>
                   <td class="text-center">{{ $reg->tingkat }}</td>
-                  <td>{{ $reg->tahun_masuk ?? '-' }}</td>
+                  <td>{{ $reg->tanggal_diterima ? \Carbon\Carbon::parse($reg->tanggal_diterima)->format('Y') : '-' }}</td>
                   <td class="text-center">
                     <span class="badge {{ $regStatusClass }} text-capitalize">{{ $reg->status }}</span>
                   </td>
-                  <td><small class="text-muted">{{ $reg->created_at?->format('d/m/Y') ?? '-' }}</small></td>
+                  <td><small class="text-muted">{{ $reg->tanggal_diterima ? \Carbon\Carbon::parse($reg->tanggal_diterima)->format('d/m/Y') : '-' }}</small></td>
                 </tr>
               @empty
                 <tr>
