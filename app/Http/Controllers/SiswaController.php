@@ -8,6 +8,7 @@ use App\Models\RombelAnggota;
 use App\Models\SiswaRegistrasi;
 use App\Models\Rombel;
 use App\Models\Sekolah;
+use App\Models\Semester;
 use App\Models\Siswa;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -753,4 +754,200 @@ class SiswaController extends Controller
       'grandTotal' => $grandTotal,
     ]);
   }
+
+  // ── Proses kelulusan massal & alumni ──────────────────────────────
+
+  /**
+   * Konteks sekolah untuk halaman kelulusan/alumni: operator memakai
+   * sekolah PTK-nya; Admin bisa memilih lewat parameter sekolah_id.
+   */
+  private function konteksSekolahId(Request $request): ?int
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      return $request->integer('sekolah_id')
+        ?: ($user->ptk?->sekolah_id ? (int) $user->ptk->sekolah_id : null);
+    }
+
+    return $user->ptk?->sekolah_id ? (int) $user->ptk->sekolah_id : null;
+  }
+
+  /**
+   * Tingkat akhir per jenjang (peta yang sama seperti modul SKHU):
+   * SD 6, SMP 9, SMA/SMK 12. Null bila jenjang tidak dikenal.
+   */
+  private function tingkatAkhirSekolah(?int $sekolahId): ?int
+  {
+    $peta    = ['SD' => 6, 'SMP' => 9, 'SMA' => 12, 'SMK' => 12];
+    $jenjang = strtoupper((string) (Sekolah::find($sekolahId)?->jenjang ?? ''));
+
+    return $peta[$jenjang] ?? null;
+  }
+
+  /**
+   * Halaman proses kelulusan: kandidatnya siswa berregistrasi aktif
+   * di sekolah ini yang tidak punya rombel aktif di semester sesi —
+   * persis daftar "tanpa rombel" yang muncul setelah kenaikan kelas.
+   * Baris kelas akhir ditandai dan tercentang sebagai bawaan.
+   */
+  public function kelulusan(Request $request)
+  {
+    $sekolahId = $this->konteksSekolahId($request);
+    if (!$sekolahId) {
+      return redirect()->route('siswa.index')
+        ->with('error', 'Konteks sekolah tidak ditemukan. Untuk Admin, buka halaman ini dengan parameter sekolah_id.');
+    }
+
+    $semesterAktifId = (int) session('semester_id');
+    $tingkatAkhir    = $this->tingkatAkhirSekolah($sekolahId);
+
+    $kandidat = Siswa::with([
+        'registrasiTerbaru',
+        'rombelAnggota' => fn($q) => $q->with('rombel.semester')->latest('id'),
+      ])
+      ->whereHas('registrasiTerbaru', fn($q) => $q
+        ->where('sekolah_id', $sekolahId)
+        ->where('status', 'aktif'))
+      ->whereDoesntHave('rombelAnggota', fn($q) => $q
+        ->where('semester_id', $semesterAktifId)
+        ->whereNull('end_date'))
+      ->orderBy('nama_siswa')
+      ->get()
+      ->map(function ($siswa) use ($tingkatAkhir) {
+        $terakhir = $siswa->rombelAnggota->first();
+        $siswa->anggota_terakhir = $terakhir;
+        $siswa->kelas_akhir = $terakhir && $tingkatAkhir
+          && (int) $terakhir->rombel->tingkat >= $tingkatAkhir;
+        return $siswa;
+      })
+      ->sortByDesc('kelas_akhir')
+      ->values();
+
+    // Bawaan tanggal kelulusan: akhir semester terakhir sebelum
+    // semester aktif (biasanya akhir semester Genap tahun lalu)
+    $defaultTanggal = now()->toDateString();
+    $semesterAktif  = Semester::find($semesterAktifId);
+    if ($semesterAktif) {
+      $sebelumnya = Semester::all()
+        ->filter(fn($s) => Semester::kunciKronologis($s) < Semester::kunciKronologis($semesterAktif))
+        ->sortByDesc(fn($s) => Semester::kunciKronologis($s))
+        ->first();
+      if ($sebelumnya?->tanggal_selesai) {
+        $defaultTanggal = $sebelumnya->tanggal_selesai->format('Y-m-d');
+      }
+    }
+
+    return view('content.siswa.kelulusan', compact('kandidat', 'defaultTanggal', 'sekolahId'));
+  }
+
+  /**
+   * Luluskan siswa terpilih sekaligus, memakai logika yang sama
+   * dengan perubahan status per siswa di registrasi(): registrasi
+   * ditutup sebagai lulus, status siswa disinkronkan, dan
+   * keanggotaan rombel yang masih aktif ditutup per tanggal itu.
+   */
+  public function prosesKelulusan(Request $request)
+  {
+    $request->validate([
+      'siswa_ids'      => 'required|array|min:1',
+      'siswa_ids.*'    => 'integer|exists:tabel_siswa,id',
+      'tanggal_keluar' => 'required|date',
+      'alasan'         => 'nullable|string|max:255',
+    ], [
+      'siswa_ids.required' => 'Pilih minimal satu siswa untuk diluluskan.',
+    ]);
+
+    $sekolahId = $this->konteksSekolahId($request);
+    if (!$sekolahId) {
+      return back()->with('error', 'Konteks sekolah tidak ditemukan.');
+    }
+
+    $tanggal  = $request->tanggal_keluar;
+    $berhasil = 0;
+    $dilewati = 0;
+
+    DB::beginTransaction();
+    try {
+      foreach ($request->siswa_ids as $siswaId) {
+        $registrasi = SiswaRegistrasi::where('siswa_id', $siswaId)
+          ->where('sekolah_id', $sekolahId)
+          ->where('status', 'aktif')
+          ->latest('id')
+          ->first();
+
+        if (!$registrasi) {
+          $dilewati++;
+          continue;
+        }
+
+        $registrasi->update([
+          'status'         => 'lulus',
+          'tanggal_keluar' => $tanggal,
+          'alasan'         => $request->alasan,
+        ]);
+
+        Siswa::where('id', $siswaId)->update(['status' => 'lulus']);
+
+        RombelAnggota::where('siswa_id', $siswaId)
+          ->whereNull('end_date')
+          ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $tanggal))
+          ->update(['end_date' => $tanggal]);
+
+        $berhasil++;
+      }
+
+      DB::commit();
+    } catch (\Exception $e) {
+      DB::rollBack();
+      return back()->with('error', 'Gagal memproses kelulusan: ' . $e->getMessage());
+    }
+
+    $pesan = $berhasil . ' siswa berhasil diluluskan.';
+    if ($dilewati) {
+      $pesan .= ' ' . $dilewati . ' siswa dilewati (registrasinya sudah tidak aktif).';
+    }
+
+    return redirect()->route('siswa.kelulusan')->with('success', $pesan);
+  }
+
+  /**
+   * Halaman alumni: siswa yang registrasi terakhirnya di sekolah ini
+   * berstatus lulus — tampilan tersaring dari data registrasi, tanpa
+   * tabel alumni terpisah. Bisa disaring per tahun kelulusan.
+   */
+  public function alumni(Request $request)
+  {
+    $sekolahId = $this->konteksSekolahId($request);
+    if (!$sekolahId) {
+      return redirect()->route('siswa.index')
+        ->with('error', 'Konteks sekolah tidak ditemukan. Untuk Admin, buka halaman ini dengan parameter sekolah_id.');
+    }
+
+    $tahunList = SiswaRegistrasi::where('sekolah_id', $sekolahId)
+      ->where('status', 'lulus')
+      ->whereNotNull('tanggal_keluar')
+      ->selectRaw('YEAR(tanggal_keluar) as tahun')
+      ->distinct()
+      ->orderByDesc('tahun')
+      ->pluck('tahun');
+
+    $tahun = $request->integer('tahun') ?: $tahunList->first();
+
+    $alumni = Siswa::with([
+        'registrasiTerbaru',
+        'rombelAnggota' => fn($q) => $q->with('rombel.semester')->latest('id'),
+      ])
+      ->whereHas('registrasiTerbaru', function ($q) use ($sekolahId, $tahun) {
+        $q->where('sekolah_id', $sekolahId)->where('status', 'lulus');
+        if ($tahun) {
+          $q->whereRaw('YEAR(tanggal_keluar) = ?', [$tahun]);
+        }
+      })
+      ->orderBy('nama_siswa')
+      ->get();
+
+    return view('content.siswa.alumni', compact('alumni', 'tahunList', 'tahun', 'sekolahId'));
+  }
 }
+

@@ -152,6 +152,7 @@ Route::controller(SiswaController::class)
     Route::get('/{id}/show', 'show')->name('show');
     Route::get('/tabel', 'tabel')->name('tabel');
     Route::get('/export', 'export')->name('export');
+    Route::get('/alumni', 'alumni')->name('alumni');
 
     Route::get('stats-pivot-usia', 'statsPivotUsia')->name('stats-pivot-usia');
     Route::get('stats-pivot-agama', 'statsPivotAgama')->name('stats-pivot-agama');
@@ -168,6 +169,8 @@ Route::controller(SiswaController::class)
     Route::post('/', 'store')->name('store');
     Route::put('/{id}', 'update')->name('update');
     Route::put('/{id}/registrasi', 'registrasi')->name('registrasi');
+    Route::get('/kelulusan', 'kelulusan')->name('kelulusan');
+    Route::post('/kelulusan', 'prosesKelulusan')->name('kelulusan.proses');
   });
 
 
