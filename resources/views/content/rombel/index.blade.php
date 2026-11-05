@@ -260,6 +260,13 @@
 
           <div id="tersedia-content" class="d-none">
             <div class="mb-3">
+              <label for="tanggal-mulai-anggota" class="form-label">Tanggal Mulai di Rombel</label>
+              <input type="date" id="tanggal-mulai-anggota" class="form-control form-control-sm"
+                style="max-width: 220px" value="{{ now()->format('Y-m-d') }}">
+              <small class="text-muted">Berlaku untuk semua siswa yang dipilih. Bila dikosongkan, memakai
+                tanggal hari ini.</small>
+            </div>
+            <div class="mb-3">
               <input type="text" id="search-tersedia" class="form-control form-control-sm"
                 placeholder="Cari nama siswa...">
             </div>
@@ -976,7 +983,8 @@
               },
               body: JSON.stringify({
                 rombel_id: globalRombelId,
-                siswa_ids: ids
+                siswa_ids: ids,
+                start_date: document.getElementById('tanggal-mulai-anggota').value || null
               })
             });
             const data = await res.json();
@@ -1007,9 +1015,17 @@
         // Hapus anggota
         const hapusAnggotaBtn = e.target.closest('.btn-hapus-anggota');
         if (hapusAnggotaBtn) {
+          const nowD = new Date();
+          const todayStr =
+            `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}-${String(nowD.getDate()).padStart(2, '0')}`;
           const result = await Swal.fire({
             title: 'Keluarkan Siswa?',
-            text: `${hapusAnggotaBtn.dataset.nama} akan dikeluarkan dari rombel ini.`,
+            html: `${hapusAnggotaBtn.dataset.nama} akan dikeluarkan dari rombel ini.
+              <div class="mt-3 text-start">
+                <label for="swal-tanggal-selesai" class="form-label">Tanggal Selesai (keluar dari
+                  rombel)</label>
+                <input type="date" id="swal-tanggal-selesai" class="form-control" value="${todayStr}">
+              </div>`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Ya, Keluarkan!',
@@ -1019,16 +1035,21 @@
               cancelButton: 'btn btn-outline-secondary'
             },
             buttonsStyling: false,
+            preConfirm: () => document.getElementById('swal-tanggal-selesai').value,
           });
           if (result.isConfirmed) {
             try {
               const res = await fetch(`/anggota-rombel/${hapusAnggotaBtn.dataset.id}`, {
                 method: 'DELETE',
                 headers: {
+                  'Content-Type': 'application/json',
                   'X-CSRF-TOKEN': document.querySelector(
                     'meta[name="csrf-token"]').content,
                   Accept: 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                  end_date: result.value || null
+                })
               });
               const data = await res.json();
               if (res.ok) {
