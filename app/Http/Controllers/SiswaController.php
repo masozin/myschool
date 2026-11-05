@@ -61,6 +61,8 @@ class SiswaController extends Controller
     $user = Auth::user();
     try {
       $semesterId     = session('semester_id');
+      $semesterAktifId = Semester::where('is_active', true)->value('id');
+      $riwayat = $semesterAktifId && (int) $semesterId !== (int) $semesterAktifId;
 
       $query = Siswa::query()->whereHas('siswaRegistrasi');
 
@@ -123,9 +125,10 @@ class SiswaController extends Controller
           $q->latest()->with('sekolah.detailTerbaru');
         },
         'rombelAnggota' => function ($q) use ($semesterId) {
-          // Filter anggota rombel hanya di semester yang dipilih
+          // Keanggotaan terakhir siswa di semester yang dipilih;
+          // penyaringan end_date dilakukan saat membangun baris,
+          // karena semester lampau dibaca sebagai riwayat
           $q->where('semester_id', $semesterId)
-            ->whereNull('end_date')
             ->latest('id')
             ->with('rombel');
         }
@@ -169,6 +172,15 @@ class SiswaController extends Controller
       foreach ($siswaRecords as $item) {
         $registrasi    = $item->siswaRegistrasi->first();
         $rombelAnggota = $item->rombelAnggota->first();
+
+        // Di semester aktif, rombel tampil hanya bila keanggotaannya
+        // masih berjalan. Di semester lampau, keanggotaan terakhir di
+        // semester itu adalah rombel historis siswa — end_date-nya
+        // memang sudah ditutup oleh proses kenaikan kelas, jadi
+        // menyaringnya akan membuat semua siswa tampak tanpa rombel.
+        if ($rombelAnggota && !$riwayat && $rombelAnggota->end_date) {
+          $rombelAnggota = null;
+        }
 
         // Gunakan detailTerbaru yang sudah ada di model Sekolah
         $namaSekolah = $registrasi?->sekolah?->detailTerbaru?->nama_sekolah;
