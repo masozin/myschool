@@ -64,6 +64,14 @@ class SiswaController extends Controller
 
       $query = Siswa::query()->whereHas('siswaRegistrasi');
 
+      // Hanya siswa aktif: yang sudah keluar/mutasi/lulus/meninggal
+      // tidak lagi tampil di daftar siswa — mereka punya halaman
+      // Siswa Keluar dan Alumni sendiri. Status yang dinilai adalah
+      // registrasi TERBARU siswa (di sekolah ini, lewat SekolahScope).
+      $query->whereHas('registrasiTerbaru', function ($q) {
+        $q->where('status', 'aktif');
+      });
+
       // ── Filter Guru Kelas ─────────────────────────────────────────────
       if ($request->filled('rombel_id')) {
         $rombelId = $request->integer('rombel_id');
@@ -880,6 +888,61 @@ class SiswaController extends Controller
   }
 
   /**
+   * Batalkan status keluar seorang siswa: registrasinya dibuka lagi
+   * sebagai aktif supaya bisa dimasukkan ke rombel kembali. Syarat:
+   * (1) registrasi keluar itu masih registrasi TERBARU siswa secara
+   * keseluruhan — bila sudah ada registrasi lebih baru di sekolah
+   * mana pun, siswa dianggap sudah terdaftar di sekolah lain;
+   * (2) tanggal keluarnya masih dalam tahun pelajaran yang sama
+   * dengan semester aktif.
+   */
+  public function batalkanKeluar(Request $request, $id)
+  {
+    $sekolahId = $this->konteksSekolahId($request);
+    if (!$sekolahId) {
+      return back()->with('error', 'Konteks sekolah tidak ditemukan.');
+    }
+
+    // withoutGlobalScopes: pemeriksaan harus melihat registrasi di
+    // SEMUA sekolah, bukan hanya yang terlihat oleh SekolahScope
+    $registrasi = SiswaRegistrasi::withoutGlobalScopes()
+      ->where('siswa_id', $id)
+      ->latest('id')
+      ->first();
+
+    if (!$registrasi
+      || (int) $registrasi->sekolah_id !== (int) $sekolahId
+      || !in_array($registrasi->status, ['keluar', 'mutasi', 'meninggal'])) {
+      return back()->with('error', 'Pembatalan tidak tersedia: siswa sudah terdaftar di sekolah lain atau status terakhirnya bukan keluar.');
+    }
+
+    $semesterAktif = Semester::find((int) session('semester_id'));
+    if (!$semesterAktif
+      || $this->tahunPelajaranDariTanggal($registrasi->tanggal_keluar) !== $semesterAktif->tahun_pelajaran) {
+      return back()->with('error', 'Pembatalan keluar hanya bisa dilakukan pada tahun pelajaran yang sama dengan tahun keluarnya.');
+    }
+
+    DB::beginTransaction();
+    try {
+      $registrasi->update([
+        'status'         => 'aktif',
+        'tanggal_keluar' => null,
+        'alasan'         => null,
+        'sekolah_tujuan' => null,
+      ]);
+
+      Siswa::where('id', $id)->update(['status' => 'aktif']);
+
+      DB::commit();
+    } catch (\Exception $e) {
+      DB::rollBack();
+      return back()->with('error', 'Gagal membatalkan status keluar: ' . $e->getMessage());
+    }
+
+    return back()->with('success', 'Status keluar dibatalkan. Siswa kembali aktif dan bisa dimasukkan ke rombel.');
+  }
+
+  /**
    * Halaman siswa keluar: siswa yang registrasi terakhirnya di
    * sekolah ini berakhir bukan karena lulus — keluar, mutasi, atau
    * meninggal — dengan saringan per status.
@@ -898,6 +961,9 @@ class SiswaController extends Controller
       $statusDipilih = 'semua';
     }
 
+    $semesterAktif = Semester::find((int) session('semester_id'));
+    $tpAktif       = $semesterAktif?->tahun_pelajaran;
+
     $siswaKeluar = Siswa::with([
         'registrasiTerbaru',
         'rombelAnggota' => fn($q) => $q->with('rombel.semester')->latest('id'),
@@ -911,6 +977,15 @@ class SiswaController extends Controller
         }
       })
       ->get()
+      ->map(function ($siswa) use ($tpAktif) {
+        // Tombol batal keluar hanya untuk yang keluar pada tahun
+        // pelajaran yang sama dengan semester aktif; syarat "belum
+        // terdaftar di sekolah lain" ditegakkan ulang di server
+        // pada batalkanKeluar()
+        $siswa->bisa_batal = $tpAktif !== null
+          && $this->tahunPelajaranDariTanggal($siswa->registrasiTerbaru?->tanggal_keluar) === $tpAktif;
+        return $siswa;
+      })
       ->sortByDesc(fn($s) => $s->registrasiTerbaru?->tanggal_keluar ?? '')
       ->values();
 
