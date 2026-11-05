@@ -251,6 +251,40 @@ class RombelAnggotaController extends Controller
   }
 
   // =========================================================================
+  // KELUARKAN BANYAK SISWA DARI ROMBEL SEKALIGUS
+  // =========================================================================
+  public function destroyMassal(Request $request)
+  {
+    $request->validate([
+      'rombel_id'     => 'required|exists:tabel_rombel,id',
+      'anggota_ids'   => 'required|array|min:1',
+      'anggota_ids.*' => 'integer',
+    ]);
+
+    $rombel = Rombel::with('semester')->findOrFail($request->rombel_id);
+
+    // Cek izin: hanya yang boleh kelola anggota rombel ini
+    $this->authorize('manageMembers', $rombel);
+
+    // Proteksi: tidak bisa mengubah anggota jika semester sudah tidak aktif
+    if (!$rombel->semester->is_active) {
+      return response()->json([
+        'message' => 'Semester sudah tidak aktif. Data anggota rombel tidak dapat diubah.'
+      ], 403);
+    }
+
+    // Hanya baris yang memang milik rombel ini yang dihapus
+    $jumlah = RombelAnggota::where('rombel_id', $rombel->id)
+      ->whereIn('id', $request->anggota_ids)
+      ->delete();
+
+    return response()->json([
+      'message' => $jumlah . ' siswa berhasil dikeluarkan dari rombel ' . $rombel->nama_rombel . '.',
+      'dihapus' => $jumlah,
+    ]);
+  }
+
+  // =========================================================================
   // RIWAYAT PERPINDAHAN ROMBEL SISWA
   // =========================================================================
   public function riwayatSiswa($siswa_id)

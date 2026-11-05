@@ -163,9 +163,14 @@
       <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
         <input type="text" id="search-anggota" class="form-control form-control-sm" style="max-width:220px"
           placeholder="Cari nama siswa...">
-        <button class="btn btn-primary btn-sm" id="btn-buka-tambah-anggota">
-          <i class="ri ri-user-add-line me-1"></i> <span class="d-none d-sm-inline-block">Tambah Anggota</span>
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-danger btn-sm d-none" id="btn-keluarkan-massal">
+            <i class="ri ri-user-unfollow-line me-1"></i> Keluarkan <span id="jumlah-terpilih">0</span> Terpilih
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-buka-tambah-anggota">
+            <i class="ri ri-user-add-line me-1"></i> <span class="d-none d-sm-inline-block">Tambah Anggota</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -175,6 +180,8 @@
         <table class="table table-bordered" id="tabel_anggota_rombel">
           <thead>
             <tr>
+              <th><input type="checkbox" class="form-check-input" id="check-all-anggota"
+                  title="Centang semua di halaman ini"></th>
               <th>#</th>
               <th>Siswa</th>
               <th>NIS / NISN</th>
@@ -603,6 +610,14 @@
             dataSrc: 'anggota'
           },
           columns: [{
+              // Centang untuk keluarkan massal
+              data: null,
+              orderable: false,
+              searchable: false,
+              render: (d, t, row) =>
+                `<input type="checkbox" class="form-check-input check-anggota" value="${row.id}">`
+            },
+            {
               // Nomor urut
               data: null,
               orderable: false,
@@ -649,7 +664,7 @@
             },
           ],
           order: [
-            [1, 'asc']
+            [2, 'asc']
           ],
           layout: {
             topStart: {
@@ -685,7 +700,10 @@
 
         dtAnggota.on('draw.dt', function() {
           const info = dtAnggota.page.info();
-          dtAnggota.column(0, {
+          const checkAll = document.getElementById('check-all-anggota');
+          if (checkAll) checkAll.checked = false;
+          segarkanTombolMassal();
+          dtAnggota.column(1, {
               search: 'applied',
               order: 'applied'
             })
@@ -697,6 +715,76 @@
 
       document.getElementById('search-anggota').addEventListener('input', function() {
         if (dtAnggota) dtAnggota.search(this.value).draw();
+      });
+
+      // ── Keluarkan Anggota Massal ─────────────────────────────────────────────
+      function segarkanTombolMassal() {
+        const terpilih = document.querySelectorAll('.check-anggota:checked').length;
+        document.getElementById('jumlah-terpilih').textContent = terpilih;
+        document.getElementById('btn-keluarkan-massal').classList.toggle('d-none', terpilih === 0);
+      }
+
+      document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('check-anggota')) {
+          segarkanTombolMassal();
+        }
+        if (e.target.id === 'check-all-anggota') {
+          document.querySelectorAll('.check-anggota')
+            .forEach(c => c.checked = e.target.checked);
+          segarkanTombolMassal();
+        }
+      });
+
+      document.getElementById('btn-keluarkan-massal').addEventListener('click', async function() {
+        const ids = [...document.querySelectorAll('.check-anggota:checked')].map(c => c.value);
+        if (!ids.length) return;
+
+        const konfirmasi = await Swal.fire({
+          title: 'Keluarkan Siswa Terpilih?',
+          text: `${ids.length} siswa akan dikeluarkan dari rombel ini. Catatan keanggotaan mereka di rombel ini akan dihapus.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Ya, Keluarkan!',
+          cancelButtonText: 'Batal',
+          customClass: {
+            confirmButton: 'btn btn-danger me-3',
+            cancelButton: 'btn btn-outline-secondary'
+          },
+          buttonsStyling: false
+        });
+        if (!konfirmasi.isConfirmed) return;
+
+        try {
+          const res = await fetch('/anggota-rombel/hapus-massal', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+              Accept: 'application/json'
+            },
+            body: JSON.stringify({
+              rombel_id: globalRombelId,
+              anggota_ids: ids
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            Swal.fire({
+              icon: 'success',
+              title: 'Berhasil',
+              text: data.message
+            });
+            dtAnggota.ajax.reload(() => refreshHeaderCounts(), false);
+          } else {
+            throw new Error(data.message || 'Gagal mengeluarkan siswa');
+          }
+        } catch (err) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err.message
+          });
+        }
       });
 
       // ── Siswa Tersedia (plain table di modal) ─────────────────────────────────

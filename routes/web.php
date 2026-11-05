@@ -260,6 +260,7 @@ Route::controller(RombelAnggotaController::class)
     Route::get('/{rombel_id}/tersedia', 'listSiswaTersedia')->name('tersedia');
     Route::get('/{siswa_id}/riwayat', 'riwayatSiswa')->name('riwayat');
     Route::post('/', 'store')->name('store');
+    Route::post('/hapus-massal', 'destroyMassal')->name('hapus-massal');
     Route::delete('/{id}', 'destroy')->name('destroy');
   });
 
