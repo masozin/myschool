@@ -11,7 +11,7 @@ class RombelAnggota extends Model
   use HasFactory;
 
   protected $table = 'tabel_rombel_anggota';
-  protected $fillable = ['siswa_id', 'rombel_id', 'semester_id', 'start_date', 'end_date'];
+  protected $fillable = ['siswa_id', 'rombel_id', 'semester_id'];
 
   public function siswa(): BelongsTo
   {

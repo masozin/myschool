@@ -23,25 +23,15 @@ class RombelAnggotaController extends Controller
     $rombel = Rombel::with(['semester', 'ptk'])->findOrFail($rombel_id);
     $this->authorize('view', $rombel);
 
-    // Di semester aktif, daftar anggota hanya yang masih berjalan
-    // (end_date kosong). Di semester lampau, seluruh anggota rombel
-    // adalah daftar historisnya — end_date mereka memang sudah
-    // ditutup oleh proses kenaikan kelas, jadi menyaring end_date
-    // kosong akan mengosongkan daftar.
-    $semesterAktifId = Semester::where('is_active', true)->value('id');
-    $riwayat = $semesterAktifId
-      && (int) $rombel->semester_id !== (int) $semesterAktifId;
-
+    // Satu baris keanggotaan berlaku untuk semester pada baris itu
+    // sendiri: daftar anggota rombel adalah seluruh barisnya, sama
+    // untuk semester aktif maupun semester lampau
     $anggota = RombelAnggota::with('siswa.registrasiTerbaru')
       ->where('rombel_id', $rombel_id)
-      ->when(!$riwayat, fn($q) => $q->whereNull('end_date'))
       ->get()
       ->map(function ($item) {
         return [
           'id'         => $item->id,
-          'start_date' => $item->start_date,
-          'end_date'   => $item->end_date,
-          'status'     => $item->end_date ? 'Selesai' : 'Aktif',
           'siswa'      => [
             'id'           => $item->siswa->id,
             'nama_siswa'   => $item->siswa->nama_siswa,
@@ -89,23 +79,18 @@ class RombelAnggotaController extends Controller
         ->where('status', 'aktif');
     });
 
-    // [B] Belum terdaftar aktif di rombel manapun pada semester yang sama
+    // [B] Belum terdaftar di rombel manapun pada semester yang sama
     $query->whereDoesntHave('rombelAnggota', function ($q) use ($semesterSekarang) {
-      $q->where('semester_id', $semesterSekarang->id)
-        ->whereNull('end_date');
+      $q->where('semester_id', $semesterSekarang->id);
     });
 
     // [C] Logika kelayakan tingkat
     if ($isGanjil) {
       $query->where(function ($q) use ($rombel, $semesterSekarang) {
 
-        // C1. Siswa BARU: belum pernah punya rombel AKTIF sama sekali
-        // Perbaikan: doesntHave → whereDoesntHave dengan filter end_date
-        // agar siswa yang pernah keluar dari rombel tetap bisa masuk
+        // C1. Siswa BARU: belum pernah punya rombel sama sekali
         $q->where(function ($qBaru) use ($rombel) {
-          $qBaru->whereDoesntHave('rombelAnggota', function ($qa) {
-            $qa->whereNull('end_date'); // tidak punya rombel aktif
-          })
+          $qBaru->whereDoesntHave('rombelAnggota')
             ->whereHas('registrasiTerbaru', function ($qr) use ($rombel) {
               $qr->where('tingkat', $rombel->tingkat);
             });
@@ -139,12 +124,9 @@ class RombelAnggotaController extends Controller
           });
         })
 
-          // D2. Siswa BARU/MUTASI: tidak punya rombel AKTIF sama sekali
-          // Perbaikan: doesntHave → whereDoesntHave dengan filter end_date
+          // D2. Siswa BARU/MUTASI: belum pernah punya rombel sama sekali
           ->orWhere(function ($qb) use ($rombel) {
-            $qb->whereDoesntHave('rombelAnggota', function ($qa) {
-              $qa->whereNull('end_date'); // tidak punya rombel aktif
-            })
+            $qb->whereDoesntHave('rombelAnggota')
               ->whereHas('registrasiTerbaru', function ($qr) use ($rombel) {
                 $qr->where('tingkat', $rombel->tingkat);
               });
@@ -170,14 +152,10 @@ class RombelAnggotaController extends Controller
       'rombel_id'   => 'required|exists:tabel_rombel,id',
       'siswa_ids'   => 'required|array',
       'siswa_ids.*' => 'exists:tabel_siswa,id',
-      'start_date'  => 'nullable|date',
     ]);
 
     $rombel   = Rombel::with('semester')->findOrFail($request->rombel_id);
     $semester = $rombel->semester;
-
-    // Tanggal mulai boleh dipilih lewat form; kosong = tanggal hari ini
-    $startDate = $request->input('start_date') ?: now()->toDateString();
 
     // Cek izin: hanya yang boleh kelola anggota rombel ini
     $this->authorize('manageMembers', $rombel);
@@ -196,10 +174,10 @@ class RombelAnggotaController extends Controller
       $skipped      = 0;
 
       foreach ($request->siswa_ids as $siswa_id) {
-        // Cek duplikasi: siswa masih aktif di rombel manapun semester ini
+        // Cek duplikasi: satu siswa hanya boleh punya satu baris
+        // keanggotaan per semester, di rombel manapun
         $sudahAktif = RombelAnggota::where('siswa_id', $siswa_id)
           ->where('semester_id', $semester->id)
-          ->whereNull('end_date')
           ->exists();
 
         if ($sudahAktif) {
@@ -211,8 +189,6 @@ class RombelAnggotaController extends Controller
           'siswa_id'    => $siswa_id,
           'rombel_id'   => $request->rombel_id,
           'semester_id' => $semester->id,
-          'start_date'  => $startDate,
-          'end_date'    => null,
           'created_at'  => now(),
           'updated_at'  => now(),
         ];
@@ -255,31 +231,19 @@ class RombelAnggotaController extends Controller
       ], 403);
     }
 
-    // Proteksi: siswa memang sedang aktif di rombel ini
-    if (!is_null($anggota->end_date)) {
-      return response()->json([
-        'message' => 'Siswa ini sudah tidak aktif di rombel ini.'
-      ], 409);
-    }
+    // Keanggotaan dihapus sungguhan: tanpa tanggal mulai/selesai,
+    // mengeluarkan siswa berarti baris keanggotaannya di rombel ini
+    // hilang. Jejak pindah rombel di tengah semester yang sama
+    // memang tidak disimpan pada model ini.
+    $namaSiswa  = $anggota->siswa->nama_siswa;
+    $namaRombel = $anggota->rombel->nama_rombel;
 
-    // Tanggal selesai boleh dipilih lewat form; kosong = tanggal hari ini
-    $request->validate(['end_date' => 'nullable|date']);
-    $endDate = $request->input('end_date') ?: now()->toDateString();
-
-    if ($endDate < $anggota->start_date) {
-      return response()->json([
-        'message' => 'Tanggal selesai tidak boleh sebelum tanggal mulai (' . $anggota->start_date . ').'
-      ], 422);
-    }
-
-    // Isi end_date — record tetap ada sebagai history perpindahan
-    $anggota->update(['end_date' => $endDate]);
+    $anggota->delete();
 
     return response()->json([
-      'message'  => "Siswa {$anggota->siswa->nama_siswa} berhasil dikeluarkan dari rombel {$anggota->rombel->nama_rombel}.",
-      'siswa'    => $anggota->siswa->nama_siswa,
-      'rombel'   => $anggota->rombel->nama_rombel,
-      'end_date' => $anggota->end_date,
+      'message' => "Siswa {$namaSiswa} berhasil dikeluarkan dari rombel {$namaRombel}.",
+      'siswa'   => $namaSiswa,
+      'rombel'  => $namaRombel,
     ]);
   }
 
@@ -291,11 +255,14 @@ class RombelAnggotaController extends Controller
     // Pastikan siswa ada
     $siswa = Siswa::findOrFail($siswa_id);
 
+    $semesterAktifId = Semester::where('is_active', true)->value('id');
+
     $riwayat = RombelAnggota::with(['rombel.semester'])
       ->where('siswa_id', $siswa_id)
-      ->orderBy('start_date', 'asc')
+      ->orderBy('semester_id', 'asc')
+      ->orderBy('id', 'asc')
       ->get()
-      ->map(function ($item) {
+      ->map(function ($item) use ($semesterAktifId) {
         return [
           'id'         => $item->id,
           'rombel'     => $item->rombel->nama_rombel,
@@ -303,9 +270,7 @@ class RombelAnggotaController extends Controller
           'semester'   => $item->rombel->semester
             ? $item->rombel->semester->tahun_pelajaran . ' - ' . $item->rombel->semester->semester
             : '-',
-          'start_date' => $item->start_date,
-          'end_date'   => $item->end_date,
-          'status'     => is_null($item->end_date) ? 'Aktif' : 'Keluar',
+          'status'     => (int) $item->semester_id === (int) $semesterAktifId ? 'Aktif' : 'Selesai',
         ];
       });
 
