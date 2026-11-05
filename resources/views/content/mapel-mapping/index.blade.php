@@ -859,6 +859,43 @@
         return String(str ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
 
+      // ── Salin Mapel Antar Semester ────────────────────────────────────
+      const btnSalin = document.getElementById('btn-salin');
+      if (btnSalin) {
+        btnSalin.addEventListener('click', async function() {
+          const jenjang = document.getElementById('salin-jenjang').value;
+          const dari = document.getElementById('salin-dari').value;
+          const ke = document.getElementById('salin-ke').value;
+
+          if (!dari || !ke) {
+            toastError('Pilih semester asal dan tujuan terlebih dahulu.');
+            return;
+          }
+          if (dari === ke) {
+            toastError('Semester asal dan tujuan tidak boleh sama.');
+            return;
+          }
+
+          btnSalin.disabled = true;
+          try {
+            const res = await apiFetch(`${baseUrl}/salin-semester`, 'POST', {
+              jenjang: jenjang,
+              dari_semester: dari,
+              ke_semester: ke,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Gagal menyalin mapel.');
+            bootstrap.Modal.getInstance(document.getElementById('modal-salin')).hide();
+            toastSukses(data.message);
+            refreshTable();
+          } catch (e) {
+            toastError(e.message);
+          } finally {
+            btnSalin.disabled = false;
+          }
+        });
+      }
+
       // ====================== INIT ======================
       loadData();
     });
