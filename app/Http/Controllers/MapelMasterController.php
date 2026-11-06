@@ -7,6 +7,7 @@ use App\Models\MapelKelompok;
 use App\Models\MapelMaster;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class MapelMasterController extends Controller
 {
@@ -41,6 +42,7 @@ class MapelMasterController extends Controller
         'id'             => $item->id,
         'nama'           => $item->nama,
         'nama_singkat'   => $item->nama_singkat,
+        'nama_sub_mapel' => $item->nama_sub_mapel,
         'is_aktif'       => $item->is_aktif,
         'kelompok_id'    => $item->kelompok?->id,
         'kelompok_kode'  => $item->kelompok?->kode,
@@ -70,6 +72,7 @@ class MapelMasterController extends Controller
       'mapel_kelompok_id'       => 'required|exists:tabel_mapel_kelompok,id',
       'nama'                    => 'required|string|max:100',
       'nama_singkat'            => 'nullable|string|max:20',
+      'nama_sub_mapel'          => 'nullable|string|max:100',
       'is_aktif'                => 'boolean',
       'jenjang'                 => 'required|array|min:1',
       'jenjang.*.jenjang'       => 'required|string|in:SD,SMP,SMA,SMK',
@@ -77,16 +80,23 @@ class MapelMasterController extends Controller
       'jenjang.*.kelas_selesai' => 'required|integer|min:1|max:12|gte:jenjang.*.kelas_mulai',
     ]);
 
-    $mapel = MapelMaster::create([
-      'mapel_kelompok_id' => $request->mapel_kelompok_id,
-      'nama'              => $request->nama,
-      'nama_singkat'      => $request->nama_singkat,
-      'is_aktif'          => $request->boolean('is_aktif', true),
-    ]);
+    // Transaksional: master dan baris jenjangnya satu kesatuan —
+    // kegagalan di tengah tidak menyisakan master tanpa jenjang
+    $mapel = DB::transaction(function () use ($request) {
+      $mapel = MapelMaster::create([
+        'mapel_kelompok_id' => $request->mapel_kelompok_id,
+        'nama'              => $request->nama,
+        'nama_singkat'      => $request->nama_singkat,
+        'nama_sub_mapel'    => $request->nama_sub_mapel,
+        'is_aktif'          => $request->boolean('is_aktif', true),
+      ]);
 
-    foreach ($request->jenjang as $j) {
-      $mapel->mapelJenjang()->create($j);
-    }
+      foreach ($request->jenjang as $j) {
+        $mapel->mapelJenjang()->create($j);
+      }
+
+      return $mapel;
+    });
 
     return response()->json([
       'message' => 'Mata pelajaran berhasil ditambahkan.',
@@ -105,6 +115,7 @@ class MapelMasterController extends Controller
       'mapel_kelompok_id'       => 'required|exists:tabel_mapel_kelompok,id',
       'nama'                    => 'required|string|max:100',
       'nama_singkat'            => 'nullable|string|max:20',
+      'nama_sub_mapel'          => 'nullable|string|max:100',
       'is_aktif'                => 'boolean',
       'jenjang'                 => 'required|array|min:1',
       'jenjang.*.jenjang'       => 'required|string|in:SD,SMP,SMA,SMK',
@@ -116,6 +127,7 @@ class MapelMasterController extends Controller
       'mapel_kelompok_id' => $request->mapel_kelompok_id,
       'nama'              => $request->nama,
       'nama_singkat'      => $request->nama_singkat,
+      'nama_sub_mapel'    => $request->nama_sub_mapel,
       'is_aktif'          => $request->boolean('is_aktif'),
     ]);
 
