@@ -330,7 +330,7 @@ Route::middleware(['fitur:skl'])->group(function () {
   Route::controller(SklController::class)
     ->prefix('skl')
     ->name('skl.')
-    ->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru|Kepala Sekolah'])
+    ->middleware(['auth:sanctum', 'role:Kepala Sekolah'])
     ->group(function () {
       Route::post('/bulk/setujui', 'bulkSetujui')->name('bulk.setujui');
       Route::post('/bulk/batal-setujui', 'bulkBatalSetujui')->name('bulk.batal_setujui');
@@ -349,19 +349,18 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::put('/', 'update')->name('update');
     });
 
-  // SKL - Manajemen (Operator Sekolah / Guru, fitur: skl)
+  // SKL - Kelola (Operator Sekolah dan Guru wali kelas; grup ini
+  // didaftarkan lebih dulu supaya /create tidak tertangkap pola
+  // /{skl} milik grup baca)
   Route::controller(SklController::class)
     ->prefix('skl')
     ->name('skl.')
-    ->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru|Kepala Sekolah'])
+    ->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru'])
     ->group(function () {
       Route::post('/bulk/ajukan', 'bulkAjukan')->name('bulk.ajukan');
       Route::delete('/bulk/hapus', 'bulkHapus')->name('bulk.hapus');
-      Route::get('/bulk/cetak', 'generateBulk')->name('bulk.cetak');
-      Route::get('/', 'index')->name('index');
       Route::get('/create', 'create')->name('create');
       Route::post('/', 'store')->name('store');
-      Route::get('/{skl}', 'show')->name('show');
       Route::get('/{skl}/edit', 'edit')->name('edit');
       Route::put('/{skl}', 'update')->name('update');
       Route::delete('/{skl}', 'destroy')->name('destroy');
@@ -371,6 +370,18 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::post('/sync', 'sync')->name('sync');
       Route::get('/template/download', 'downloadTemplate')->name('template.download');
       Route::post('/import', 'importNilai')->name('import');
+    });
+
+  // SKL - Baca (Admin dan Kepala Sekolah boleh melihat;
+  // Kepala Sekolah bertindak lewat grup persetujuan)
+  Route::controller(SklController::class)
+    ->prefix('skl')
+    ->name('skl.')
+    ->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru|Kepala Sekolah'])
+    ->group(function () {
+      Route::get('/bulk/cetak', 'generateBulk')->name('bulk.cetak');
+      Route::get('/', 'index')->name('index');
+      Route::get('/{skl}', 'show')->name('show');
       Route::get('/{id}/preview', 'previewPdf')->name('preview');
       Route::get('/{id}/download', 'generatePdf')->name('download');
     });
@@ -380,21 +391,38 @@ Route::middleware(['fitur:skl'])->group(function () {
 | SKHU
 |--------------------------------------------------------------------------
 */
+// SKHU - Baca (Admin boleh melihat; yang mengisi dibatasi di grup kelola)
 Route::controller(SkhuController::class)
   ->prefix('skhu')
-  ->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru|Kepala Sekolah', 'fitur:skhu'])
+  ->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru|Kepala Sekolah', 'fitur:skhu'])
   ->group(function () {
     Route::get('/', 'index')->name('skhu');
+    Route::get('/download-bulk', 'generateBulk');
+    Route::get('/siswa/{siswa_id}', 'formSiswa')->name('skhu.form'); // Nama unik agar tidak bentrok dengan index 'skhu'
+    Route::get('/pdf/{skhu_id}', 'generatePdf');
+    Route::get('view/{skhu_id}', 'previewPdf');
+  });
+
+// SKHU - Kelola (Operator Sekolah dan Guru wali kelas; penjaga
+// wali kelasnya ditegakkan di controller)
+Route::controller(SkhuController::class)
+  ->prefix('skhu')
+  ->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru', 'fitur:skhu'])
+  ->group(function () {
+    Route::post('/finalisasi-semua', 'finalisasiSemua');
+    Route::post('/siswa/{siswa_id}/simpan', 'simpan');
+    Route::post('/siswa/{skhu_id}/updateStatus', 'updateStatus');
+  });
+
+// SKHU - Khusus Operator (impor & template memang sudah
+// dijaga Operator-only di controller; route kini selaras)
+Route::controller(SkhuController::class)
+  ->prefix('skhu')
+  ->middleware(['auth:sanctum', 'role:Operator Sekolah', 'fitur:skhu'])
+  ->group(function () {
     Route::get('/import', 'halamanImport');
     Route::get('/import/template', 'downloadTemplate');
     Route::post('/import', 'importNilai');
-    Route::get('/download-bulk', 'generateBulk');
-    Route::post('/finalisasi-semua', 'finalisasiSemua');
-    Route::get('/siswa/{siswa_id}', 'formSiswa')->name('skhu.form'); // Nama unik agar tidak bentrok dengan index 'skhu'
-    Route::post('/siswa/{siswa_id}/simpan', 'simpan');
-    Route::post('/siswa/{skhu_id}/updateStatus', 'updateStatus');
-    Route::get('/pdf/{skhu_id}', 'generatePdf');
-    Route::get('view/{skhu_id}', 'previewPdf');
   });
 
 
