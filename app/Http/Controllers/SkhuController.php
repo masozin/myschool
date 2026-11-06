@@ -399,6 +399,369 @@ class SkhuController extends Controller
     ]);
   }
 
+  // =========================================================================
+  // PENGATURAN ANGKATAN — tanggal & nomor untuk seluruh siswa sekaligus
+  // =========================================================================
+  // Tanggal ujian, tanggal terbit, dan penomoran adalah keputusan satu
+  // angkatan, bukan per siswa. Halaman ini menerapkannya ke semua SKHU
+  // berstatus draft milik siswa kelas akhir pada semester sesi; SKHU yang
+  // sudah final tidak disentuh. Nomor dibuat dari pola teks, contoh:
+  //   800/{no:3}/SDN-01/{tahun}  →  800/007/SDN-01/2026
+  // Token nomor: {no} (tanpa nol di depan), {no:3} atau {no;3} (3 digit).
+  // Token {tahun} diisi tahun tanggal terbit. Urutan nomor mengikuti
+  // posisi siswa pada urutan yang dipilih (nama A–Z atau NIS).
+
+  public function pengaturanAngkatan()
+  {
+    $user     = Auth::user();
+    $sekolah  = Sekolah::with(['detailTerbaru'])->findOrFail($this->sekolahKonteksId());
+    $semester = Semester::findOrFail(session('semester_id'));
+    $jenjang  = strtoupper($sekolah->jenjang);
+    $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? null;
+
+    if (!$tingkatAkhir) {
+      return back()->with('error', 'Jenjang sekolah tidak dikenali.');
+    }
+
+    $anggota = $this->getSiswaKelasAkhir($sekolah->id, $semester->id, $tingkatAkhir);
+
+    $siswaList = $anggota->map(function ($a) {
+      $skhu = $a->siswa->skhu->first();
+      return [
+        'siswa_id'    => $a->siswa->id,
+        'nama'        => $a->siswa->nama_siswa,
+        'nis'         => $a->siswa->registrasiTerbaru?->nis,
+        'nisn'        => $a->siswa->nisn,
+        'rombel'      => $a->rombel?->nama_rombel,
+        'nomor_surat' => $skhu?->nomor_surat,
+        'nomor_ujian' => $skhu?->nomor_ujian,
+        'status'      => $skhu?->status,
+      ];
+    })->values();
+
+    // Nilai tanggal yang sudah umum dipakai angkatan ini (untuk prefill form)
+    $skhus = Skhu::where('sekolah_id', $sekolah->id)
+      ->where('semester_id', $semester->id)
+      ->get();
+    $prefill = [
+      'tanggal_mulai_ujian'   => $skhus->pluck('tanggal_mulai_ujian')->filter()->first(),
+      'tanggal_selesai_ujian' => $skhus->pluck('tanggal_selesai_ujian')->filter()->first(),
+      'tanggal_terbit'        => $skhus->pluck('tanggal_terbit')->filter()->first(),
+    ];
+    $jumlahFinal = $skhus->where('status', 'final')->count();
+
+    return view('content.skhu.pengaturan-angkatan', compact(
+      'sekolah', 'semester', 'jenjang', 'tingkatAkhir',
+      'siswaList', 'prefill', 'jumlahFinal'
+    ));
+  }
+
+  public function simpanPengaturanAngkatan(Request $request)
+  {
+    $request->validate([
+      'tanggal_mulai_ujian'   => 'nullable|date',
+      'tanggal_selesai_ujian' => 'nullable|date|after_or_equal:tanggal_mulai_ujian',
+      'tanggal_terbit'        => 'nullable|date',
+      'pola_nomor_surat'      => 'nullable|string|max:100',
+      'pola_nomor_ujian'      => 'nullable|string|max:100',
+      'nomor_awal'            => 'nullable|integer|min:0|max:99999',
+      'urutan'                => 'required|in:nama,nis',
+      'timpa_nomor'           => 'nullable|boolean',
+    ]);
+
+    foreach (['pola_nomor_surat' => 'Nomor SKHU', 'pola_nomor_ujian' => 'Nomor ujian'] as $field => $label) {
+      $pola = trim((string) $request->input($field, ''));
+      if ($pola !== '' && !preg_match('/\{no(?:[:;]\d+)?\}/', $pola)) {
+        return response()->json([
+          'message' => "Pola {$label} harus mengandung token nomor, contoh {no:3}.",
+        ], 422);
+      }
+    }
+
+    $adaTanggal = $request->filled('tanggal_mulai_ujian')
+      || $request->filled('tanggal_selesai_ujian')
+      || $request->filled('tanggal_terbit');
+    $adaNomor = $request->filled('pola_nomor_surat') || $request->filled('pola_nomor_ujian');
+
+    if (!$adaTanggal && !$adaNomor) {
+      return response()->json([
+        'message' => 'Tidak ada yang diterapkan. Isi minimal satu tanggal atau satu pola nomor.',
+      ], 422);
+    }
+
+    $sekolahId = $this->sekolahKonteksId();
+    $sekolah   = Sekolah::findOrFail($sekolahId);
+    $semester  = Semester::findOrFail(session('semester_id'));
+    $jenjang   = strtoupper($sekolah->jenjang);
+    $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? null;
+
+    if (!$tingkatAkhir) {
+      return response()->json(['message' => 'Jenjang sekolah tidak dikenali.'], 422);
+    }
+
+    $anggota = $this->getSiswaKelasAkhir($sekolahId, $semester->id, $tingkatAkhir);
+
+    if ($anggota->isEmpty()) {
+      return response()->json(['message' => 'Belum ada siswa kelas akhir pada semester ini.'], 422);
+    }
+
+    // Urutan penomoran: nama A–Z, atau NIS (urut alami agar "9" < "10")
+    if ($request->urutan === 'nis') {
+      $anggota = $anggota->sort(function ($a, $b) {
+        $na = (string) ($a->siswa->registrasiTerbaru?->nis ?? '');
+        $nb = (string) ($b->siswa->registrasiTerbaru?->nis ?? '');
+        $cmp = strnatcasecmp($na, $nb);
+        return $cmp !== 0 ? $cmp : strcasecmp($a->siswa->nama_siswa, $b->siswa->nama_siswa);
+      })->values();
+    } else {
+      $anggota = $anggota->sortBy(fn($a) => strtolower($a->siswa->nama_siswa))->values();
+    }
+
+    $tahun = $request->filled('tanggal_terbit')
+      ? (int) date('Y', strtotime($request->tanggal_terbit))
+      : (int) date('Y');
+    $nomorAwal = (int) ($request->input('nomor_awal') ?? 1);
+    $timpa     = (bool) $request->input('timpa_nomor', false);
+
+    // SKHU yang sudah final dikunci: nomornya tidak boleh tertabrak
+    $skhuFinal = Skhu::where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semester->id)
+      ->where('status', 'final')
+      ->get();
+    $nomorFinalSurat = $skhuFinal->pluck('nomor_surat')->filter()->all();
+    $nomorFinalUjian = $skhuFinal->pluck('nomor_ujian')->filter()->all();
+
+    // Hitung dulu seluruh penetapan nomor sebelum menulis apa pun
+    $penetapan = []; // siswa_id => ['nomor_surat' => ?, 'nomor_ujian' => ?]
+    foreach ($anggota as $i => $a) {
+      $skhu = $a->siswa->skhu->first();
+      if ($skhu && $skhu->status === 'final') {
+        continue;
+      }
+      $seq  = $nomorAwal + $i;
+      $item = [];
+      if ($request->filled('pola_nomor_surat') && ($timpa || empty($skhu?->nomor_surat))) {
+        $item['nomor_surat'] = $this->formatNomor($request->pola_nomor_surat, $seq, $tahun);
+      }
+      if ($request->filled('pola_nomor_ujian') && ($timpa || empty($skhu?->nomor_ujian))) {
+        $item['nomor_ujian'] = $this->formatNomor($request->pola_nomor_ujian, $seq, $tahun);
+      }
+      if ($item) {
+        $penetapan[$a->siswa->id] = $item;
+      }
+    }
+
+    foreach ($penetapan as $item) {
+      if (isset($item['nomor_surat']) && in_array($item['nomor_surat'], $nomorFinalSurat, true)) {
+        return response()->json([
+          'message' => "Nomor SKHU \"{$item['nomor_surat']}\" akan sama dengan milik SKHU yang sudah final. Ubah nomor awal atau polanya — tidak ada yang disimpan.",
+        ], 422);
+      }
+      if (isset($item['nomor_ujian']) && in_array($item['nomor_ujian'], $nomorFinalUjian, true)) {
+        return response()->json([
+          'message' => "Nomor ujian \"{$item['nomor_ujian']}\" akan sama dengan milik SKHU yang sudah final. Ubah nomor awal atau polanya — tidak ada yang disimpan.",
+        ], 422);
+      }
+    }
+
+    $nTanggal = 0;
+    $nSurat   = 0;
+    $nUjian   = 0;
+    $nFinal   = 0;
+
+    DB::transaction(function () use (
+      $anggota, $request, $adaTanggal, $penetapan,
+      $sekolahId, $semester, &$nTanggal, &$nSurat, &$nUjian, &$nFinal
+    ) {
+      foreach ($anggota as $a) {
+        $skhu = $a->siswa->skhu->first();
+
+        if ($skhu && $skhu->status === 'final') {
+          $nFinal++;
+          continue;
+        }
+
+        $isi = $penetapan[$a->siswa->id] ?? [];
+
+        if ($adaTanggal) {
+          if ($request->filled('tanggal_mulai_ujian'))   $isi['tanggal_mulai_ujian']   = $request->tanggal_mulai_ujian;
+          if ($request->filled('tanggal_selesai_ujian')) $isi['tanggal_selesai_ujian'] = $request->tanggal_selesai_ujian;
+          if ($request->filled('tanggal_terbit'))        $isi['tanggal_terbit']        = $request->tanggal_terbit;
+        }
+
+        if (!$isi) {
+          continue;
+        }
+
+        if (!$skhu) {
+          $skhu = new Skhu();
+          $skhu->siswa_id    = $a->siswa->id;
+          $skhu->semester_id = $semester->id;
+        }
+        $skhu->sekolah_id = $sekolahId;
+        $skhu->fill($isi);
+        $skhu->save();
+
+        if ($adaTanggal) $nTanggal++;
+        if (isset($isi['nomor_surat'])) $nSurat++;
+        if (isset($isi['nomor_ujian'])) $nUjian++;
+      }
+    });
+
+    $ringkasan = [];
+    if ($nTanggal > 0) $ringkasan[] = "tanggal diterapkan ke {$nTanggal} siswa";
+    if ($nSurat > 0)   $ringkasan[] = "nomor SKHU dibuat untuk {$nSurat} siswa";
+    if ($nUjian > 0)   $ringkasan[] = "nomor ujian dibuat untuk {$nUjian} siswa";
+    if ($nFinal > 0)   $ringkasan[] = "{$nFinal} SKHU final dilewati (terkunci)";
+    if (!$ringkasan)   $ringkasan[] = 'tidak ada perubahan (semua nomor sudah terisi — centang "timpa" bila ingin membuat ulang)';
+
+    return response()->json([
+      'message' => 'Pengaturan angkatan disimpan: ' . implode('; ', $ringkasan) . '.',
+    ]);
+  }
+
+  // Pola → nomor jadi. Token: {no}, {no:3}, {no;3}, {tahun}
+  private function formatNomor(string $pola, int $nomor, int $tahun): string
+  {
+    $hasil = preg_replace_callback(
+      '/\{no(?:[:;](\d+))?\}/',
+      fn($m) => isset($m[1]) && $m[1] !== ''
+        ? str_pad((string) $nomor, (int) $m[1], '0', STR_PAD_LEFT)
+        : (string) $nomor,
+      trim($pola)
+    );
+
+    return str_replace('{tahun}', (string) $tahun, $hasil);
+  }
+
+  // =========================================================================
+  // KELOLA TEMPLATE CETAK SKHU (Admin)
+  // =========================================================================
+  // Template cetak = file Blade di resources/views/templates/skhu-template/
+  // yang didaftarkan di tabel_skhu_template untuk satu jenjang + semester.
+  // Tanpa pendaftaran ini, preview/cetak berhenti di "template tidak
+  // ditemukan" walaupun file Blade-nya ada.
+
+  public function templateIndex()
+  {
+    $templates = SkhuTemplate::with(['semester', 'kurikulum'])
+      ->orderBy('jenjang')
+      ->orderByDesc('semester_id')
+      ->get();
+
+    $semesters  = Semester::orderByDesc('kode_semester')->get();
+    $kurikulums = \App\Models\Kurikulum::orderBy('nama')->get();
+    $fileList   = $this->daftarFileTemplate();
+
+    return view('content.skhu.template', compact(
+      'templates', 'semesters', 'kurikulums', 'fileList'
+    ));
+  }
+
+  public function templateStore(Request $request)
+  {
+    $data = $request->validate([
+      'jenjang'      => 'required|in:SD,SMP,SMA,SMK',
+      'semester_id'  => 'required|exists:tabel_semester,id',
+      'kurikulum_id' => 'required|exists:tabel_kurikulum,id',
+      'nama_file'    => 'required|string|max:255',
+      'keterangan'   => 'nullable|string|max:255',
+      'is_active'    => 'nullable|boolean',
+    ]);
+
+    if (!in_array($data['nama_file'], $this->daftarFileTemplate(), true)) {
+      return back()->withInput()
+        ->with('error', 'File template tidak ditemukan di folder templates/skhu-template.');
+    }
+
+    $duplikat = SkhuTemplate::where('jenjang', $data['jenjang'])
+      ->where('semester_id', $data['semester_id'])
+      ->exists();
+    if ($duplikat) {
+      return back()->withInput()
+        ->with('error', "Template untuk jenjang {$data['jenjang']} pada semester itu sudah terdaftar. Edit entri yang ada.");
+    }
+
+    SkhuTemplate::create([
+      'jenjang'      => $data['jenjang'],
+      'semester_id'  => $data['semester_id'],
+      'kurikulum_id' => $data['kurikulum_id'],
+      'nama_file'    => $data['nama_file'],
+      'keterangan'   => $data['keterangan'] ?? null,
+      'is_active'    => $request->boolean('is_active'),
+    ]);
+
+    return back()->with('success', 'Template SKHU berhasil didaftarkan.');
+  }
+
+  public function templateUpdate(Request $request, int $id)
+  {
+    $template = SkhuTemplate::findOrFail($id);
+
+    $data = $request->validate([
+      'jenjang'      => 'required|in:SD,SMP,SMA,SMK',
+      'semester_id'  => 'required|exists:tabel_semester,id',
+      'kurikulum_id' => 'required|exists:tabel_kurikulum,id',
+      'nama_file'    => 'required|string|max:255',
+      'keterangan'   => 'nullable|string|max:255',
+      'is_active'    => 'nullable|boolean',
+    ]);
+
+    if (!in_array($data['nama_file'], $this->daftarFileTemplate(), true)) {
+      return back()->withInput()
+        ->with('error', 'File template tidak ditemukan di folder templates/skhu-template.');
+    }
+
+    $duplikat = SkhuTemplate::where('jenjang', $data['jenjang'])
+      ->where('semester_id', $data['semester_id'])
+      ->where('id', '!=', $id)
+      ->exists();
+    if ($duplikat) {
+      return back()->withInput()
+        ->with('error', "Template untuk jenjang {$data['jenjang']} pada semester itu sudah terdaftar.");
+    }
+
+    $template->update([
+      'jenjang'      => $data['jenjang'],
+      'semester_id'  => $data['semester_id'],
+      'kurikulum_id' => $data['kurikulum_id'],
+      'nama_file'    => $data['nama_file'],
+      'keterangan'   => $data['keterangan'] ?? null,
+      'is_active'    => $request->boolean('is_active'),
+    ]);
+
+    return back()->with('success', 'Template SKHU berhasil diperbarui.');
+  }
+
+  public function templateDestroy(int $id)
+  {
+    SkhuTemplate::findOrFail($id)->delete();
+
+    return back()->with('success', 'Pendaftaran template dihapus. File Blade-nya tidak ikut terhapus.');
+  }
+
+  // Nama relatif semua file Blade template yang tersedia di disk,
+  // contoh: ['2425-sd', 'sd/2024-2025']
+  private function daftarFileTemplate(): array
+  {
+    $base = resource_path('views/templates/skhu-template');
+    if (!is_dir($base)) {
+      return [];
+    }
+
+    $files = [];
+    $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($base));
+    foreach ($it as $file) {
+      if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+        $rel = str_replace('\\', '/', substr($file->getPathname(), strlen($base) + 1));
+        $files[] = substr($rel, 0, -strlen('.blade.php'));
+      }
+    }
+    sort($files);
+
+    return $files;
+  }
+
   // ── Generate PDF per siswa ────────────────────────────────────────────
   public function generatePdf(int $skhuId)
   {

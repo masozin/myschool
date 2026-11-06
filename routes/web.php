@@ -426,6 +426,20 @@ Route::controller(SkhuController::class)
     Route::get('/import', 'halamanImport');
     Route::get('/import/template', 'downloadTemplate');
     Route::post('/import', 'importNilai');
+    Route::get('/pengaturan-angkatan', 'pengaturanAngkatan');
+    Route::post('/pengaturan-angkatan', 'simpanPengaturanAngkatan');
+  });
+
+// SKHU - Kelola Template Cetak (Admin; template berlaku lintas sekolah
+// untuk satu jenjang + semester, jadi bukan domain Operator)
+Route::controller(SkhuController::class)
+  ->prefix('skhu')
+  ->middleware(['auth:sanctum', 'role:Admin', 'fitur:skhu'])
+  ->group(function () {
+    Route::get('/template', 'templateIndex');
+    Route::post('/template', 'templateStore');
+    Route::put('/template/{id}', 'templateUpdate');
+    Route::delete('/template/{id}', 'templateDestroy');
   });
 
 

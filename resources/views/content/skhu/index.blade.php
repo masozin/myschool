@@ -54,6 +54,13 @@
             </div>
             <small class="text-muted">Hubungi administrator untuk membuat template.</small>
           @endif
+          @hasanyrole('Admin')
+            <div class="mt-2">
+              <a href="{{ url('/skhu/template') }}" class="btn btn-label-primary btn-sm">
+                <i class="icon-base ri ri-layout-line me-1"></i>Kelola Template
+              </a>
+            </div>
+          @endhasanyrole
         </div>
       </div>
     </div>
@@ -74,6 +81,13 @@
           <button class="btn btn-label-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-import">
             <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
           </button>
+        @endhasanyrole
+        {{-- Pengaturan Angkatan (tanggal & nomor massal) --}}
+        @hasanyrole('Operator Sekolah')
+          <a href="{{ url('/skhu/pengaturan-angkatan') }}" class="btn btn-label-info btn-sm">
+            <i class="icon-base ri ri-calendar-settings-line me-1"></i><span class="d-none d-md-block">Pengaturan
+              Angkatan</span>
+          </a>
         @endhasanyrole
         {{-- Finalisasi Semua --}}
         @hasanyrole('Admin|Operator Sekolah')
