@@ -17,7 +17,7 @@ class MapelMappingSeeder extends Seeder
       return;
     }
 
-    $masters = MapelMaster::with('mapelJenjang')->get();
+    $masters = MapelMaster::with(['mapelJenjang', 'kurikulum'])->get();
 
     $urutan = [
       'AGM-ISLAM' => 1,
@@ -50,7 +50,7 @@ class MapelMappingSeeder extends Seeder
       'SMK' => range(10, 13),
     ];
 
-    $rows = [];
+    $jumlah = 0;
 
     foreach ($tingkatPerJenjang as $jenjang => $tingkatList) {
       foreach ($tingkatList as $tingkat) {
@@ -66,30 +66,37 @@ class MapelMappingSeeder extends Seeder
               continue;
             }
 
-            $rows[] = [
-              'mapel_master_id' => $master->id,
-              'jenjang'         => $jenjang,
-              'tingkat'         => $tingkat,
-              'semester_id'     => $semester->id,
-              'jenis'           => 'pokok',
-              'sekolah_id'      => null,
-              'urutan'          => $urutan[$master->kode] ?? 99,
-              'created_at'      => now(),
-              'updated_at'      => now(),
-            ];
+            // Master bertanda kurikulum tertentu menghasilkan satu
+            // baris per kurikulum; tanpa tanda berarti satu baris
+            // kurikulum NULL (berlaku semua kurikulum)
+            $kurikulumIds = $master->kurikulum->pluck('id');
+            if ($kurikulumIds->isEmpty()) {
+              $kurikulumIds = collect([null]);
+            }
+
+            foreach ($kurikulumIds as $kurikulumId) {
+              MapelMapping::updateOrCreate(
+                [
+                  'mapel_master_id' => $master->id,
+                  'jenjang'         => $jenjang,
+                  'tingkat'         => $tingkat,
+                  'semester_id'     => $semester->id,
+                  'sekolah_id'      => null,
+                  'kurikulum_id'    => $kurikulumId,
+                ],
+                [
+                  'mapel_kelompok_id' => $master->mapel_kelompok_id,
+                  'jenis'             => 'pokok',
+                  'urutan'            => $urutan[$master->kode] ?? 99,
+                ]
+              );
+              $jumlah++;
+            }
           }
         }
       }
     }
 
-    collect($rows)->chunk(500)->each(
-      fn($chunk) => MapelMapping::upsert(
-        $chunk->toArray(),
-        ['mapel_master_id', 'jenjang', 'tingkat', 'semester_id', 'sekolah_id'],
-        ['jenis', 'urutan', 'updated_at']
-      )
-    );
-
-    $this->command->info('✅ MapelMappingSeeder selesai: ' . count($rows) . ' baris.');
+    $this->command->info('✅ MapelMappingSeeder selesai: ' . $jumlah . ' baris.');
   }
 }

@@ -141,6 +141,15 @@
             <small class="text-muted d-block" id="note-anggota"></small>
           </label>
         </div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" name="salin[]" value="mapel"
+            id="salin-mapel" checked>
+          <label class="form-check-label" for="salin-mapel">
+            Mapping Mapel Tambahan
+            <small class="text-muted d-block">Mapel lokal sekolah dari semester asal; yang sudah ada
+              dilewati. Mapel pokok disalin oleh Admin.</small>
+          </label>
+        </div>
       </div>
     </div>
 

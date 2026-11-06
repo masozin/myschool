@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\MapelMapping;
 use App\Models\RombelAnggota;
 use App\Models\Sekolah;
 use App\Models\Siswa;
@@ -154,7 +155,8 @@ class DataPeriodikController extends Controller
    * Eksekusi Salin Data dari Semester Pilihan Pengguna.
    *
    * Item yang disalin dipilih lewat checkbox `salin[]`:
-   * detail (sekolah), rombel, dan anggota (siswa aktif di rombel sumber).
+   * detail (sekolah), rombel, anggota (siswa aktif di rombel sumber),
+   * dan mapel (mapping tambahan milik sekolah).
    * Item yang sudah ada di semester tujuan dilewati, bukan ditimpa.
    */
   public function copyData(Request $request)
@@ -162,7 +164,7 @@ class DataPeriodikController extends Controller
     $request->validate([
       'semester_asal' => 'required|exists:tabel_semester,id',
       'salin'         => 'nullable|array',
-      'salin.*'       => 'in:rombel,anggota',
+      'salin.*'       => 'in:rombel,anggota,mapel',
     ]);
 
     $user = Auth::user();
@@ -354,6 +356,59 @@ class DataPeriodikController extends Controller
           if ($dilewati) {
             $catatan[] = $dilewati . ' anggota dilewati (sudah punya rombel di semester ini)';
           }
+        }
+      }
+
+      // ── Mapping mapel tambahan ───────────────────────────────────
+      // Mapel lokal sekolah disalin dari semester asal; yang sudah
+      // berlaku di semester ini (sebagai pokok atau tambahan)
+      // dilewati. Mapel pokok adalah urusan Admin (salin semester
+      // di halaman mapping), tidak disalin di sini.
+      if (in_array('mapel', $pilihan)) {
+        $tambahanAsal = MapelMapping::where('sekolah_id', $sekolahId)
+          ->where('jenis', 'tambahan')
+          ->where('semester_id', $semesterLalu)
+          ->orderBy('urutan')
+          ->get();
+
+        $tersalinMapel = 0;
+
+        foreach ($tambahanAsal as $m) {
+          $sudahAda = MapelMapping::where('mapel_master_id', $m->mapel_master_id)
+            ->where('jenjang', $m->jenjang)
+            ->where('tingkat', $m->tingkat)
+            ->where('semester_id', $semesterSekarang)
+            ->when($m->kurikulum_id !== null, fn($q) => $q->where(
+              fn($q2) => $q2->whereNull('kurikulum_id')->orWhere('kurikulum_id', $m->kurikulum_id)
+            ))
+            ->where(function ($q) use ($sekolahId) {
+              $q->whereNull('sekolah_id')->orWhere('sekolah_id', $sekolahId);
+            })
+            ->exists();
+
+          if ($sudahAda) {
+            continue;
+          }
+
+          MapelMapping::create([
+            'mapel_master_id'   => $m->mapel_master_id,
+            'mapel_kelompok_id' => $m->mapel_kelompok_id,
+            'jenjang'           => $m->jenjang,
+            'tingkat'           => $m->tingkat,
+            'semester_id'       => $semesterSekarang,
+            'kurikulum_id'      => $m->kurikulum_id,
+            'jenis'             => 'tambahan',
+            'sekolah_id'        => $sekolahId,
+            'urutan'            => $m->urutan,
+            'is_aktif'          => $m->is_aktif,
+          ]);
+          $tersalinMapel++;
+        }
+
+        if ($tersalinMapel) {
+          $hasil[] = $tersalinMapel . ' mapping mapel tambahan';
+        } elseif ($tambahanAsal->isNotEmpty()) {
+          $catatan[] = 'mapping mapel tambahan sudah lengkap di semester ini';
         }
       }
 
