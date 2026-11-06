@@ -156,6 +156,20 @@ class RombelController extends Controller
       ], 422);
     }
 
+    $errorKurikulum = $this->cekKurikulumSetingkat(
+      $sekolahId,
+      $semesterId,
+      (int) $validated['tingkat'],
+      (int) $validated['kurikulum_id']
+    );
+
+    if ($errorKurikulum) {
+      return response()->json([
+        'message' => $errorKurikulum,
+        'errors'  => ['kurikulum_id' => [$errorKurikulum]],
+      ], 422);
+    }
+
     Rombel::create([
       ...$validated,
       'sekolah_id'  => $sekolahId,
@@ -189,15 +203,64 @@ class RombelController extends Controller
 
     $validated = $request->validate($rules);
 
+    $tingkatEfektif = $sudahAdaAnggota ? $rombel->tingkat : $validated['tingkat'];
+
+    $errorKurikulum = $this->cekKurikulumSetingkat(
+      (int) $rombel->sekolah_id,
+      (int) $rombel->semester_id,
+      (int) $tingkatEfektif,
+      (int) $validated['kurikulum_id'],
+      (int) $rombel->id
+    );
+
+    if ($errorKurikulum) {
+      return response()->json([
+        'message' => $errorKurikulum,
+        'errors'  => ['kurikulum_id' => [$errorKurikulum]],
+      ], 422);
+    }
+
     $rombel->update([
       ...$validated,
-      'tingkat' => $sudahAdaAnggota ? $rombel->tingkat : $validated['tingkat'],
+      'tingkat' => $tingkatEfektif,
     ]);
 
     return response()->json([
       'message'   => 'Berhasil update data kelas',
       'is_locked' => $sudahAdaAnggota,
     ]);
+  }
+
+  /**
+   * Satu tingkat memakai SATU kurikulum per sekolah per semester —
+   * rombel paralel (6A, 6B, …) tidak boleh berbeda kurikulum, karena
+   * dokumen tingkat (template Excel & nilai SKHU/SKL) disusun per
+   * tingkat. Mengembalikan pesan error bila kurikulum yang diajukan
+   * bertabrakan dengan rombel setingkat lain, null bila aman.
+   */
+  private function cekKurikulumSetingkat(
+    int $sekolahId,
+    int $semesterId,
+    int $tingkat,
+    int $kurikulumId,
+    ?int $kecualiRombelId = null
+  ): ?string {
+    $lain = Rombel::with('kurikulum')
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->where('tingkat', $tingkat)
+      ->whereNotNull('kurikulum_id')
+      ->where('kurikulum_id', '!=', $kurikulumId)
+      ->when($kecualiRombelId, fn($q) => $q->where('id', '!=', $kecualiRombelId))
+      ->first();
+
+    if (!$lain) {
+      return null;
+    }
+
+    return "Kurikulum harus sama untuk semua rombel kelas {$tingkat} pada semester ini. " .
+      "Rombel {$lain->nama_rombel} sudah memakai {$lain->kurikulum?->nama}. " .
+      'Bila memang ingin mengganti kurikulum tingkat ini, ubah dulu kurikulum semua rombel kelas tersebut.';
   }
 
   public function destroy($id)
