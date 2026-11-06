@@ -132,6 +132,15 @@ class MapelMappingController extends Controller
       $query->where('tingkat', $tingkatDipilih);
     }
 
+    // Saringan tampilan kurikulum: yang berlaku untuk kurikulum
+    // terpilih, termasuk yang berlaku untuk semua kurikulum
+    $kurikulumDipilih = (int) $request->get('kurikulum_id');
+    if ($kurikulumDipilih > 0) {
+      $query->where(function ($q) use ($kurikulumDipilih) {
+        $q->whereNull('kurikulum_id')->orWhere('kurikulum_id', $kurikulumDipilih);
+      });
+    }
+
     if ($isOperator) {
       $query->where(function ($q) use ($sekolah) {
         $q->whereNull('sekolah_id')

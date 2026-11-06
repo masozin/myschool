@@ -80,6 +80,17 @@
           </div>
         @endif
 
+        {{-- Filter Kurikulum --}}
+        <div>
+          <label class="form-label mb-1">Kurikulum</label>
+          <select id="filter-kurikulum" class="form-select form-select-sm" style="min-width: 180px;">
+            <option value="">Semua Kurikulum</option>
+            @foreach ($kurikulumList as $kur)
+              <option value="{{ $kur->id }}">Berlaku untuk {{ $kur->nama }}</option>
+            @endforeach
+          </select>
+        </div>
+
         {{-- Filter Tingkat --}}
         <div>
           <select id="filter-tingkat" class="form-select form-select-sm" style="min-width: 140px;">
@@ -345,6 +356,12 @@
 
       let activeJenjang = @json($jenjangDipilih);
       let activeTingkat = @json($tingkatDipilih);
+      let activeKurikulum = '';
+
+      document.getElementById('filter-kurikulum')?.addEventListener('change', function() {
+        activeKurikulum = this.value;
+        loadData();
+      });
 
       // ====================== CORE FUNCTIONS ======================
       async function loadData() {
@@ -356,6 +373,7 @@
             jenjang: activeJenjang
           });
           if (activeTingkat) params.append('tingkat', activeTingkat);
+          if (activeKurikulum) params.append('kurikulum_id', activeKurikulum);
 
           const res = await fetch(`${dataUrl}?${params}`, {
             headers: {
@@ -470,6 +488,10 @@
           `<span class="badge bg-label-secondary ms-2" style="font-size:.7rem;">Nonaktif</span>` :
           '';
 
+        const kurikulumBadge = row.kurikulum ?
+          `<span class="badge bg-label-info ms-2" style="font-size:.7rem;">${escHtml(row.kurikulum)}</span>` :
+          '';
+
         const subNama = row.nama_sub ?
           `<span class="text-muted">${escHtml(row.nama_sub)}</span>` :
           `<span class="text-muted fst-italic">—</span>`;
@@ -508,7 +530,7 @@
     <tr data-mapel-id="${row.id}"${row.nonaktif ? ' style="opacity:.55"' : ''}>
       <td class="text-center"><span class="badge bg-label-secondary urutan-badge">${row.urutan}</span></td>
       <td class="text-center"><span class="badge bg-label-info">Kelas ${row.tingkat}</span></td>
-      <td>${escHtml(row.nama)}${lokBadge}${nonaktifBadge}</td>
+      <td>${escHtml(row.nama)}${lokBadge}${nonaktifBadge}${kurikulumBadge}</td>
       <td>${subNama}</td>
       <td><div class="d-flex gap-1 justify-content-center align-items-center">${aksi}</div></td>
     </tr>`;
