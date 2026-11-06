@@ -54,7 +54,7 @@ class AppServiceProvider extends ServiceProvider
         $semesterId = session('semester_id');
         $semester   = Semester::find($semesterId);
 
-        $isEditable = $user->hasRole('admin')
+        $isEditable = $user->hasRole('Admin')
           || ($semester && $semester->is_active == 1);
 
         $view->with([

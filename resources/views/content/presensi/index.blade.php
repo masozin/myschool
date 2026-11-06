@@ -120,7 +120,8 @@
         <button type="button" class="btn btn-outline-secondary btn-sm btn-tambah" id="btn_tandai_semua_hadir">
           <i class="ri ri-checkbox-circle-line me-1"></i> Tandai Semua Hadir
         </button>
-        <button type="button" class="btn btn-primary btn-sm btn-simpan" id="btn_simpan_presensi">
+        <button type="button" class="btn btn-primary btn-sm btn-simpan" id="btn_simpan_presensi"
+          {{ !$isEditable ? 'disabled' : '' }}>
           <i class="ri ri-save-line me-1"></i> Simpan Presensi
         </button>
       </div>

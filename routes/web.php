@@ -491,7 +491,7 @@ Route::controller(DhSiswaController::class)
   });
 
 // routes/web.php
-Route::prefix('presensi')->name('presensi.')->middleware('auth')->group(function () {
+Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru', 'fitur:presensi'])->group(function () {
   Route::get('/', [PresensiController::class, 'index'])->name('index');
   Route::get('/ajax-siswa', [PresensiController::class, 'ajaxSiswa'])->name('ajaxSiswa');
   Route::post('/store', [PresensiController::class, 'store'])->name('store');
