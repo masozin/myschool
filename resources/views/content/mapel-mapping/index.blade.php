@@ -99,6 +99,13 @@
             </button>
           @endif
 
+          @if ($isOperator)
+            <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal"
+              data-bs-target="#modal-salin-tambahan">
+              <i class="icon-base ri ri-file-copy-line me-1"></i>Salin dari Semester Lalu
+            </button>
+          @endif
+
           <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-mapel"
             id="btn-tambah-mapel">
             <i class="icon-base ri ri-add-line me-1"></i>Tambah Mapel{{ $isOperator ? ' Lokal' : '' }}
@@ -136,7 +143,9 @@
             <select id="mapel-master" class="form-select" required>
               <option value="">— Pilih Mata Pelajaran —</option>
               @foreach ($masterMapelList as $master)
-                <option value="{{ $master->id }}">
+                <option value="{{ $master->id }}"
+                  data-kelompok="{{ $master->mapel_kelompok_id }}"
+                  data-kurikulum="{{ $master->kurikulum->count() === 1 ? $master->kurikulum->first()->id : '' }}">
                   {{ $master->kelompok?->nama ?? 'Tanpa Kelompok' }} —
                   {{ $master->nama }}
                   {{ $master->nama_sub_mapel ? ' — ' . $master->nama_sub_mapel : '' }}
@@ -148,6 +157,26 @@
                 Tidak ada di daftar? Buat mapel baru
               </button>
             @endif
+
+            <div class="row g-3 mt-2">
+              <div class="col-6">
+                <label class="form-label">Kelompok Penempatan</label>
+                <select id="mapel-kelompok" class="form-select">
+                  @foreach ($mapelKelompok as $k)
+                    <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label">Kurikulum</label>
+                <select id="mapel-kurikulum" class="form-select">
+                  <option value="">Semua Kurikulum</option>
+                  @foreach ($kurikulumList as $kur)
+                    <option value="{{ $kur->id }}">{{ $kur->nama }}</option>
+                  @endforeach
+                </select>
+              </div>
+            </div>
           </div>
 
           <div class="mb-2" id="wrap-mapel-tingkat">
@@ -173,6 +202,10 @@
               <div class="mb-4">
                 <label class="form-label">Singkatan <small class="text-muted">(opsional)</small></label>
                 <input type="text" id="lokal-singkat" class="form-control" maxlength="20" placeholder="BD">
+              </div>
+              <div class="mb-4">
+                <label class="form-label">Sub Nama <small class="text-muted">(opsional)</small></label>
+                <input type="text" id="lokal-sub" class="form-control" maxlength="100" placeholder="Bahasa Jawa">
               </div>
               <div class="mb-4">
                 <label class="form-label">Rentang Tingkat <span class="text-danger">*</span></label>
@@ -249,6 +282,41 @@
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
             <button type="button" class="btn btn-info text-white" id="btn-salin">
+              <i class="icon-base ri ri-file-copy-line me-1"></i>Salin Sekarang
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  @endif
+
+  {{-- ═══ MODAL: Salin Mapel Tambahan (Operator) ═══════════════════════════ --}}
+  @if ($isOperator)
+    <div class="modal fade" id="modal-salin-tambahan" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Salin Mapel Tambahan dari Semester Lalu</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted small mb-4">
+              Mapel tambahan (lokal) milik sekolah Anda dari semester asal disalin ke semester
+              aktif ini; yang sudah ada dilewati. Mapel pokok tidak perlu disalin — itu bagian Admin.
+            </p>
+            <label class="form-label">Semester Asal</label>
+            <select id="salin-tambahan-dari" class="form-select">
+              <option value="">— Pilih Semester —</option>
+              @foreach ($semesterList as $smt)
+                @if ($smt->id !== $semester?->id)
+                  <option value="{{ $smt->id }}">{{ $smt->tahun_pelajaran }} — {{ $smt->semester }}</option>
+                @endif
+              @endforeach
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-info text-white" id="btn-salin-tambahan">
               <i class="icon-base ri ri-file-copy-line me-1"></i>Salin Sekarang
             </button>
           </div>
@@ -398,6 +466,10 @@
           `<span class="badge bg-label-warning ms-2" style="font-size:.7rem;">Lokal</span>` :
           '';
 
+        const nonaktifBadge = row.nonaktif ?
+          `<span class="badge bg-label-secondary ms-2" style="font-size:.7rem;">Nonaktif</span>` :
+          '';
+
         const subNama = row.nama_sub ?
           `<span class="text-muted">${escHtml(row.nama_sub)}</span>` :
           `<span class="text-muted fst-italic">—</span>`;
@@ -410,12 +482,21 @@
          style="cursor:grab;"></i>
       <button class="btn btn-sm btn-icon btn-text-primary rounded-pill btn-edit"
         data-id="${row.id}" data-master="${row.master_id}"
-        data-tingkat="${row.tingkat}" data-nama="${escAttr(row.nama)}">
+        data-tingkat="${row.tingkat}" data-nama="${escAttr(row.nama)}"
+        data-kelompok-id="${row.kelompok_id ?? ''}" data-kurikulum-id="${row.kurikulum_id ?? ''}"
+        data-lokal="${row.lokal ? escAttr(JSON.stringify(row.lokal)) : ''}">
         <i class="icon-base ri ri-edit-line icon-18px"></i>
       </button>
       <button class="btn btn-sm btn-icon btn-text-danger rounded-pill btn-hapus"
         data-id="${row.id}" data-nama="${escAttr(row.nama)}">
         <i class="icon-base ri ri-delete-bin-line icon-18px"></i>
+      </button>`;
+        } else if (row.can_nonaktif) {
+          aksi = `
+      <button class="btn btn-sm btn-icon btn-text-${row.nonaktif ? 'success' : 'warning'} rounded-pill btn-nonaktif"
+        data-id="${row.id}" data-nama="${escAttr(row.nama)}"
+        title="${row.nonaktif ? 'Aktifkan kembali untuk sekolah saya' : 'Nonaktifkan untuk sekolah saya (tidak diajarkan)'}">
+        <i class="icon-base ri ${row.nonaktif ? 'ri-eye-line' : 'ri-eye-off-line'} icon-18px"></i>
       </button>`;
         } else {
           aksi = `<span class="text-muted" title="Read-Only" data-bs-toggle="tooltip">
@@ -424,10 +505,10 @@
         }
 
         return `
-    <tr data-mapel-id="${row.id}">
+    <tr data-mapel-id="${row.id}"${row.nonaktif ? ' style="opacity:.55"' : ''}>
       <td class="text-center"><span class="badge bg-label-secondary urutan-badge">${row.urutan}</span></td>
       <td class="text-center"><span class="badge bg-label-info">Kelas ${row.tingkat}</span></td>
-      <td>${escHtml(row.nama)}${lokBadge}</td>
+      <td>${escHtml(row.nama)}${lokBadge}${nonaktifBadge}</td>
       <td>${subNama}</td>
       <td><div class="d-flex gap-1 justify-content-center align-items-center">${aksi}</div></td>
     </tr>`;
@@ -499,13 +580,16 @@
             onEnd: async function(evt) {
               if (evt.oldIndex === evt.newIndex) return;
 
-              // Kumpulkan urutan ID baru dari DOM
-              const ids = [...tbody.querySelectorAll('tr[data-mapel-id]')]
-                .map(tr => tr.dataset.mapelId);
+              // Kumpulkan urutan ID baru dari DOM — hanya baris yang
+              // boleh digeser pengguna ini; baris pokok tidak ikut
+              // terkirim untuk Operator (server menolaknya)
+              const barisBisaGeser = [...tbody.querySelectorAll('tr[data-mapel-id]:has(.btn-edit)')];
+              const ids = barisBisaGeser.map(tr => tr.dataset.mapelId);
 
               // Update badge urutan di DOM (optimistic)
-              tbody.querySelectorAll('.urutan-badge').forEach((badge, i) => {
-                badge.textContent = i + 1;
+              barisBisaGeser.forEach((tr, i) => {
+                const badge = tr.querySelector('.urutan-badge');
+                if (badge) badge.textContent = i + 1;
               });
 
               try {
@@ -518,6 +602,7 @@
                 }
                 // Sync state.kelompok agar refreshTable() konsisten
                 syncStateUrutan(ids);
+                toastSukses('Urutan mapel berhasil disimpan.');
               } catch (err) {
                 toastError(err.message);
                 refreshTable(); // rollback tampilan
@@ -529,14 +614,51 @@
         // ── Edit ────────────────────────────────────────────────────────────
         document.querySelectorAll('.btn-edit').forEach(btn => {
           btn.addEventListener('click', function() {
+            // Mapel lokal milik sekolah: yang diedit datanya
+            // (nama, singkatan, sub nama, kelompok, rentang kelas)
+            if (isOperator && this.dataset.lokal) {
+              const lokal = JSON.parse(this.dataset.lokal);
+              document.getElementById('modal-mapel-title').textContent = 'Edit Mata Pelajaran Lokal';
+              tampilkanModeLokal(true);
+              document.getElementById('lokal-kelompok').value = lokal.kelompok_id ?? '';
+              document.getElementById('lokal-nama').value = lokal.nama ?? '';
+              document.getElementById('lokal-singkat').value = lokal.nama_singkat ?? '';
+              document.getElementById('lokal-sub').value = lokal.nama_sub ?? '';
+              if (lokalSliderInstance && lokal.kelas_mulai && lokal.kelas_selesai) {
+                lokalSliderInstance.set([lokal.kelas_mulai, lokal.kelas_selesai]);
+              }
+              const btnSimpan = document.getElementById('btn-simpan-mapel');
+              btnSimpan.dataset.mode = 'edit-lokal';
+              btnSimpan.dataset.masterLokal = lokal.master_id;
+              new bootstrap.Modal(document.getElementById('modal-mapel')).show();
+              return;
+            }
+
             document.getElementById('modal-mapel-title').textContent =
               isOperator ? 'Edit Mata Pelajaran Lokal' : 'Edit Mata Pelajaran';
             document.getElementById('mapel-id').value = this.dataset.id;
             document.getElementById('mapel-master').value = this.dataset.master;
             document.getElementById('mapel-tingkat').value = this.dataset.tingkat;
+            document.getElementById('mapel-kelompok').value = this.dataset.kelompokId ?? '';
+            document.getElementById('mapel-kurikulum').value = this.dataset.kurikulumId ?? '';
             document.getElementById('btn-simpan-mapel').dataset.mode = 'edit';
-            tampilkanModeMaster(); // ← tambahkan baris ini
+            tampilkanModeMaster();
             new bootstrap.Modal(document.getElementById('modal-mapel')).show();
+          });
+        });
+
+        // ── Nonaktif/aktifkan pokok untuk sekolah sendiri ─────────────────
+        document.querySelectorAll('.btn-nonaktif').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            try {
+              const res = await apiFetch(`${baseUrl}/${this.dataset.id}/nonaktif`, 'POST', {});
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.message || 'Gagal mengubah status mapel.');
+              toastSukses(data.message);
+              refreshTable();
+            } catch (err) {
+              toastError(err.message);
+            }
           });
         });
 
@@ -628,6 +750,16 @@
         }
       }
 
+      // Pilihan master mengisi bawaan kelompok & kurikulum penempatan
+      document.getElementById('mapel-master')?.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        if (!opt) return;
+        const kelompokEl = document.getElementById('mapel-kelompok');
+        const kurikulumEl = document.getElementById('mapel-kurikulum');
+        if (kelompokEl && opt.dataset.kelompok) kelompokEl.value = opt.dataset.kelompok;
+        if (kurikulumEl) kurikulumEl.value = opt.dataset.kurikulum ?? '';
+      });
+
       // ====================== MODAL & SIMPAN ======================
       document.getElementById('btn-tambah-mapel')?.addEventListener('click', function() {
         document.getElementById('modal-mapel-title').textContent =
@@ -637,13 +769,14 @@
         document.getElementById('mapel-master').value = '';
         document.getElementById('mapel-tingkat').value = activeTingkat || '';
         document.getElementById('btn-simpan-mapel').dataset.mode = 'tambah';
+        tampilkanModeMaster();
       });
 
       document.getElementById('btn-simpan-mapel')?.addEventListener('click', async function() {
         const mode = this.dataset.mode ?? 'tambah';
         const submode = this.dataset.submode ?? 'master';
 
-        if (mode === 'tambah' && submode === 'lokal') {
+        if (submode === 'lokal' && (mode === 'tambah' || mode === 'edit-lokal')) {
           await simpanMapelLokal(this);
           return;
         }
@@ -667,12 +800,16 @@
             res = await apiFetch(baseUrl, 'POST', {
               mapel_master_id: master,
               tingkat,
-              jenjang
+              jenjang,
+              mapel_kelompok_id: document.getElementById('mapel-kelompok').value || null,
+              kurikulum_id: document.getElementById('mapel-kurikulum').value || null
             });
           } else {
             res = await apiFetch(`${baseUrl}/${mapelId}`, 'PUT', {
               mapel_master_id: master,
-              tingkat
+              tingkat,
+              mapel_kelompok_id: document.getElementById('mapel-kelompok').value || null,
+              kurikulum_id: document.getElementById('mapel-kurikulum').value || null
             });
           }
 
@@ -756,13 +893,16 @@
         document.getElementById('btn-simpan-mapel').dataset.submode = 'master';
       }
 
-      function tampilkanModeLokal() {
+      function tampilkanModeLokal(untukEdit = false) {
         document.getElementById('wrap-mapel-master')?.classList.add('d-none');
         document.getElementById('wrap-mapel-tingkat')?.classList.add('d-none');
         document.getElementById('wrap-mapel-lokal')?.classList.remove('d-none');
-        document.getElementById('lokal-kelompok').value = '';
-        document.getElementById('lokal-nama').value = '';
-        document.getElementById('lokal-singkat').value = '';
+        if (!untukEdit) {
+          document.getElementById('lokal-kelompok').value = '';
+          document.getElementById('lokal-nama').value = '';
+          document.getElementById('lokal-singkat').value = '';
+          document.getElementById('lokal-sub').value = '';
+        }
         bangunLokalTingkatSlider();
         document.getElementById('btn-simpan-mapel').dataset.submode = 'lokal';
       }
@@ -775,6 +915,7 @@
         const kelompok = document.getElementById('lokal-kelompok').value;
         const nama = document.getElementById('lokal-nama').value.trim();
         const singkat = document.getElementById('lokal-singkat').value.trim();
+        const subNama = document.getElementById('lokal-sub').value.trim();
         const mulai = parseInt(document.getElementById('lokal-tingkat-mulai').value);
         const selesai = parseInt(document.getElementById('lokal-tingkat-selesai').value);
 
@@ -791,13 +932,18 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
 
         try {
-          const res = await apiFetch('/mapel-mapping/quick-create', 'POST', {
+          const payloadLokal = {
             mapel_kelompok_id: kelompok,
             nama,
             nama_singkat: singkat || null,
+            nama_sub_mapel: subNama || null,
             kelas_mulai: mulai,
             kelas_selesai: selesai,
-          });
+          };
+
+          const res = btn.dataset.mode === 'edit-lokal'
+            ? await apiFetch(`/mapel-mapping/master-lokal/${btn.dataset.masterLokal}`, 'PUT', payloadLokal)
+            : await apiFetch('/mapel-mapping/quick-create', 'POST', payloadLokal);
           const data = await res.json();
 
           if (res.ok) {
@@ -860,6 +1006,30 @@
       }
 
       // ── Salin Mapel Antar Semester ────────────────────────────────────
+      // ── Salin mapel tambahan dari semester lalu (Operator) ──
+      document.getElementById('btn-salin-tambahan')?.addEventListener('click', async function() {
+        const dari = document.getElementById('salin-tambahan-dari').value;
+        if (!dari) {
+          toastError('Pilih semester asal dulu.');
+          return;
+        }
+        this.disabled = true;
+        try {
+          const res = await apiFetch(`${baseUrl}/salin-tambahan`, 'POST', {
+            dari_semester: dari
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Gagal menyalin mapel tambahan.');
+          toastSukses(data.message);
+          bootstrap.Modal.getInstance(document.getElementById('modal-salin-tambahan')).hide();
+          refreshTable();
+        } catch (err) {
+          toastError(err.message);
+        } finally {
+          this.disabled = false;
+        }
+      });
+
       const btnSalin = document.getElementById('btn-salin');
       if (btnSalin) {
         btnSalin.addEventListener('click', async function() {

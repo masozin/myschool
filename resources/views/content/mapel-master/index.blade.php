@@ -28,6 +28,7 @@
               <th>No</th>
               <th>Nama Mata Pelajaran</th>
               <th>Singkatan</th>
+              <th>Sub Nama</th>
               <th>Kelompok</th>
               <th>Jenjang</th>
               <th>Status</th>
@@ -80,6 +81,13 @@
           <input type="text" class="form-control" id="mapel_singkat" name="nama_singkat" placeholder="PAI"
             maxlength="20" />
           <label>Singkatan <small class="text-muted">(opsional)</small></label>
+        </div>
+
+        {{-- Sub Nama --}}
+        <div class="form-floating form-floating-outline mb-5">
+          <input type="text" class="form-control" id="mapel_sub" name="nama_sub_mapel" placeholder="Islam"
+            maxlength="100" />
+          <label>Sub Nama <small class="text-muted">(opsional — mis. pecahan agama: Islam, Kristen)</small></label>
         </div>
 
         {{-- Status --}}
@@ -165,6 +173,7 @@
           <td><span class="badge bg-label-secondary">${index + 1}</span></td>
           <td>${row.nama ?? '—'}</td>
           <td>${row.nama_singkat ?? '—'}</td>
+          <td>${row.nama_sub_mapel ?? '—'}</td>
           <td>
             <span class="fw-medium">${row.kelompok_nama ?? '—'}</span><br>
           </td>
@@ -288,6 +297,7 @@
             document.getElementById('mapel_kelompok_id').value = data.kelompok_id ?? '';
             document.getElementById('mapel_nama').value = data.nama ?? '';
             document.getElementById('mapel_singkat').value = data.nama_singkat ?? '';
+            document.getElementById('mapel_sub').value = data.nama_sub_mapel ?? '';
             document.getElementById('mapel_aktif').checked = !!data.is_aktif;
             document.getElementById('label_aktif').innerText = data.is_aktif ? 'Aktif' : 'Tidak Aktif';
 
@@ -354,6 +364,7 @@
           mapel_kelompok_id: document.getElementById('mapel_kelompok_id').value,
           nama: document.getElementById('mapel_nama').value.trim(),
           nama_singkat: document.getElementById('mapel_singkat').value.trim() || null,
+          nama_sub_mapel: document.getElementById('mapel_sub').value.trim() || null,
           is_aktif: document.getElementById('mapel_aktif').checked,
           jenjang: getJenjangPayload(),
         };
