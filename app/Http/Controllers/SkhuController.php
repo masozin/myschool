@@ -42,7 +42,7 @@ class SkhuController extends Controller
   public function index()
   {
     $user     = Auth::user();
-    $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])->findOrFail($user->ptk->sekolah_id);
+    $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])->findOrFail($this->sekolahKonteksId());
     $semester = Semester::find(session('semester_id'));
 
     if (!$semester) {
@@ -58,6 +58,14 @@ class SkhuController extends Controller
 
     // Ambil siswa kelas akhir dari rombel aktif semester ini
     $siswaAkhir = $this->getSiswaKelasAkhir($sekolah->id, $semester->id, $tingkatAkhir);
+
+    // Guru hanya melihat siswa pada rombel yang ia wali kelasi —
+    // guru lain tidak diberi akses ke SKHU siswa tersebut
+    if ($user->hasRole('Guru')) {
+      $siswaAkhir = $siswaAkhir
+        ->filter(fn($anggota) => (int) ($anggota->rombel->ptk_id ?? 0) === (int) $user->ptk?->id)
+        ->values();
+    }
 
     // Template SKHU untuk jenjang + semester ini
     $template = SkhuTemplate::aktifUntuk($jenjang, $semester->id);
@@ -127,12 +135,42 @@ class SkhuController extends Controller
       ]);
   }
 
+  /**
+   * Sekolah konteks dari PTK pengguna; akun tanpa tautan
+   * sekolah (mis. Admin murni) menerima pesan yang jelas,
+   * bukan error.
+   */
+  private function sekolahKonteksId(): int
+  {
+    $sekolahId = Auth::user()->ptk?->sekolah_id;
+    abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
+
+    return (int) $sekolahId;
+  }
+
+  /**
+   * Guru hanya boleh mengelola SKHU siswa di rombel yang ia
+   * wali kelasi pada semester itu.
+   */
+  private function abortUnlessWaliKelas(int $siswaId, int $sekolahId, int $semesterId): void
+  {
+    $user = Auth::user();
+
+    $punya = RombelAnggota::where('siswa_id', $siswaId)
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->whereHas('rombel', fn($q) => $q->where('ptk_id', $user->ptk?->id))
+      ->exists();
+
+    abort_unless($punya, 403, 'Anda bukan wali kelas siswa ini.');
+  }
+
   // ── Form input/edit SKHU per siswa ────────────────────────────────────
   public function formSiswa(int $siswaId)
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])
-      ->findOrFail($user->ptk->sekolah_id);
+      ->findOrFail($this->sekolahKonteksId());
     $semester = Semester::findOrFail(session('semester_id'));
     $jenjang  = strtoupper($sekolah->jenjang);
 
@@ -146,6 +184,11 @@ class SkhuController extends Controller
       })
       ->whereHas('siswa', fn($q) => $q->where('id', $siswaId))
       ->firstOrFail();
+
+    // Guru hanya boleh membuka siswa rombelnya sendiri
+    if ($user->hasRole('Guru') && (int) $anggota->rombel->ptk_id !== (int) $user->ptk?->id) {
+      abort(403, 'Anda bukan wali kelas siswa ini.');
+    }
 
     $siswa    = $anggota->siswa;
     $template = SkhuTemplate::aktifUntuk($jenjang, $semester->id);
@@ -199,6 +242,11 @@ class SkhuController extends Controller
 
     $sekolahId = Auth::user()->ptk->sekolah_id
       ?? $siswa->registrasiTerbaru?->sekolah_id;
+
+    // Guru hanya boleh menyimpan SKHU siswa rombelnya sendiri
+    if (Auth::user()->hasRole('Guru')) {
+      $this->abortUnlessWaliKelas($siswa->id, (int) $sekolahId, (int) $semester->id);
+    }
 
     // Cari atau buat SKHU
     $skhu = Skhu::firstOrNew([
@@ -269,6 +317,11 @@ class SkhuController extends Controller
   // =========================================================================
   public function finalisasiSemua(Request $request)
   {
+    // Finalisasi massal berdampak ke seluruh sekolah — khusus Operator
+    if (!Auth::user()->hasRole('Operator Sekolah')) {
+      return response()->json(['message' => 'Akses ditolak. Finalisasi massal hanya untuk Operator Sekolah.'], 403);
+    }
+
     $sekolahId = Auth::user()->ptk->sekolah_id;
     $semester  = Semester::where('id', session('semester_id'))->first()
       ?? Semester::where('is_active', 1)->first();
@@ -317,6 +370,45 @@ class SkhuController extends Controller
   }
 
   // ── Generate PDF per siswa ────────────────────────────────────────────
+  /**
+   * Toggle status SKHU satu siswa: draft → final (dengan
+   * validasi kelengkapan yang sama seperti finalisasi massal)
+   * atau final → draft (dibuka kembali). Dipanggil tombol
+   * toggle di daftar SKHU dan di form siswa. Method ini
+   * sebelumnya tidak ada sama sekali, padahal route dan kedua
+   * view memanggilnya — tombolnya selalu gagal.
+   */
+  public function updateStatus(int $skhuId)
+  {
+    $user      = Auth::user();
+    $sekolahId = $user->ptk->sekolah_id;
+
+    $skhu = Skhu::where('sekolah_id', $sekolahId)->findOrFail($skhuId);
+
+    if ($user->hasRole('Guru')) {
+      $this->abortUnlessWaliKelas((int) $skhu->siswa_id, (int) $sekolahId, (int) $skhu->semester_id);
+    }
+
+    if ($skhu->status === 'final') {
+      $skhu->update(['status' => 'draft']);
+
+      return response()->json(['message' => 'SKHU dikembalikan ke Draft.']);
+    }
+
+    $errors = $skhu->validasiFinalisasi();
+
+    if (!empty($errors)) {
+      return response()->json([
+        'message' => 'SKHU belum bisa difinalisasi.',
+        'errors'  => $errors,
+      ], 422);
+    }
+
+    $skhu->update(['status' => 'final']);
+
+    return response()->json(['message' => 'SKHU berhasil difinalisasi.']);
+  }
+
   public function generatePdf(int $skhuId)
   {
     $user     = Auth::user();
