@@ -15,6 +15,16 @@ class SkhuTemplate extends Model
 
   protected $casts = ['is_active' => 'boolean'];
 
+  public function semester()
+  {
+    return $this->belongsTo(Semester::class, 'semester_id');
+  }
+
+  public function kurikulum()
+  {
+    return $this->belongsTo(Kurikulum::class, 'kurikulum_id');
+  }
+
   public function getViewNameAttribute(): string
   {
     // Sesuaikan prefix dengan lokasi folder di resources/views/
