@@ -289,7 +289,16 @@ class SkhuController extends Controller
   // ── Toggle status finalisasi per siswa ───────────────────────────────
   public function UpdateStatus(int $skhuId)
   {
-    $skhu = Skhu::findOrFail($skhuId);
+    $user = Auth::user();
+
+    // Batasi ke sekolah konteks — sebelumnya SKHU milik sekolah
+    // lain pun bisa diubah statusnya hanya dengan id-nya
+    $skhu = Skhu::where('sekolah_id', $user->ptk->sekolah_id)->findOrFail($skhuId);
+
+    // Guru hanya boleh mengubah SKHU siswa rombelnya sendiri
+    if ($user->hasRole('Guru')) {
+      $this->abortUnlessWaliKelas((int) $skhu->siswa_id, (int) $skhu->sekolah_id, (int) $skhu->semester_id);
+    }
 
     if ($skhu->status === 'final') {
       $skhu->update(['status' => 'draft']);
@@ -370,45 +379,6 @@ class SkhuController extends Controller
   }
 
   // ── Generate PDF per siswa ────────────────────────────────────────────
-  /**
-   * Toggle status SKHU satu siswa: draft → final (dengan
-   * validasi kelengkapan yang sama seperti finalisasi massal)
-   * atau final → draft (dibuka kembali). Dipanggil tombol
-   * toggle di daftar SKHU dan di form siswa. Method ini
-   * sebelumnya tidak ada sama sekali, padahal route dan kedua
-   * view memanggilnya — tombolnya selalu gagal.
-   */
-  public function updateStatus(int $skhuId)
-  {
-    $user      = Auth::user();
-    $sekolahId = $user->ptk->sekolah_id;
-
-    $skhu = Skhu::where('sekolah_id', $sekolahId)->findOrFail($skhuId);
-
-    if ($user->hasRole('Guru')) {
-      $this->abortUnlessWaliKelas((int) $skhu->siswa_id, (int) $sekolahId, (int) $skhu->semester_id);
-    }
-
-    if ($skhu->status === 'final') {
-      $skhu->update(['status' => 'draft']);
-
-      return response()->json(['message' => 'SKHU dikembalikan ke Draft.']);
-    }
-
-    $errors = $skhu->validasiFinalisasi();
-
-    if (!empty($errors)) {
-      return response()->json([
-        'message' => 'SKHU belum bisa difinalisasi.',
-        'errors'  => $errors,
-      ], 422);
-    }
-
-    $skhu->update(['status' => 'final']);
-
-    return response()->json(['message' => 'SKHU berhasil difinalisasi.']);
-  }
-
   public function generatePdf(int $skhuId)
   {
     $user     = Auth::user();
