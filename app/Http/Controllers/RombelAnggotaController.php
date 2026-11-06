@@ -85,8 +85,11 @@ class RombelAnggotaController extends Controller
     });
 
     // [B] Belum terdaftar di rombel manapun pada semester yang sama
-    $query->whereDoesntHave('rombelAnggota', function ($q) use ($semesterSekarang) {
-      $q->where('semester_id', $semesterSekarang->id);
+    $query->whereDoesntHave('rombelAnggota', function ($q) use ($rombel, $semesterSekarang) {
+      // Baris di sekolah LAIN pada semester yang sama (mutasi
+      // masuk tengah semester) tidak menghalangi penempatan di sini
+      $q->where('semester_id', $semesterSekarang->id)
+        ->where('sekolah_id', $rombel->sekolah_id);
     });
 
     // [C] Kelayakan tingkat — dinilai dari bukti terakhir siswa:
@@ -184,6 +187,7 @@ class RombelAnggotaController extends Controller
         // kedua); bila sudah di rombel ini juga, lewati
         $barisAda = RombelAnggota::where('siswa_id', $siswa_id)
           ->where('semester_id', $semester->id)
+          ->where('sekolah_id', $rombel->sekolah_id)
           ->first();
 
         if ($barisAda) {
@@ -200,6 +204,7 @@ class RombelAnggotaController extends Controller
           'siswa_id'    => $siswa_id,
           'rombel_id'   => $request->rombel_id,
           'semester_id' => $semester->id,
+          'sekolah_id'  => $rombel->sekolah_id,
           'created_at'  => now(),
           'updated_at'  => now(),
         ];

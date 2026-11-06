@@ -329,6 +329,7 @@ class DataPeriodikController extends Controller
             foreach ($anggotaAktif as $anggota) {
               $sudahAktif = RombelAnggota::where('siswa_id', $anggota->siswa_id)
                 ->where('semester_id', $semesterSekarang)
+                ->where('sekolah_id', $sekolahId)
                 ->exists();
 
               if ($sudahAktif) {
@@ -340,6 +341,7 @@ class DataPeriodikController extends Controller
                 'siswa_id'    => $anggota->siswa_id,
                 'rombel_id'   => $rombelBaruId,
                 'semester_id' => $semesterSekarang,
+                'sekolah_id'  => $sekolahId,
               ]);
 
               $tersalin++;

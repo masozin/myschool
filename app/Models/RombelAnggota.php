@@ -11,7 +11,7 @@ class RombelAnggota extends Model
   use HasFactory;
 
   protected $table = 'tabel_rombel_anggota';
-  protected $fillable = ['siswa_id', 'rombel_id', 'semester_id'];
+  protected $fillable = ['siswa_id', 'rombel_id', 'semester_id', 'sekolah_id'];
 
   public function siswa(): BelongsTo
   {
@@ -26,5 +26,10 @@ class RombelAnggota extends Model
   public function semester(): BelongsTo
   {
     return $this->belongsTo(Semester::class);
+  }
+
+  public function sekolah(): BelongsTo
+  {
+    return $this->belongsTo(Sekolah::class);
   }
 }
