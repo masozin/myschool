@@ -1005,7 +1005,37 @@ class SkhuController extends Controller
 
     $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? 12;
 
-    $mapels = $this->getMapels($jenjang, $tingkatAkhir, $semester->id, $sekolah->id);
+    // Satu tingkat memakai SATU kurikulum untuk seluruh sekolah —
+    // rombel paralel (6A, 6B, …) tidak boleh berbeda kurikulum.
+    // Template Excel dibuat untuk satu angkatan, jadi mapelnya
+    // disaring dengan kurikulum tingkat itu; tanpa saringan ini
+    // mapel dari semua kurikulum ikut masuk sebagai kolom.
+    $kurikulumIds = Rombel::where('sekolah_id', $sekolah->id)
+      ->where('semester_id', $semester->id)
+      ->where('tingkat', $tingkatAkhir)
+      ->pluck('kurikulum_id')
+      ->filter()
+      ->unique()
+      ->values();
+
+    if ($kurikulumIds->count() > 1) {
+      $namaKurikulum = \App\Models\Kurikulum::whereIn('id', $kurikulumIds)
+        ->pluck('nama')
+        ->implode(', ');
+
+      return response()->json([
+        'message' => "Kurikulum rombel kelas {$tingkatAkhir} belum seragam ({$namaKurikulum}). " .
+          'Satu tingkat harus memakai satu kurikulum — samakan dulu kurikulum rombel kelas akhir di menu Rombel, lalu unduh template lagi.',
+      ], 422);
+    }
+
+    $mapels = $this->getMapels(
+      $jenjang,
+      $tingkatAkhir,
+      $semester->id,
+      $sekolah->id,
+      $kurikulumIds->first() ? (int) $kurikulumIds->first() : null
+    );
 
     if ($mapels->isEmpty()) {
       return response()->json([
