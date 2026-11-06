@@ -77,6 +77,24 @@
     </div>
   </div>
 
+  {{-- Pemilih konteks sekolah untuk Admin --}}
+  @hasanyrole('Admin')
+    <div class="card mb-4">
+      <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
+        <span class="text-muted"><i class="icon-base ri ri-school-line me-1"></i>Anda masuk sebagai Admin — konteks
+          sekolah:</span>
+        <form method="GET" action="{{ url('/skl') }}">
+          <select name="sekolah_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            @foreach ($daftarSekolah as $ds)
+              <option value="{{ $ds->id }}" {{ $ds->id === $sekolahId ? 'selected' : '' }}>
+                {{ $ds->detailTerbaru->nama_sekolah ?? 'Sekolah #' . $ds->id }}</option>
+            @endforeach
+          </select>
+        </form>
+      </div>
+    </div>
+  @endhasanyrole
+
   {{-- ── Toolbar ──────────────────────────────────────────────────────────── --}}
   <div class="card mb-4">
     <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">

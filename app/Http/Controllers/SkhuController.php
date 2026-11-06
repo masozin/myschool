@@ -41,8 +41,20 @@ class SkhuController extends Controller
   // ── Halaman utama SKHU ────────────────────────────────────────────────
   public function index()
   {
-    $user     = Auth::user();
-    $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])->findOrFail($this->sekolahKonteksId());
+    $user = Auth::user();
+
+    // Admin tanpa konteks sekolah (beberapa sekolah, belum memilih)
+    // mendapat halaman pemilih, bukan 403
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return view('content.kelulusan.pilih-sekolah', [
+        'judul'         => 'SKHU',
+        'urlTujuan'     => '/skhu',
+        'daftarSekolah' => Sekolah::with('detailTerbaru')->orderBy('id')->get(),
+      ]);
+    }
+
+    $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])->findOrFail($sekolahId);
     $semester = Semester::find(session('semester_id'));
 
     if (!$semester) {
@@ -73,6 +85,10 @@ class SkhuController extends Controller
     // Mapel yang berlaku untuk jenjang + tingkat akhir + semester ini
     $mapels = $this->getMapels($jenjang, $tingkatAkhir, $semester->id, $sekolah->id);
 
+    $daftarSekolah = $user->hasRole('Admin')
+      ? Sekolah::with('detailTerbaru')->orderBy('id')->get()
+      : collect();
+
     return view('content.skhu.index', compact(
       'sekolah',
       'semester',
@@ -80,7 +96,8 @@ class SkhuController extends Controller
       'template',
       'mapels',
       'jenjang',
-      'tingkatAkhir'
+      'tingkatAkhir',
+      'daftarSekolah'
     ));
   }
 
@@ -129,16 +146,44 @@ class SkhuController extends Controller
   }
 
   /**
-   * Sekolah konteks dari PTK pengguna; akun tanpa tautan
-   * sekolah (mis. Admin murni) menerima pesan yang jelas,
-   * bukan error.
+   * Sekolah konteks pengguna. Peran berkait sekolah memakai sekolah
+   * PTK-nya. Admin tidak punya PTK, jadi konteksnya dipilih lewat
+   * parameter ?sekolah_id= (disimpan di sesi 'admin_sekolah_id',
+   * dipakai bersama menu SKL) atau — bila hanya ada satu sekolah —
+   * sekolah satu-satunya itu. Mengembalikan null hanya untuk Admin
+   * yang belum memilih di antara beberapa sekolah; peran lain tanpa
+   * tautan sekolah menerima 403 seperti sebelumnya.
    */
-  private function sekolahKonteksId(): int
+  private function sekolahKonteksIdNullable(): ?int
   {
-    $sekolahId = Auth::user()->ptk?->sekolah_id;
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      if (request()->filled('sekolah_id')) {
+        session(['admin_sekolah_id' => request()->integer('sekolah_id')]);
+      }
+
+      $sekolahId = session('admin_sekolah_id') ?? $user->ptk?->sekolah_id;
+
+      if (!$sekolahId && Sekolah::count() === 1) {
+        $sekolahId = Sekolah::value('id');
+      }
+
+      return $sekolahId ? (int) $sekolahId : null;
+    }
+
+    $sekolahId = $user->ptk?->sekolah_id;
     abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
 
     return (int) $sekolahId;
+  }
+
+  private function sekolahKonteksId(): int
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    abort_if(!$sekolahId, 403, 'Sebagai Admin, pilih sekolah terlebih dahulu dari halaman SKHU.');
+
+    return $sekolahId;
   }
 
   /**
@@ -766,7 +811,7 @@ class SkhuController extends Controller
   public function generatePdf(int $skhuId)
   {
     $user     = Auth::user();
-    $sekolah  = Sekolah::findOrFail($user->ptk->sekolah_id);
+    $sekolah  = Sekolah::findOrFail($this->sekolahKonteksId());
     $semester = Semester::findOrFail(session('semester_id'));
     $jenjang  = strtoupper($sekolah->jenjang);
 
@@ -811,7 +856,7 @@ class SkhuController extends Controller
   public function previewPdf(int $skhuId)
   {
     $user     = Auth::user();
-    $sekolah  = Sekolah::findOrFail($user->ptk->sekolah_id);
+    $sekolah  = Sekolah::findOrFail($this->sekolahKonteksId());
     $semester = Semester::findOrFail(session('semester_id'));
     $jenjang  = strtoupper($sekolah->jenjang);
 
@@ -873,7 +918,7 @@ class SkhuController extends Controller
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])
-      ->findOrFail($user->ptk->sekolah_id);
+      ->findOrFail($this->sekolahKonteksId());
     $semester = Semester::findOrFail(session('semester_id'));
     $jenjang  = strtoupper($sekolah->jenjang);
 

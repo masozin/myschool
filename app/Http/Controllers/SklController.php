@@ -54,13 +54,41 @@ class SklController extends Controller
   ];
 
   /**
-   * Ambil sekolah_id user yang sedang login via relasi PTK.
-   * Abort 403 jika user tidak terhubung ke PTK/sekolah.
+   * Ambil sekolah_id konteks user. Peran berkait sekolah memakai
+   * sekolah PTK-nya. Admin tidak punya PTK, jadi konteksnya dipilih
+   * lewat parameter ?sekolah_id= (disimpan di sesi 'admin_sekolah_id',
+   * dipakai bersama menu SKHU) atau — bila hanya ada satu sekolah —
+   * sekolah satu-satunya itu. Mengembalikan null hanya untuk Admin
+   * yang belum memilih di antara beberapa sekolah; peran lain tanpa
+   * tautan sekolah menerima 403 seperti sebelumnya.
    */
+  private function getSekolahIdNullable(): ?int
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      if (request()->filled('sekolah_id')) {
+        session(['admin_sekolah_id' => request()->integer('sekolah_id')]);
+      }
+
+      $sekolahId = session('admin_sekolah_id') ?? $user->ptk?->sekolah_id;
+
+      if (!$sekolahId && Sekolah::count() === 1) {
+        $sekolahId = Sekolah::value('id');
+      }
+
+      return $sekolahId ? (int) $sekolahId : null;
+    }
+
+    $sekolahId = $user->ptk?->sekolah_id;
+    abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
+    return (int) $sekolahId;
+  }
+
   private function getSekolahId(): int
   {
-    $sekolahId = Auth::user()->ptk?->sekolah_id;
-    abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
+    $sekolahId = $this->getSekolahIdNullable();
+    abort_if(!$sekolahId, 403, 'Sebagai Admin, pilih sekolah terlebih dahulu dari halaman SKL.');
     return $sekolahId;
   }
 
@@ -139,8 +167,19 @@ class SklController extends Controller
 
   public function index(Request $request)
   {
-    $semesterId  = session('semester_id');
-    $sekolahId   = $this->getSekolahId();
+    $semesterId = session('semester_id');
+
+    // Admin tanpa konteks sekolah (beberapa sekolah, belum memilih)
+    // mendapat halaman pemilih, bukan 403
+    $sekolahId = $this->getSekolahIdNullable();
+    if (!$sekolahId) {
+      return view('content.kelulusan.pilih-sekolah', [
+        'judul'         => 'SKL',
+        'urlTujuan'     => '/skl',
+        'daftarSekolah' => Sekolah::with('detailTerbaru')->orderBy('id')->get(),
+      ]);
+    }
+
     $semester    = Semester::find($semesterId);
     $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semesterId);
 
@@ -225,6 +264,10 @@ class SklController extends Controller
     $statDisetujui = $sklExisting->where('status', 'disetujui')->count();
     $statDitolak   = $sklExisting->where('status', 'ditolak')->count();
 
+    $daftarSekolah = Auth::user()->hasRole('Admin')
+      ? Sekolah::with('detailTerbaru')->orderBy('id')->get()
+      : collect();
+
     return view('content.skl.index', compact(
       'daftarSiswa',
       'semester',
@@ -235,6 +278,8 @@ class SklController extends Controller
       'statDisetujui',
       'statDitolak',
       'tingkatAkhir',
+      'daftarSekolah',
+      'sekolahId',
     ));
   }
 
@@ -1262,7 +1307,7 @@ class SklController extends Controller
   public function previewPdf(int $sklId)
   {
     $user    = Auth::user();
-    $sekolah = Sekolah::findOrFail($user->ptk->sekolah_id);
+    $sekolah = Sekolah::findOrFail($this->getSekolahId());
 
     $skl = Skl::with([
       'siswa',
@@ -1310,7 +1355,7 @@ class SklController extends Controller
   public function generatePdf(int $sklId)
   {
     $user    = Auth::user();
-    $sekolah = Sekolah::findOrFail($user->ptk->sekolah_id);
+    $sekolah = Sekolah::findOrFail($this->getSekolahId());
 
     $skl = Skl::with([
       'siswa',
@@ -1353,7 +1398,7 @@ class SklController extends Controller
   public function generateBulk(Request $request)
   {
     $user     = Auth::user();
-    $sekolah  = Sekolah::findOrFail($user->ptk->sekolah_id);
+    $sekolah  = Sekolah::findOrFail($this->getSekolahId());
     $semester = Semester::findOrFail(session('semester_id'));
 
     $query = Skl::with([
