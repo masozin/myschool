@@ -11,7 +11,7 @@ class SkhuTemplate extends Model
   use HasFactory;
 
   protected $table    = 'tabel_skhu_template';
-  protected $fillable = ['jenjang', 'semester_id', 'nama_file', 'keterangan', 'is_active'];
+  protected $fillable = ['jenjang', 'semester_id', 'kurikulum_id', 'nama_file', 'keterangan', 'is_active'];
 
   protected $casts = ['is_active' => 'boolean'];
 
