@@ -19,30 +19,31 @@ return new class extends Migration
    *   (backfill), setelah ini menjadi milik mapping.
    * - Unique lama berlubang untuk baris pokok karena sekolah_id
    *   NULL tidak pernah dianggap sama oleh MySQL. Diganti unique
-   *   atas kolom ter-generate sekolah_key/kurikulum_key
-   *   (COALESCE(..., 0)). Unique baru dibuat SEBELUM yang lama
-   *   dihapus karena unique lama menopang FK mapel_master_id.
+   *   atas kolom kunci sekolah_key/kurikulum_key (cermin dengan
+   *   NULL dihitung 0). Kolom kunci adalah kolom BIASA yang
+   *   kesegarannya dijaga model MapelMapping — kolom ter-generate
+   *   tidak dipakai karena MySQL menolaknya di atas kolom yang
+   *   memiliki foreign key (error 1215). Unique baru dibuat
+   *   SEBELUM yang lama dihapus karena unique lama menopang FK
+   *   mapel_master_id.
+   * - Semua langkah dijaga hasColumn/hasIndex/cek information
+   *   schema: migrasi versi pertama berhenti di tengah pada
+   *   sebagian database (beberapa kolom sempat terbuat), dan
+   *   versi ini harus aman dijalankan dari keadaan parsial itu.
    */
   public function up(): void
   {
-    Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
-      $table->foreignId('kurikulum_id')
-        ->nullable()
-        ->after('semester_id')
-        ->constrained('tabel_kurikulum')
-        ->nullOnDelete();
+    $this->tambahKolomFk('kurikulum_id', 'tabel_kurikulum', 'semester_id');
+    $this->tambahKolomFk('mapel_kelompok_id', 'tabel_mapel_kelompok', 'mapel_master_id');
 
-      $table->foreignId('mapel_kelompok_id')
-        ->nullable()
-        ->after('mapel_master_id')
-        ->constrained('tabel_mapel_kelompok')
-        ->nullOnDelete();
+    if (!Schema::hasColumn('tabel_mapel_mapping', 'is_aktif')) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
+        $table->boolean('is_aktif')->default(true)->after('urutan');
+      });
+    }
 
-      $table->boolean('is_aktif')->default(true)->after('urutan');
-
-      $table->unsignedBigInteger('sekolah_key')->storedAs('COALESCE(sekolah_id, 0)');
-      $table->unsignedBigInteger('kurikulum_key')->storedAs('COALESCE(kurikulum_id, 0)');
-    });
+    $this->pastikanKolomKunci('sekolah_key');
+    $this->pastikanKolomKunci('kurikulum_key');
 
     // Backfill kelompok dari master pemiliknya
     DB::statement('
@@ -67,46 +68,137 @@ return new class extends Migration
       WHERE mm.kurikulum_id IS NULL
     ');
 
+    // Backfill kolom kunci
+    DB::statement('
+      UPDATE tabel_mapel_mapping
+      SET sekolah_key = COALESCE(sekolah_id, 0),
+          kurikulum_key = COALESCE(kurikulum_id, 0)
+    ');
+
     // Unique baru dulu (menopang FK mapel_master_id) ...
-    Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
-      $table->unique(
-        ['mapel_master_id', 'jenjang', 'tingkat', 'semester_id', 'sekolah_key', 'kurikulum_key'],
-        'uniq_mapel_mapping_v2'
-      );
-    });
+    if (!Schema::hasIndex('tabel_mapel_mapping', 'uniq_mapel_mapping_v2')) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
+        $table->unique(
+          ['mapel_master_id', 'jenjang', 'tingkat', 'semester_id', 'sekolah_key', 'kurikulum_key'],
+          'uniq_mapel_mapping_v2'
+        );
+      });
+    }
 
     // ... baru unique lama dihapus
-    Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
-      $table->dropUnique('uniq_mapel_mapping');
-    });
+    if (Schema::hasIndex('tabel_mapel_mapping', 'uniq_mapel_mapping')) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
+        $table->dropUnique('uniq_mapel_mapping');
+      });
+    }
 
     // Daftar mapel pokok yang dinonaktifkan per sekolah
-    Schema::create('tabel_mapel_nonaktif_sekolah', function (Blueprint $table) {
-      $table->id();
-      $table->foreignId('sekolah_id')->constrained('tabel_sekolah')->cascadeOnDelete();
-      $table->foreignId('mapel_mapping_id')->constrained('tabel_mapel_mapping')->cascadeOnDelete();
-      $table->timestamps();
+    if (!Schema::hasTable('tabel_mapel_nonaktif_sekolah')) {
+      Schema::create('tabel_mapel_nonaktif_sekolah', function (Blueprint $table) {
+        $table->id();
+        $table->foreignId('sekolah_id')->constrained('tabel_sekolah')->cascadeOnDelete();
+        $table->foreignId('mapel_mapping_id')->constrained('tabel_mapel_mapping')->cascadeOnDelete();
+        $table->timestamps();
 
-      $table->unique(['sekolah_id', 'mapel_mapping_id'], 'uniq_nonaktif_sekolah_mapping');
-    });
+        $table->unique(['sekolah_id', 'mapel_mapping_id'], 'uniq_nonaktif_sekolah_mapping');
+      });
+    }
   }
 
   public function down(): void
   {
     Schema::dropIfExists('tabel_mapel_nonaktif_sekolah');
 
-    Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
-      $table->unique(
-        ['mapel_master_id', 'jenjang', 'tingkat', 'semester_id', 'sekolah_id'],
-        'uniq_mapel_mapping'
-      );
-    });
+    if (!Schema::hasIndex('tabel_mapel_mapping', 'uniq_mapel_mapping')) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
+        $table->unique(
+          ['mapel_master_id', 'jenjang', 'tingkat', 'semester_id', 'sekolah_id'],
+          'uniq_mapel_mapping'
+        );
+      });
+    }
+
+    if (Schema::hasIndex('tabel_mapel_mapping', 'uniq_mapel_mapping_v2')) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
+        $table->dropUnique('uniq_mapel_mapping_v2');
+      });
+    }
 
     Schema::table('tabel_mapel_mapping', function (Blueprint $table) {
-      $table->dropUnique('uniq_mapel_mapping_v2');
-      $table->dropColumn(['sekolah_key', 'kurikulum_key', 'is_aktif']);
-      $table->dropConstrainedForeignId('kurikulum_id');
-      $table->dropConstrainedForeignId('mapel_kelompok_id');
+      if (Schema::hasColumn('tabel_mapel_mapping', 'sekolah_key')) {
+        $table->dropColumn('sekolah_key');
+      }
+      if (Schema::hasColumn('tabel_mapel_mapping', 'kurikulum_key')) {
+        $table->dropColumn('kurikulum_key');
+      }
+      if (Schema::hasColumn('tabel_mapel_mapping', 'is_aktif')) {
+        $table->dropColumn('is_aktif');
+      }
+      if (Schema::hasColumn('tabel_mapel_mapping', 'kurikulum_id')) {
+        $table->dropConstrainedForeignId('kurikulum_id');
+      }
+      if (Schema::hasColumn('tabel_mapel_mapping', 'mapel_kelompok_id')) {
+        $table->dropConstrainedForeignId('mapel_kelompok_id');
+      }
     });
+  }
+
+  /**
+   * Tambahkan kolom FK bila belum ada — kolom dan constraint-nya
+   * dijaga terpisah, karena percobaan migrasi yang berhenti di
+   * tengah bisa meninggalkan kolom tanpa constraint.
+   */
+  private function tambahKolomFk(string $kolom, string $tabelRef, string $after): void
+  {
+    if (!Schema::hasColumn('tabel_mapel_mapping', $kolom)) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) use ($kolom, $after) {
+        $table->unsignedBigInteger($kolom)->nullable()->after($after);
+      });
+    }
+
+    $namaFk = 'tabel_mapel_mapping_' . $kolom . '_foreign';
+    $ada = DB::selectOne(
+      "SELECT COUNT(*) AS c FROM information_schema.TABLE_CONSTRAINTS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'tabel_mapel_mapping'
+         AND CONSTRAINT_NAME = ?
+         AND CONSTRAINT_TYPE = 'FOREIGN KEY'",
+      [$namaFk]
+    );
+
+    if ((int) ($ada->c ?? 0) === 0) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) use ($kolom, $tabelRef) {
+        $table->foreign($kolom)->references('id')->on($tabelRef)->nullOnDelete();
+      });
+    }
+  }
+
+  /**
+   * Pastikan kolom kunci adalah kolom biasa. Bila percobaan
+   * migrasi sebelumnya sempat membuatnya sebagai kolom
+   * ter-generate (yang tidak bisa di-UPDATE untuk backfill),
+   * buang dan buat ulang.
+   */
+  private function pastikanKolomKunci(string $kolom): void
+  {
+    $baris = DB::selectOne(
+      "SELECT EXTRA FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'tabel_mapel_mapping'
+         AND COLUMN_NAME = ?",
+      [$kolom]
+    );
+
+    if ($baris && stripos((string) ($baris->EXTRA ?? ''), 'GENERATED') !== false) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) use ($kolom) {
+        $table->dropColumn($kolom);
+      });
+    }
+
+    if (!Schema::hasColumn('tabel_mapel_mapping', $kolom)) {
+      Schema::table('tabel_mapel_mapping', function (Blueprint $table) use ($kolom) {
+        $table->unsignedBigInteger($kolom)->default(0);
+      });
+    }
   }
 };

@@ -33,7 +33,22 @@ class MapelMapping extends Model
     'kurikulum_id'      => 'integer',
     'mapel_kelompok_id' => 'integer',
     'is_aktif'          => 'boolean',
+    'sekolah_key'       => 'integer',
+    'kurikulum_key'     => 'integer',
   ];
+
+  protected static function booted(): void
+  {
+    // Kolom kunci untuk unique database (uniq_mapel_mapping_v2):
+    // cermin sekolah_id/kurikulum_id dengan NULL dihitung 0.
+    // Kolom ter-generate tidak dipakai karena MySQL menolaknya
+    // di atas kolom ber-FK (error 1215) — kesegarannya dijaga
+    // di sini, setiap kali mapping disimpan lewat Eloquent.
+    static::saving(function (MapelMapping $mapping) {
+      $mapping->sekolah_key   = $mapping->sekolah_id ?? 0;
+      $mapping->kurikulum_key = $mapping->kurikulum_id ?? 0;
+    });
+  }
 
   // -------------------------------------------------------
   // Relationships
