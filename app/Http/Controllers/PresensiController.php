@@ -20,7 +20,13 @@ class PresensiController extends Controller
    */
   public function index()
   {
-    $rombelList = Rombel::orderBy('nama_rombel')->get();
+    // Hanya rombel semester sesi: tanggal presensi divalidasi
+    // terhadap semester sesi, jadi rombel semester lain tidak
+    // boleh bisa dipilih (snapshot rombel/semester akan bertentangan)
+    $rombelList = Rombel::where('semester_id', session('semester_id'))
+      ->orderBy('tingkat')
+      ->orderBy('nama_rombel')
+      ->get();
     $semester   = Semester::find(session('semester_id'));
 
     return view('content.presensi.index', compact('rombelList', 'semester'));
@@ -74,6 +80,13 @@ class PresensiController extends Controller
 
     $rombel = Rombel::findOrFail($rombelId);
 
+    if ((int) $rombel->semester_id !== (int) $semester->id) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Rombel ini bukan rombel semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester . '.',
+      ], 422);
+    }
+
     // Roster = anggota rombel itu pada semesternya, dibatasi hari
     // efektif siswa dari tanggal registrasinya di sekolah rombel
     // ini: belum bisa dipresensi sebelum tanggal_diterima dan tidak
@@ -81,24 +94,13 @@ class PresensiController extends Controller
     // bertanggal — ia berlaku untuk semester rombel itu, jadi guru
     // rombel yang terdaftar pada semester tanggal inilah yang
     // mengelola presensinya.
-    $anggota = RombelAnggota::with('siswa')
-      ->where('rombel_id', $rombelId)
-      ->whereHas('siswa', function ($q) use ($rombel, $tanggal) {
-        $q->whereHas('siswaRegistrasi', function ($qr) use ($rombel, $tanggal) {
-          $qr->where('sekolah_id', $rombel->sekolah_id)
-            ->where(function ($qw) use ($tanggal) {
-              $qw->whereNull('tanggal_diterima')
-                ->orWhereDate('tanggal_diterima', '<=', $tanggal);
-            })
-            ->where(function ($qw) use ($tanggal) {
-              $qw->whereNull('tanggal_keluar')
-                ->orWhereDate('tanggal_keluar', '>=', $tanggal);
-            });
-        });
-      })
-      ->get();
+    $anggota = $this->roster($rombel, $tanggal);
 
-    $presensiExisting = Presensi::where('rombel_id', $rombelId)
+    // Presensi melekat ke siswa + tanggal, bukan ke rombel: status
+    // tersimpan dicari tanpa memandang rombel asalnya, supaya
+    // membuka tanggal yang sama dari rombel lain (mis. setelah
+    // siswa pindah rombel) tetap menampilkan status yang tersimpan
+    $presensiExisting = Presensi::whereIn('siswa_id', $anggota->pluck('siswa_id'))
       ->whereDate('tanggal', $tanggal)
       ->get()
       ->keyBy('siswa_id');
@@ -124,6 +126,34 @@ class PresensiController extends Controller
       'tanggal' => $tanggal->format('Y-m-d'),
       'siswa'   => $data,
     ]);
+  }
+
+  /**
+   * Roster presensi: anggota rombel yang hari efektifnya — dari
+   * tanggal registrasi di sekolah rombel itu — mencakup $tanggal
+   * (belum bisa dipresensi sebelum tanggal_diterima, tidak lagi
+   * sesudah tanggal_keluar). Dipakai bersama oleh ajaxSiswa dan
+   * store() supaya aturan yang ditampilkan sama dengan yang
+   * ditegakkan saat menyimpan.
+   */
+  private function roster(Rombel $rombel, Carbon $tanggal)
+  {
+    return RombelAnggota::with('siswa')
+      ->where('rombel_id', $rombel->id)
+      ->whereHas('siswa', function ($q) use ($rombel, $tanggal) {
+        $q->whereHas('siswaRegistrasi', function ($qr) use ($rombel, $tanggal) {
+          $qr->where('sekolah_id', $rombel->sekolah_id)
+            ->where(function ($qw) use ($tanggal) {
+              $qw->whereNull('tanggal_diterima')
+                ->orWhereDate('tanggal_diterima', '<=', $tanggal);
+            })
+            ->where(function ($qw) use ($tanggal) {
+              $qw->whereNull('tanggal_keluar')
+                ->orWhereDate('tanggal_keluar', '>=', $tanggal);
+            });
+        });
+      })
+      ->get();
   }
 
   /**
@@ -154,7 +184,7 @@ class PresensiController extends Controller
 
     // Sama seperti modul lain: kalau semester di session bukan semester aktif,
     // hanya admin yang boleh melakukan perubahan (termasuk presensi).
-    $isEditable = Auth::user()->hasRole('admin') || $semester->is_active == 1;
+    $isEditable = Auth::user()->hasRole('Admin') || $semester->is_active == 1;
 
     if (!$isEditable) {
       return response()->json([
@@ -181,6 +211,34 @@ class PresensiController extends Controller
       return response()->json([
         'success' => false,
         'message' => 'Tanggal ini hari libur, presensi tidak dapat disimpan.',
+      ], 422);
+    }
+
+    $rombel = Rombel::findOrFail($request->rombel_id);
+
+    if ((int) $rombel->semester_id !== (int) $semester->id) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Rombel ini bukan rombel semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester . '.',
+      ], 422);
+    }
+
+    // Tegakkan aturan roster yang sama dengan yang ditampilkan
+    // ajaxSiswa: setiap siswa yang dikirim harus anggota rombel ini
+    // dan hari efektif registrasinya mencakup tanggal presensi.
+    // Tanpa ini, POST langsung bisa menyimpan presensi untuk
+    // non-anggota, sebelum tanggal_diterima, atau sesudah
+    // tanggal_keluar.
+    $rosterIds = $this->roster($rombel, $tanggal)->pluck('siswa_id');
+    $diLuarRoster = collect($request->presensi)
+      ->pluck('siswa_id')
+      ->map(fn($id) => (int) $id)
+      ->diff($rosterIds->map(fn($id) => (int) $id));
+
+    if ($diLuarRoster->isNotEmpty()) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Ada ' . $diLuarRoster->count() . ' siswa di luar daftar presensi rombel ini untuk tanggal tersebut — presensi ditolak.',
       ], 422);
     }
 
