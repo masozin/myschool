@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Kurikulum extends Model
@@ -25,15 +24,6 @@ class Kurikulum extends Model
     'tahun_berlaku' => 'integer',
     'is_aktif'      => 'boolean',
   ];
-
-  // -------------------------------------------------------
-  // Relationships
-  // -------------------------------------------------------
-
-  public function mapelMapping(): BelongsToMany
-  {
-    return $this->belongsToMany(MapelMapping::class, 'mapel_kurikulum');
-  }
 
   // -------------------------------------------------------
   // Scopes
