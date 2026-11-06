@@ -94,8 +94,8 @@
         </a>
       </div>
       <div class="d-flex gap-2">
-        {{-- Import Nilai --}}
-        @hasanyrole('Admin|Operator Sekolah')
+        {{-- Import Nilai (route khusus Operator — jangan tampilkan ke peran lain) --}}
+        @hasanyrole('Operator Sekolah')
           <button class="btn btn-label-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-import">
             <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
           </button>
@@ -107,8 +107,8 @@
               Angkatan</span>
           </a>
         @endhasanyrole
-        {{-- Finalisasi Semua --}}
-        @hasanyrole('Admin|Operator Sekolah')
+        {{-- Finalisasi Semua (controller menolak selain Operator) --}}
+        @hasanyrole('Operator Sekolah')
           <button class="btn btn-warning btn-sm" id="btn-finalisasi-semua">
             <i class="icon-base ri ri-checkbox-circle-line me-1"></i><span class="d-none d-md-block">Finalisasi Semua</span>
           </button>
