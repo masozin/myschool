@@ -534,6 +534,9 @@ class SklController extends Controller
 
     abort_if($skl->status !== 'pengajuan', 403);
 
+    // Disetujui = terbit: bekukan identitas siswa ke snapshot agar
+    // perubahan data induk sesudahnya tidak mengubah dokumen
+    $skl->isiSnapshotIdentitas();
     $skl->update(['status' => 'disetujui', 'generated_at' => now()]);
 
     return response()->json(['message' => 'SKL berhasil disetujui.']);
@@ -601,10 +604,18 @@ class SklController extends Controller
 
     $request->validate(['ids' => 'required|array']);
 
-    // Hanya ubah yang statusnya pengajuan
-    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
+    // Hanya ubah yang statusnya pengajuan; snapshot identitas
+    // dibekukan per SKL, jadi diproses per model
+    $daftar = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', 'pengajuan')
-      ->update(['status' => 'disetujui']);
+      ->get();
+
+    foreach ($daftar as $skl) {
+      $skl->isiSnapshotIdentitas();
+      $skl->update(['status' => 'disetujui']);
+    }
+
+    $affected = $daftar->count();
 
     return response()->json(['message' => "$affected SKL berhasil disetujui."]);
   }
@@ -616,13 +627,22 @@ class SklController extends Controller
     $request->validate(['ids' => 'required|array']);
 
     // Hanya memproses SKL yang saat ini berstatus 'disetujui'
-    // Status dikembalikan ke 'pengajuan' agar bisa diperiksa/diedit kembali
-    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
+    // Status dikembalikan ke 'pengajuan' agar bisa diperiksa/diedit
+    // kembali; snapshot identitas dikosongkan (kembali mengikuti
+    // data induk) sampai disetujui ulang
+    $daftar = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', 'disetujui')
-      ->update([
+      ->get();
+
+    foreach ($daftar as $skl) {
+      $skl->hapusSnapshotIdentitas();
+      $skl->update([
         'status' => 'pengajuan',
         'catatan' => 'batal disetujui'
       ]);
+    }
+
+    $affected = $daftar->count();
 
     return response()->json([
       'status' => 'success',
@@ -1334,6 +1354,7 @@ class SklController extends Controller
     $html = view('templates.skl-template.skl-2425-sd', [
       'skl'   => $skl,
       'qrCode' => $qrCodeBase64,
+      'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,
     ])->render();
 
     $pdf = Pdf::loadHTML($html)
@@ -1377,6 +1398,7 @@ class SklController extends Controller
     $html = view('templates.skl-template.skl-2425-sd', [
       'skl'    => $skl,
       'qrCode' => $qrCodeBase64,
+      'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,
     ])->render();
 
     $pdf = Pdf::loadHTML($html)
@@ -1442,6 +1464,7 @@ class SklController extends Controller
       $html = view('templates.skl-template.skl-2425-sd', [
         'skl'    => $skl,
         'qrCode' => $qrCodeBase64,
+        'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,
       ])->render();
 
       $pdf = Pdf::loadHTML($html)

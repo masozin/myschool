@@ -367,6 +367,9 @@ class SkhuController extends Controller
     }
 
     if ($skhu->status === 'final') {
+      // Batal final: snapshot identitas dikosongkan, dokumen kembali
+      // mengikuti data induk selama berstatus draft
+      $skhu->hapusSnapshotIdentitas();
       $skhu->update(['status' => 'draft']);
       $pesan = 'SKHU berhasil dibatalkan finalisasinya.';
     } else {
@@ -380,6 +383,9 @@ class SkhuController extends Controller
         ], 422);
       }
 
+      // Final: bekukan identitas siswa ke snapshot agar perubahan
+      // data induk sesudahnya tidak mengubah dokumen terbit
+      $skhu->isiSnapshotIdentitas();
       $skhu->update(['status' => 'final']);
       $pesan = 'SKHU berhasil difinalisasi.';
     }
@@ -429,7 +435,11 @@ class SkhuController extends Controller
     }
 
     if (!empty($validIds)) {
-      Skhu::whereIn('id', $validIds)->update(['status' => 'final']);
+      // Finalisasi massal juga membekukan snapshot identitas per SKHU
+      foreach ($skhuList->whereIn('id', $validIds) as $skhu) {
+        $skhu->isiSnapshotIdentitas();
+        $skhu->update(['status' => 'final']);
+      }
     }
 
     $jumlahBerhasil = count($validIds);
@@ -835,7 +845,7 @@ class SkhuController extends Controller
 
     $skhu->update(['generated_at' => now()]);
 
-    $html = view($template->view_name, ['skhu' => $skhu])->render();
+    $html = view($template->view_name, ['skhu' => $skhu, 'watermark' => $skhu->status !== 'final' ? 'DRAFT' : null])->render();
 
     $pdf = Pdf::loadHTML($html)
       ->setPaper('a4', 'portrait')
@@ -896,6 +906,7 @@ class SkhuController extends Controller
     $html = view($template->view_name, [
       'skhu'   => $skhu,
       'qrCode' => $qrCodeBase64,
+      'watermark' => $skhu->status !== 'final' ? 'DRAFT' : null,
     ])->render();
 
     $pdf = Pdf::loadHTML($html)
@@ -960,7 +971,7 @@ class SkhuController extends Controller
     foreach ($skhus as $skhu) {
       $skhu->update(['generated_at' => now()]);
 
-      $html = view($template->view_name, ['skhu' => $skhu])->render();
+      $html = view($template->view_name, ['skhu' => $skhu, 'watermark' => $skhu->status !== 'final' ? 'DRAFT' : null])->render();
 
       $pdf = Pdf::loadHTML($html)
         ->setPaper('a4', 'portrait')
