@@ -80,6 +80,12 @@
         <i class="ri ri-file-excel-line me-1"></i>
         <span class="d-none d-lg-inline-block">Impor Siswa</span>
       </button>
+      @hasanyrole('Admin|Operator Sekolah')
+      <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modal-mutasi-masuk">
+        <i class="ri ri-user-shared-line me-1"></i>
+        <span class="d-none d-lg-inline-block">Mutasi Masuk</span>
+      </button>
+      @endhasanyrole
       <button class="btn btn-secondary btn-sm" id="btn-export-excel">
         <i class="ri ri-download-2-line me-1"></i>
         <span class="d-none d-lg-inline-block">Download</span>
@@ -104,6 +110,13 @@
             <i class="ri ri-file-excel-line me-2"></i> Impor Siswa
           </button>
         </li>
+        @hasanyrole('Admin|Operator Sekolah')
+        <li>
+          <button class="dropdown-item text-info" data-bs-toggle="modal" data-bs-target="#modal-mutasi-masuk">
+            <i class="ri ri-user-shared-line me-2"></i> Mutasi Masuk
+          </button>
+        </li>
+        @endhasanyrole
         <li>
           <hr class="dropdown-divider">
         </li>
@@ -540,11 +553,114 @@
                 <label for="alasan">Alasan</label>
               </div>
             </div>
+            <div id="container-tujuan" class="col-12 d-none">
+              <div class="form-floating form-floating-outline mb-2">
+                <select id="tujuan_pilih" class="form-select">
+                  <option value="">— Pilih sekolah tujuan —</option>
+                  @foreach ($semuaSekolah as $sk)
+                    <option value="{{ $sk->detailTerbaru?->nama_sekolah }}">
+                      {{ $sk->detailTerbaru?->nama_sekolah ?? 'Sekolah #' . $sk->id }}</option>
+                  @endforeach
+                  <option value="__lainnya__">Sekolah lain (di luar aplikasi)…</option>
+                </select>
+                <label for="tujuan_pilih">Sekolah Tujuan</label>
+              </div>
+              <div class="form-floating form-floating-outline">
+                <input type="text" name="sekolah_tujuan" id="sekolah_tujuan" class="form-control"
+                  placeholder="Nama sekolah tujuan" readonly />
+                <label for="sekolah_tujuan">Nama Sekolah Tujuan</label>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
           <button type="submit" class="btn btn-primary">Simpan Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{{-- =========================================================== --}}
+{{-- MODAL: Mutasi Masuk (siswa yang sudah ada di aplikasi)       --}}
+{{-- =========================================================== --}}
+<div class="modal fade" id="modal-mutasi-masuk" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ri ri-user-shared-line me-2"></i>Mutasi Masuk</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="form-mutasi-masuk">
+        @csrf
+        <div class="modal-body">
+          <p class="text-muted small mb-3">Untuk siswa yang <strong>sudah terdaftar di aplikasi ini</strong>
+            (mis. pindahan dari sekolah lain sesama pengguna). Biodatanya dipakai apa adanya —
+            tidak perlu dimasukkan ulang, dan tidak akan ada siswa ganda.</p>
+          <div class="form-floating form-floating-outline mb-3">
+            <input type="text" id="mutasi_cari" class="form-control" placeholder="Nama / NISN / NIK"
+              autocomplete="off" />
+            <label for="mutasi_cari">Cari Siswa (min. 3 huruf)</label>
+          </div>
+          <div id="mutasi_hasil" class="list-group mb-3"></div>
+          <input type="hidden" name="siswa_id" id="mutasi_siswa_id">
+          <div id="mutasi_terpilih" class="alert alert-primary py-2 px-3 d-none"></div>
+          <div id="mutasi_form_lanjut" class="d-none">
+            @hasrole('Admin')
+            <div class="form-floating form-floating-outline mb-3">
+              <select name="sekolah_id" id="mutasi_sekolah_id" class="form-select">
+                <option value="">— Pilih Sekolah Tujuan —</option>
+                @foreach ($sekolahs as $sk)
+                  <option value="{{ $sk->id }}">{{ $sk->detailTerbaru?->nama_sekolah ?? 'Sekolah #' . $sk->id }}
+                  </option>
+                @endforeach
+              </select>
+              <label for="mutasi_sekolah_id">Sekolah Tujuan</label>
+            </div>
+            @endhasrole
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="date" name="tanggal_diterima" id="mutasi_tanggal" class="form-control"
+                    value="{{ now()->format('Y-m-d') }}" required />
+                  <label for="mutasi_tanggal">Tanggal Diterima</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="number" name="tingkat" id="mutasi_tingkat" class="form-control" min="1"
+                    max="12" required />
+                  <label for="mutasi_tingkat">Tingkat</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="nis" id="mutasi_nis" class="form-control" required />
+                  <label for="mutasi_nis">NIS di Sekolah Ini</label>
+                </div>
+              </div>
+              @hasrole('Operator Sekolah')
+              <div class="col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <select name="rombel_id" id="mutasi_rombel" class="form-select">
+                    <option value="">— Tanpa Rombel Dulu —</option>
+                    @foreach ($rombels as $r)
+                      <option value="{{ $r->id }}">{{ $r->nama_rombel }} (Tingkat {{ $r->tingkat }})
+                      </option>
+                    @endforeach
+                  </select>
+                  <label for="mutasi_rombel">Tempatkan di Rombel</label>
+                </div>
+              </div>
+              @endhasrole
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary" id="btn-proses-mutasi" disabled>Proses Mutasi
+            Masuk</button>
         </div>
       </form>
     </div>
@@ -1198,6 +1314,22 @@
       const showExtra = ['mutasi', 'lulus', 'keluar', 'meninggal'].includes(this.value);
       document.getElementById('container-tgl-keluar').classList.toggle('d-none', !showExtra);
       document.getElementById('container-alasan').classList.toggle('d-none', !showExtra);
+      // Sekolah tujuan hanya untuk mutasi
+      document.getElementById('container-tujuan').classList.toggle('d-none', this.value !== 'mutasi');
+    });
+
+    // Pilihan sekolah tujuan mengisi kolom nama; "lainnya" membukanya
+    // untuk diketik bebas (sekolah di luar aplikasi)
+    document.getElementById('tujuan_pilih').addEventListener('change', function() {
+      const input = document.getElementById('sekolah_tujuan');
+      if (this.value === '__lainnya__') {
+        input.value = '';
+        input.readOnly = false;
+        input.focus();
+      } else {
+        input.value = this.value;
+        input.readOnly = true;
+      }
     });
 
     // ── Submit Form Update Status ───────────────────────────────────────────
@@ -1251,6 +1383,135 @@
         btn.disabled = false;
       }
     });
+
+    // ── Mutasi Masuk: cari siswa yang sudah ada di aplikasi ───────────
+    const mutasiCari = document.getElementById('mutasi_cari');
+    if (mutasiCari) {
+      const hasilEl = document.getElementById('mutasi_hasil');
+      const terpilihEl = document.getElementById('mutasi_terpilih');
+      const lanjutEl = document.getElementById('mutasi_form_lanjut');
+      const idEl = document.getElementById('mutasi_siswa_id');
+      const btnProses = document.getElementById('btn-proses-mutasi');
+      let timerCari = null;
+
+      mutasiCari.addEventListener('input', function() {
+        clearTimeout(timerCari);
+        const q = this.value.trim();
+        idEl.value = '';
+        terpilihEl.classList.add('d-none');
+        lanjutEl.classList.add('d-none');
+        btnProses.disabled = true;
+
+        if (q.length < 3) {
+          hasilEl.innerHTML = '';
+          return;
+        }
+
+        timerCari = setTimeout(async () => {
+          hasilEl.innerHTML = '<div class="list-group-item text-muted">Mencari…</div>';
+          try {
+            const url = "{{ route('siswa.cari-terdaftar') }}?q=" + encodeURIComponent(q);
+            const response = await fetch(url, {
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json'
+              }
+            });
+            const res = await response.json();
+            const items = res.data || [];
+
+            if (!items.length) {
+              hasilEl.innerHTML =
+                '<div class="list-group-item text-muted">Tidak ditemukan — siswa ini belum ada di aplikasi, daftarkan lewat Tambah Siswa.</div>';
+              return;
+            }
+
+            hasilEl.innerHTML = '';
+            items.forEach(s => {
+              const t = s.terakhir;
+              const masihAktifLain = t && t.status === 'aktif' && !s.aktif_di_sini;
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'list-group-item list-group-item-action';
+              btn.disabled = !!s.aktif_di_sini;
+              btn.innerHTML =
+                '<div class="d-flex justify-content-between">' +
+                '<strong>' + s.nama_siswa + '</strong>' +
+                '<small class="text-muted">NISN ' + (s.nisn || '-') + '</small></div>' +
+                '<small class="text-muted">' +
+                (t ? ('Terakhir: ' + t.sekolah + ' — status ' + t.status + ', tingkat ' + (t.tingkat ?? '-')) :
+                  'Belum pernah terdaftar di sekolah mana pun') +
+                (s.aktif_di_sini ? ' — <span class="text-success">sudah aktif di sekolah Anda</span>' : '') +
+                (masihAktifLain ?
+                  ' — <span class="text-danger">masih aktif di sekolah lain; mutasi masuk diblokir sampai sekolah asal menutupnya</span>' :
+                  '') +
+                '</small>';
+              btn.addEventListener('click', () => pilihSiswaMutasi(s));
+              hasilEl.appendChild(btn);
+            });
+          } catch (e) {
+            hasilEl.innerHTML = '<div class="list-group-item text-danger">Pencarian gagal, coba lagi.</div>';
+          }
+        }, 300);
+      });
+
+      function pilihSiswaMutasi(s) {
+        idEl.value = s.id;
+        const t = s.terakhir;
+        terpilihEl.innerHTML = '<strong>' + s.nama_siswa + '</strong> — NISN ' + (s.nisn || '-') +
+          (t ? '<br><small>Asal: ' + t.sekolah + ' (status terakhir: ' + t.status + ')</small>' : '');
+        terpilihEl.classList.remove('d-none');
+        lanjutEl.classList.remove('d-none');
+        if (t && t.tingkat) document.getElementById('mutasi_tingkat').value = t.tingkat;
+        btnProses.disabled = false;
+        hasilEl.innerHTML = '';
+      }
+
+      document.getElementById('form-mutasi-masuk').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!idEl.value) return;
+        btnProses.disabled = true;
+
+        try {
+          const response = await fetch("{{ route('siswa.mutasi-masuk') }}", {
+            method: 'POST',
+            body: new FormData(this),
+            headers: {
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json'
+            }
+          });
+          const res = await response.json();
+
+          if (response.ok && res.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('modal-mutasi-masuk'))?.hide();
+            Swal.fire({
+              icon: 'success',
+              title: 'Berhasil',
+              text: res.message,
+              customClass: {
+                confirmButton: 'btn btn-success'
+              }
+            });
+            window.siswa.dtSiswa?.ajax.reload(null, false);
+          } else {
+            const detail = res.errors ? Object.values(res.errors).flat().join('\n') : null;
+            throw new Error(detail || res.message || 'Gagal memproses mutasi masuk');
+          }
+        } catch (error) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal',
+            text: error.message,
+            customClass: {
+              confirmButton: 'btn btn-primary'
+            }
+          });
+          btnProses.disabled = false;
+        }
+      });
+    }
 
   }); // end DOMContentLoaded (main)
 

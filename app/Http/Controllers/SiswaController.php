@@ -40,14 +40,20 @@ class SiswaController extends Controller
         ->where('semester_id', $semesterId)
         ->get();
     }
-    return view('content.siswa.index', compact('sekolahs', 'rombels'));
+    // Semua sekolah: untuk dropdown tujuan mutasi keluar dan
+    // pilihan sekolah tujuan mutasi masuk
+    $semuaSekolah = Sekolah::with('detailTerbaru')->get();
+
+    return view('content.siswa.index', compact('sekolahs', 'rombels', 'semuaSekolah'));
   }
 
   public function show($id)
   {
     $siswa = Siswa::with([
       'registrasiTerbaru',
-      'siswaRegistrasi',   // semua riwayat registrasi
+      // Riwayat registrasi dari SEMUA sekolah (tanpa SekolahScope):
+      // sekolah baru perlu melihat asal-usul siswa pindahan
+      'siswaRegistrasi' => fn($q) => $q->withoutGlobalScopes()->with('sekolah.detailTerbaru'),
     ])->findOrFail($id);
 
     // Opsional: cek izin jika pakai Policy

@@ -213,6 +213,7 @@
             <thead>
               <tr>
                 <th class="text-center">#</th>
+                <th>Sekolah</th>
                 <th>NIS / NISN</th>
                 <th class="text-center">Tingkat</th>
                 <th>Tahun Masuk</th>
@@ -232,6 +233,7 @@
                 @endphp
                 <tr>
                   <td class="text-center">{{ $loop->iteration }}</td>
+                  <td><small>{{ $reg->sekolah?->detailTerbaru?->nama_sekolah ?? '-' }}</small></td>
                   <td><small>{{ $reg->nisn ?? '-' }} / {{ $reg->nis ?? '-' }}</small></td>
                   <td class="text-center">{{ $reg->tingkat }}</td>
                   <td>{{ $reg->tanggal_diterima ? \Carbon\Carbon::parse($reg->tanggal_diterima)->format('Y') : '-' }}</td>
@@ -242,7 +244,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="6" class="text-center py-3 text-muted">
+                  <td colspan="7" class="text-center py-3 text-muted">
                     <i class="ri ri-inbox-line me-1"></i> Belum ada data registrasi.
                   </td>
                 </tr>
