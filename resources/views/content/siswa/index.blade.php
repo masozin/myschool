@@ -638,6 +638,8 @@
                 <div class="form-floating form-floating-outline">
                   <input type="text" name="nis" id="mutasi_nis" class="form-control" required />
                   <label for="mutasi_nis">NIS di Sekolah Ini</label>
+                  <div class="form-text">Bila ia pernah terdaftar di sekolah ini, boleh memakai NIS
+                    lamanya.</div>
                 </div>
               </div>
               @hasrole('Operator Sekolah')

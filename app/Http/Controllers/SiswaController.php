@@ -1049,7 +1049,12 @@ class SiswaController extends Controller
       'nis'              => [
         'required',
         'string',
-        Rule::unique('tabel_siswa_registrasi', 'nis')->where('sekolah_id', $sekolahId),
+        // NIS harus unik per sekolah terhadap siswa LAIN; NIS
+        // lamanya sendiri di sekolah ini boleh dipakai lagi —
+        // untuk siswa yang mutasi keluar lalu kembali ke sini
+        Rule::unique('tabel_siswa_registrasi', 'nis')
+          ->where('sekolah_id', $sekolahId)
+          ->where('siswa_id', '!=', $request->integer('siswa_id')),
       ],
       'rombel_id'        => 'nullable|exists:tabel_rombel,id',
     ]);
