@@ -82,7 +82,9 @@ class Skhu extends Model
 
     foreach ($this->nilais as $nilai) {
       if ($tampilKelompok) {
-        $namaKelompok = $nilai->mapelMapping?->masterMapel?->kelompok?->nama ?? 'Lainnya';
+        $namaKelompok = $nilai->mapelMapping?->kelompok?->nama
+          ?? $nilai->mapelMapping?->masterMapel?->kelompok?->nama
+          ?? 'Lainnya';
       } else {
         $namaKelompok = '__semua__';
       }
@@ -225,18 +227,19 @@ class Skhu extends Model
       return $errors;
     }
 
-    // 5. Mapel wajib untuk kombinasi jenjang + tingkat + semester ini
-    $mapelWajibIds = MapelMapping::where('jenjang', $jenjang)
-      ->where('tingkat', $tingkat)
-      ->where('semester_id', $this->semester_id)
-      ->where(function ($q) {
-        $q->where('jenis', 'pokok')
-          ->orWhere(function ($q2) {
-            $q2->where('jenis', 'tambahan')
-              ->where('sekolah_id', $this->sekolah_id);
-          });
-      })
-      ->pluck('id');
+    // 5. Mapel wajib: rumus berlaku yang sama seperti form SKHU
+    //    (scope tunggal di MapelMapping), dengan kurikulum dari
+    //    rombel siswa ini — mapel pokok yang dinonaktifkan
+    //    sekolah tidak lagi mewajibkan nilai
+    $kurikulumId = $rombelAnggota?->rombel?->kurikulum_id;
+
+    $mapelWajibIds = MapelMapping::berlakuUntuk(
+      (int) $this->sekolah_id,
+      $jenjang,
+      (int) $tingkat,
+      (int) $this->semester_id,
+      $kurikulumId !== null ? (int) $kurikulumId : null
+    )->pluck('id');
 
     if ($mapelWajibIds->isEmpty()) {
       $errors[] = 'Belum ada mapping mapel untuk jenjang/tingkat/semester ini. Hubungi admin.';

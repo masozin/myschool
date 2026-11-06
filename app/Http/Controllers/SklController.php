@@ -303,12 +303,7 @@ class SklController extends Controller
     // ══════════════════════════════════════════════════════════════════════
 
     // A. Cek Ketersediaan Mapel Mapping
-    $mappings = MapelMapping::where('semester_id', $semesterId)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $tingkatAkhir)
-      ->where(function ($q) use ($sekolahId) {
-        $q->whereNull('sekolah_id')->orWhere('sekolah_id', $sekolahId);
-      })
+    $mappings = MapelMapping::berlakuUntuk($sekolahId, $jenjang, (int) $tingkatAkhir, (int) $semesterId)
       ->orderBy('urutan')
       ->get();
 
@@ -675,14 +670,16 @@ class SklController extends Controller
       return response()->json(['message' => 'Tidak ada data SKL aktif yang perlu disinkronkan.']);
     }
 
-    // 2. Ambil Master Mapping Mapel Terbaru
-    $mappings = MapelMapping::where('semester_id', $semesterId)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $tingkatAkhir)
-      ->where(function ($q) use ($sekolahId) {
-        $q->whereNull('sekolah_id')->orWhere('sekolah_id', $sekolahId);
-      })
-      ->get();
+    // 2. Ambil mapping mapel yang berlaku (rumus tunggal di
+    //    MapelMapping); kurikulum disaring per siswa di langkah 4
+    $mappings = MapelMapping::berlakuUntuk($sekolahId, $jenjang, (int) $tingkatAkhir, (int) $semesterId)->get();
+
+    // Kurikulum tiap siswa, dari rombelnya pada semester ini
+    $kurikulumPerSiswa = RombelAnggota::where('semester_id', $semesterId)
+      ->where('sekolah_id', $sekolahId)
+      ->with('rombel')
+      ->get()
+      ->mapWithKeys(fn($a) => [$a->siswa_id => $a->rombel?->kurikulum_id]);
 
     // 3. Ambil Master Komponen Terbaru
     $komponens = collect();
@@ -698,15 +695,21 @@ class SklController extends Controller
     }
 
     // 4. Proses Eksekusi Sinkronisasi secara Massal dalam Database Transaction
-    DB::transaction(function () use ($skls, $mappings, $komponens, $modeInput) {
+    DB::transaction(function () use ($skls, $mappings, $komponens, $modeInput, $kurikulumPerSiswa) {
       foreach ($skls as $skl) {
+
+        // Saring mapping menurut kurikulum rombel siswa ini
+        $kurikulumSiswa = $kurikulumPerSiswa[$skl->siswa_id] ?? null;
+        $mappingsSiswa  = $kurikulumSiswa === null
+          ? $mappings
+          : $mappings->filter(fn($m) => $m->kurikulum_id === null || (int) $m->kurikulum_id === (int) $kurikulumSiswa)->values();
 
         // --- A. SINKRONISASI MAPEL MAPPING (TAMBAH / HAPUS MAPEL) ---
         $existingMappingIds = SklNilai::where('skl_id', $skl->id)->pluck('mapel_mapping_id')->toArray();
-        $currentMappingIds = $mappings->pluck('id')->toArray();
+        $currentMappingIds = $mappingsSiswa->pluck('id')->toArray();
 
         // Tambah jika ada mapel mapping baru bertambah
-        foreach ($mappings as $mapping) {
+        foreach ($mappingsSiswa as $mapping) {
           if (!in_array($mapping->id, $existingMappingIds)) {
             $sklNilai = SklNilai::create([
               'skl_id'           => $skl->id,
@@ -851,21 +854,13 @@ class SklController extends Controller
     }
   }
 
-  private function getMapels(string $jenjang, int $tingkat, int $semesterId, int $sekolahId)
+  private function getMapels(string $jenjang, int $tingkat, int $semesterId, int $sekolahId, ?int $kurikulumId = null)
   {
-    return MapelMapping::with(['masterMapel.kelompok'])
-      ->where('semester_id', $semesterId)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $tingkat)
-      ->where(function ($q) use ($sekolahId) {
-        // pokok (berlaku semua sekolah) atau tambahan milik sekolah ini
-        $q->whereNull('sekolah_id')
-          ->orWhere('sekolah_id', $sekolahId);
-      })
-      ->whereHas('masterMapel', fn($q) => $q->where('is_aktif', true))
+    return MapelMapping::with(['masterMapel.kelompok', 'kelompok'])
+      ->berlakuUntuk($sekolahId, $jenjang, $tingkat, $semesterId, $kurikulumId)
       ->get()
       ->sortBy(fn($m) => [
-        $m->masterMapel->kelompok->urutan ?? 999,
+        $m->kelompokTampil()?->urutan ?? 999,
         $m->urutan ?? 999,
       ]);
   }
@@ -1212,12 +1207,7 @@ class SklController extends Controller
     // ══════════════════════════════════════════════════════════════════════
 
     // A. Cek Ketersediaan Mapel Mapping
-    $mappings = MapelMapping::where('semester_id', $semesterId)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $tingkatAkhir)
-      ->where(function ($q) use ($sekolahId) {
-        $q->whereNull('sekolah_id')->orWhere('sekolah_id', $sekolahId);
-      })
+    $mappings = MapelMapping::berlakuUntuk($sekolahId, $jenjang, (int) $tingkatAkhir, (int) $semesterId)
       ->orderBy('urutan')
       ->get();
 

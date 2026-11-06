@@ -77,7 +77,7 @@ class Skl extends Model
   public function nilaisLengkap()
   {
     return $this->nilais()
-      ->with('mapelMapping.masterMapel.kelompok', 'komponens.komponen.subKomponen', 'komponens.nilaiSubKomponen')
+      ->with('mapelMapping.masterMapel.kelompok', 'mapelMapping.kelompok', 'komponens.komponen.subKomponen', 'komponens.nilaiSubKomponen')
       ->get();
   }
 
@@ -87,7 +87,9 @@ class Skl extends Model
   {
     $result = [];
     foreach ($this->nilais as $nilai) {
-      $namaKelompok = $nilai->mapelMapping->masterMapel->kelompok->nama ?? 'Lainnya';
+      $namaKelompok = $nilai->mapelMapping->kelompok->nama
+        ?? $nilai->mapelMapping->masterMapel->kelompok->nama
+        ?? 'Lainnya';
       $result[$namaKelompok][] = $nilai;
     }
     return $result;

@@ -101,7 +101,9 @@ class ValidasiKelulusan extends Controller
 
     foreach ($nilaiUrut as $nilai) {
       // 2. Ambil kelompok mapel dari: mapelMapping -> masterMapel -> kelompok
-      $namaKelompok = $nilai->mapelMapping?->masterMapel?->kelompok?->nama ?? 'Lainnya';
+      $namaKelompok = $nilai->mapelMapping?->kelompok?->nama
+        ?? $nilai->mapelMapping?->masterMapel?->kelompok?->nama
+        ?? 'Lainnya';
 
       $result[$namaKelompok][] = [
         'nama_mapel'     => $nilai->mapelMapping?->masterMapel?->nama ?? '-',
@@ -144,7 +146,7 @@ class ValidasiKelulusan extends Controller
     $sklList = Skl::with([
       'sekolah.detailTerbaru',
       'semester',
-      'nilais.mapelMapping.masterMapel.kelompok',
+      'nilais.mapelMapping.masterMapel.kelompok', 'nilais.mapelMapping.kelompok',
     ])
       ->whereHas('siswa', fn($q) => $q->where('nisn', $nisn))
       ->where('status', 'disetujui')
@@ -199,7 +201,9 @@ class ValidasiKelulusan extends Controller
     $nilaiUrut = $skl->nilais->sortBy(fn($n) => $n->mapelMapping?->urutan ?? 999);
 
     foreach ($nilaiUrut as $nilai) {
-      $namaKelompok = $nilai->mapelMapping?->masterMapel?->kelompok?->nama ?? 'Lainnya';
+      $namaKelompok = $nilai->mapelMapping?->kelompok?->nama
+        ?? $nilai->mapelMapping?->masterMapel?->kelompok?->nama
+        ?? 'Lainnya';
 
       $result[$namaKelompok][] = [
         'nama_mapel'     => $nilai->mapelMapping?->masterMapel?->nama ?? '-',

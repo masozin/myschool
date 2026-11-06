@@ -111,26 +111,19 @@ class SkhuController extends Controller
    *   - semester_id  : sesuai semester aktif
    *   - jenjang      : jenjang sekolah
    *   - tingkat      : tingkat akhir jenjang
-   *   - sekolah_id   : pokok (null) + tambahan milik sekolah ini
+   *   - rumus berlaku: scope berlakuUntuk() di MapelMapping
+   *     (satu-satunya sumber; kurikulum per siswa dari rombelnya)
    *
    * Return: Collection of MapelMapping, sudah eager-load masterMapel & kelompok,
    *         diurutkan kelompok.urutan → mapelMapping.urutan.
    */
-  private function getMapels(string $jenjang, int $tingkat, int $semesterId, int $sekolahId)
+  private function getMapels(string $jenjang, int $tingkat, int $semesterId, int $sekolahId, ?int $kurikulumId = null)
   {
-    return MapelMapping::with(['masterMapel.kelompok'])
-      ->where('semester_id', $semesterId)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $tingkat)
-      ->where(function ($q) use ($sekolahId) {
-        // pokok (berlaku semua sekolah) atau tambahan milik sekolah ini
-        $q->whereNull('sekolah_id')
-          ->orWhere('sekolah_id', $sekolahId);
-      })
-      ->whereHas('masterMapel', fn($q) => $q->where('is_aktif', true))
+    return MapelMapping::with(['masterMapel.kelompok', 'kelompok'])
+      ->berlakuUntuk($sekolahId, $jenjang, $tingkat, $semesterId, $kurikulumId)
       ->get()
       ->sortBy(fn($m) => [
-        $m->masterMapel->kelompok->urutan ?? 999,
+        $m->kelompokTampil()?->urutan ?? 999,
         $m->urutan ?? 999,
       ]);
   }
@@ -194,8 +187,14 @@ class SkhuController extends Controller
     $template = SkhuTemplate::aktifUntuk($jenjang, $semester->id);
 
     // Mapel dikelompokkan untuk tampilan form
-    $mapels = $this->getMapels($jenjang, $this->tingkatAkhir[$jenjang], $semester->id, $sekolah->id)
-      ->groupBy(fn($m) => $m->masterMapel->kelompok->nama ?? 'Lainnya');
+    $mapels = $this->getMapels(
+        $jenjang,
+        $this->tingkatAkhir[$jenjang],
+        $semester->id,
+        $sekolah->id,
+        $anggota->rombel?->kurikulum_id !== null ? (int) $anggota->rombel->kurikulum_id : null
+      )
+      ->groupBy(fn($m) => $m->kelompokTampil()?->nama ?? 'Lainnya');
 
     // SKHU yang sudah ada (jika edit)
     $skhu = Skhu::with('nilais.mapelMapping')
@@ -273,8 +272,30 @@ class SkhuController extends Controller
     ]);
     $skhu->save();
 
+    // Hanya mapping yang memang berlaku untuk siswa ini yang
+    // boleh disimpan nilainya (kurikulum dari rombel siswa)
+    $anggotaSiswa = RombelAnggota::where('siswa_id', $siswa->id)
+      ->where('semester_id', $semester->id)
+      ->where('sekolah_id', $sekolahId)
+      ->with('rombel')
+      ->first();
+    $jenjangSiswa  = strtoupper(Sekolah::find($sekolahId)?->jenjang ?? '');
+    $mapelsBerlaku = isset($this->tingkatAkhir[$jenjangSiswa])
+      ? $this->getMapels(
+          $jenjangSiswa,
+          $this->tingkatAkhir[$jenjangSiswa],
+          (int) $semester->id,
+          (int) $sekolahId,
+          $anggotaSiswa?->rombel?->kurikulum_id !== null ? (int) $anggotaSiswa->rombel->kurikulum_id : null
+        )->pluck('id')->map(fn($id) => (int) $id)->all()
+      : [];
+
     // Simpan nilai — key dari request adalah mapel_mapping_id
     foreach ($request->nilai as $mapelMappingId => $nilai) {
+      if (!in_array((int) $mapelMappingId, $mapelsBerlaku, true)) {
+        continue;
+      }
+
       SkhuNilai::updateOrCreate(
         ['skhu_id' => $skhu->id, 'mapel_mapping_id' => $mapelMappingId],
         ['nilai'   => $nilai]
@@ -391,7 +412,7 @@ class SkhuController extends Controller
       'sekolah.detailTerbaru',
       'sekolah.asets',
       'semester',
-      'nilais.mapelMapping.masterMapel.kelompok',
+      'nilais.mapelMapping.masterMapel.kelompok', 'nilais.mapelMapping.kelompok',
     ])
       ->where('sekolah_id', $sekolah->id)
       ->findOrFail($skhuId);
@@ -436,7 +457,7 @@ class SkhuController extends Controller
       'sekolah.detailPerSemester.regency',
       'sekolah.asets',
       'semester',
-      'nilais.mapelMapping.masterMapel.kelompok',
+      'nilais.mapelMapping.masterMapel.kelompok', 'nilais.mapelMapping.kelompok',
     ])
       ->where('sekolah_id', $sekolah->id)
       ->findOrFail($skhuId);
@@ -498,7 +519,7 @@ class SkhuController extends Controller
       'sekolah.detailTerbaru',
       'sekolah.asets',
       'semester',
-      'nilais.mapelMapping.masterMapel.kelompok',
+      'nilais.mapelMapping.masterMapel.kelompok', 'nilais.mapelMapping.kelompok',
     ])
       ->where('sekolah_id', $sekolah->id)
       ->where('semester_id', $semester->id)
@@ -664,7 +685,7 @@ class SkhuController extends Controller
     }
 
     // Header Mapel (Dikelompokkan)
-    $mapelsGrouped = $mapels->groupBy(fn($m) => $m->masterMapel->kelompok->nama ?? 'Lainnya');
+    $mapelsGrouped = $mapels->groupBy(fn($m) => $m->kelompokTampil()?->nama ?? 'Lainnya');
     $currentCol = $mapelStartCol;
 
     foreach ($mapelsGrouped as $kelompokNama => $items) {
