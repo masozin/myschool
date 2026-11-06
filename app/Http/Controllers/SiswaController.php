@@ -62,6 +62,14 @@ class SiswaController extends Controller
     try {
       $semesterId     = session('semester_id');
 
+      // Sekolah konteks daftar ini: sekolahnya operator, atau
+      // saringan sekolah_id yang dipilih Admin. Dipakai membatasi
+      // pembacaan baris anggota — baris milik sekolah lain pada
+      // semester yang sama (mutasi masuk) bukan urusan daftar ini
+      $sekolahKonteks = $user->hasRole('Admin')
+        ? ($request->filled('sekolah_id') ? $request->integer('sekolah_id') : null)
+        : $user->ptk?->sekolah_id;
+
       $query = Siswa::query()->whereHas('siswaRegistrasi');
 
       // Hanya siswa aktif: yang sudah keluar/mutasi/lulus/meninggal
@@ -93,11 +101,12 @@ class SiswaController extends Controller
         // ── Filter semester untuk Operator/Admin ──────────────────────
         // Hanya tampilkan siswa yang terdaftar di semester yang dipilih
         // Siswa tanpa rombel di semester ini tetap tampil (whereDoesntHave dikecualikan)
-        $query->where(function ($q) use ($semesterId) {
+        $query->where(function ($q) use ($semesterId, $sekolahKonteks) {
 
           // Siswa yang punya anggota rombel di semester ini
-          $q->whereHas('rombelAnggota', function ($qa) use ($semesterId) {
-            $qa->where('semester_id', $semesterId);
+          $q->whereHas('rombelAnggota', function ($qa) use ($semesterId, $sekolahKonteks) {
+            $qa->where('semester_id', $semesterId)
+              ->when($sekolahKonteks, fn($qq) => $qq->where('sekolah_id', $sekolahKonteks));
           })
             // ATAU siswa yang registrasinya aktif di tahun pelajaran ini
             // tapi belum masuk rombel (Tanpa Rombel)
@@ -122,9 +131,11 @@ class SiswaController extends Controller
         'siswaRegistrasi' => function ($q) {
           $q->latest()->with('sekolah.detailTerbaru');
         },
-        'rombelAnggota' => function ($q) use ($semesterId) {
-          // Keanggotaan terakhir siswa di semester yang dipilih
+        'rombelAnggota' => function ($q) use ($semesterId, $sekolahKonteks) {
+          // Keanggotaan terakhir siswa di semester yang dipilih,
+          // pada sekolah konteks daftar ini
           $q->where('semester_id', $semesterId)
+            ->when($sekolahKonteks, fn($qq) => $qq->where('sekolah_id', $sekolahKonteks))
             ->latest('id')
             ->with('rombel');
         }
