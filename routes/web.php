@@ -172,6 +172,8 @@ Route::controller(SiswaController::class)
     Route::put('/{id}/registrasi', 'registrasi')->name('registrasi');
     Route::post('/alumni/{id}/batal-lulus', 'batalkanKelulusan')->name('alumni.batal-lulus');
     Route::post('/keluar/{id}/batal', 'batalkanKeluar')->name('keluar.batal');
+    Route::get('/cari-terdaftar', 'cariTerdaftar')->name('cari-terdaftar');
+    Route::post('/mutasi-masuk', 'mutasiMasuk')->name('mutasi-masuk');
   });
 
 

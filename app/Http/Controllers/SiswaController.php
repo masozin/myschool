@@ -515,6 +515,7 @@ class SiswaController extends Controller
       'status'         => 'required|in:aktif,mutasi,lulus,keluar,meninggal',
       'tanggal_keluar' => 'required_unless:status,aktif|nullable|date',
       'alasan'         => 'nullable|string|max:255',
+      'sekolah_tujuan' => 'nullable|string|max:255',
     ]);
 
     $user = Auth::user();
@@ -533,6 +534,8 @@ class SiswaController extends Controller
         'status'         => $request->status,
         'tanggal_keluar' => $isAktif ? null : $request->tanggal_keluar,
         'alasan'         => $isAktif ? null : $request->alasan,
+        // Sekolah tujuan hanya bermakna untuk mutasi
+        'sekolah_tujuan' => $request->status === 'mutasi' ? $request->sekolah_tujuan : null,
       ]);
 
       // Sinkronkan status di tabel siswa (dipakai oleh tabel())
@@ -956,6 +959,187 @@ class SiswaController extends Controller
    * sekolah ini berakhir bukan karena lulus — keluar, mutasi, atau
    * meninggal — dengan saringan per status.
    */
+  /**
+   * Pencarian siswa yang SUDAH ada di aplikasi (untuk mutasi
+   * masuk): lintas sekolah, karena siswa pindahan justru
+   * terdaftar di sekolah lain. Yang dikembalikan hanya ringkasan
+   * secukupnya — identitas, registrasi terakhir secara global,
+   * dan penanda apakah ia sudah aktif di sekolah ini.
+   */
+  public function cariTerdaftar(Request $request)
+  {
+    $q = trim((string) $request->query('q', ''));
+
+    if (mb_strlen($q) < 3) {
+      return response()->json(['data' => []]);
+    }
+
+    $sekolahId = $this->konteksSekolahId($request);
+
+    $siswa = Siswa::query()
+      ->where(function ($w) use ($q) {
+        $w->where('nama_siswa', 'like', "%{$q}%")
+          ->orWhere('nisn', 'like', "%{$q}%")
+          ->orWhere('nik', 'like', "%{$q}%");
+      })
+      ->with(['registrasiTerbaru' => fn($r) => $r->withoutGlobalScopes()->with('sekolah.detailTerbaru')])
+      ->orderBy('nama_siswa')
+      ->limit(15)
+      ->get();
+
+    $aktifDiSini = $sekolahId
+      ? SiswaRegistrasi::withoutGlobalScopes()
+        ->where('sekolah_id', $sekolahId)
+        ->where('status', 'aktif')
+        ->whereIn('siswa_id', $siswa->pluck('id'))
+        ->pluck('siswa_id')
+        ->all()
+      : [];
+
+    $data = $siswa->map(function ($s) use ($aktifDiSini) {
+      $reg = $s->registrasiTerbaru;
+
+      return [
+        'id'            => $s->id,
+        'nama_siswa'    => $s->nama_siswa,
+        'nisn'          => $s->nisn,
+        'nik'           => $s->nik,
+        'jenis_kelamin' => $s->jenis_kelamin,
+        'tempat_lahir'  => $s->tempat_lahir,
+        'tgl_lahir'     => $s->tgl_lahir,
+        'terakhir'      => $reg ? [
+          'sekolah'          => $reg->sekolah?->detailTerbaru?->nama_sekolah ?? ('Sekolah #' . $reg->sekolah_id),
+          'status'           => $reg->status,
+          'tingkat'          => $reg->tingkat,
+          'tanggal_diterima' => $reg->tanggal_diterima,
+          'tanggal_keluar'   => $reg->tanggal_keluar,
+        ] : null,
+        'aktif_di_sini' => in_array($s->id, $aktifDiSini),
+      ];
+    });
+
+    return response()->json(['data' => $data]);
+  }
+
+  /**
+   * Mutasi masuk: membuatkan registrasi baru di sekolah ini untuk
+   * siswa yang sudah ada di aplikasi — baris tabel_siswa yang sama
+   * dipakai lagi, tidak ada siswa ganda. Kebijakan: DIBLOKIR
+   * selama siswa masih berstatus aktif di sekolah lain; sekolah
+   * asal harus menutup pendaftarannya dulu (status mutasi).
+   */
+  public function mutasiMasuk(Request $request)
+  {
+    $sekolahId = $this->konteksSekolahId($request);
+
+    if (!$sekolahId) {
+      return response()->json(['status' => 'error', 'message' => 'Konteks sekolah tidak ditemukan untuk akun Anda.'], 422);
+    }
+
+    $request->validate([
+      'siswa_id'         => 'required|exists:tabel_siswa,id',
+      'tanggal_diterima' => 'required|date',
+      'tingkat'          => 'required|integer|min:1|max:12',
+      'nis'              => [
+        'required',
+        'string',
+        Rule::unique('tabel_siswa_registrasi', 'nis')->where('sekolah_id', $sekolahId),
+      ],
+      'rombel_id'        => 'nullable|exists:tabel_rombel,id',
+    ]);
+
+    $siswa = Siswa::findOrFail($request->siswa_id);
+
+    // Sudah aktif di sekolah ini?
+    $aktifDiSini = SiswaRegistrasi::withoutGlobalScopes()
+      ->where('siswa_id', $siswa->id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('status', 'aktif')
+      ->exists();
+
+    if ($aktifDiSini) {
+      return response()->json(['status' => 'error', 'message' => 'Siswa ini sudah terdaftar aktif di sekolah Anda.'], 422);
+    }
+
+    // Masih aktif di sekolah lain? Blokir — kebijakan mutasi masuk
+    $aktifDiLain = SiswaRegistrasi::withoutGlobalScopes()
+      ->where('siswa_id', $siswa->id)
+      ->where('status', 'aktif')
+      ->where('sekolah_id', '!=', $sekolahId)
+      ->with('sekolah.detailTerbaru')
+      ->latest('id')
+      ->first();
+
+    if ($aktifDiLain) {
+      $namaAsal = $aktifDiLain->sekolah?->detailTerbaru?->nama_sekolah ?? 'sekolah lain';
+
+      return response()->json([
+        'status'  => 'error',
+        'message' => "Siswa ini masih berstatus aktif di {$namaAsal}. Mutasi masuk diblokir — sekolah asal harus menutup pendaftarannya (status mutasi) terlebih dahulu.",
+      ], 422);
+    }
+
+    // Penempatan rombel: hanya rombel sekolah ini, semester aktif
+    $rombel = null;
+    if ($request->filled('rombel_id')) {
+      $rombel = Rombel::findOrFail($request->rombel_id);
+
+      if ((int) $rombel->sekolah_id !== (int) $sekolahId) {
+        return response()->json(['status' => 'error', 'message' => 'Rombel tujuan bukan milik sekolah Anda.'], 422);
+      }
+
+      $semesterAktif = Semester::where('is_active', 1)->first();
+      if (!$semesterAktif || (int) $rombel->semester_id !== (int) $semesterAktif->id) {
+        return response()->json(['status' => 'error', 'message' => 'Penempatan rombel hanya bisa ke rombel semester aktif.'], 422);
+      }
+    }
+
+    // Sekolah asal yang dicatat: sekolah registrasi terakhirnya
+    $terakhir = SiswaRegistrasi::withoutGlobalScopes()
+      ->where('siswa_id', $siswa->id)
+      ->with('sekolah.detailTerbaru')
+      ->latest('id')
+      ->first();
+    $sekolahAsal = $terakhir?->sekolah?->detailTerbaru?->nama_sekolah;
+
+    try {
+      DB::transaction(function () use ($request, $siswa, $sekolahId, $sekolahAsal, $rombel) {
+        SiswaRegistrasi::create([
+          'siswa_id'          => $siswa->id,
+          'sekolah_id'        => $sekolahId,
+          'nis'               => $request->nis,
+          'jenis_pendaftaran' => 'Pindahan',
+          'tingkat'           => $request->tingkat,
+          'tanggal_diterima'  => $request->tanggal_diterima,
+          'sekolah_asal'      => $sekolahAsal,
+          'status'            => 'aktif',
+        ]);
+
+        // Selaraskan status global siswa seperti alur status lain
+        $siswa->update(['status' => 'aktif']);
+
+        if ($rombel) {
+          RombelAnggota::updateOrCreate(
+            [
+              'siswa_id'    => $siswa->id,
+              'semester_id' => $rombel->semester_id,
+              'sekolah_id'  => $sekolahId,
+            ],
+            ['rombel_id' => $rombel->id]
+          );
+        }
+      });
+    } catch (\Exception $e) {
+      return response()->json(['status' => 'error', 'message' => 'Gagal memproses mutasi masuk: ' . $e->getMessage()], 500);
+    }
+
+    return response()->json([
+      'status'  => 'success',
+      'message' => 'Mutasi masuk berhasil: ' . $siswa->nama_siswa . ' kini terdaftar di sekolah Anda'
+        . ($rombel ? ' dan ditempatkan di rombel ' . $rombel->nama_rombel : '') . '.',
+    ]);
+  }
+
   public function siswaKeluar(Request $request)
   {
     $sekolahId = $this->konteksSekolahId($request);
