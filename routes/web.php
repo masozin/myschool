@@ -193,6 +193,9 @@ Route::controller(MapelMappingController::class)
     Route::post('/', 'store');
     Route::post('/reorder', 'reorder'); // NOTE: sebelumnya di luar group tanpa middleware sama sekali, sekarang ikut terlindungi
     Route::post('/salin-semester', 'salinSemester');
+    Route::post('/salin-tambahan', 'salinTambahan');
+    Route::post('/{mapel}/nonaktif', 'toggleNonaktif');
+    Route::put('/master-lokal/{mapelMaster}', 'updateMasterLokal');
     // Tambah mapel baru (quick create)
     Route::post('quick-create', 'quickCreateMapel')->name('quick-create');
   });

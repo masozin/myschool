@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kurikulum;
 use App\Models\MapelKelompok;
+use App\Models\MapelNonaktifSekolah;
 use App\Models\MapelJenjang;
 use App\Models\MapelMapping;
 use App\Models\MapelMaster;
@@ -68,13 +70,15 @@ class MapelMappingController extends Controller
       $tingkatDipilih = $tingkatList[0] ?? 1;
     }
 
-    $masterMapelList = MapelMaster::with('kelompok')
+    $masterMapelList = MapelMaster::with(['kelompok', 'kurikulum'])
       ->aktifUntukJenjang($jenjangDipilih)
       ->orderBy('mapel_kelompok_id')
       ->orderBy('nama')
       ->get();
 
     $mapelKelompok = MapelKelompok::orderBy('urutan')->get(['id', 'nama']);
+
+    $kurikulumList = Kurikulum::aktif()->orderBy('nama')->get(['id', 'kode', 'nama']);
 
     return view('content.mapel-mapping.index', compact(
       'semesterList',
@@ -86,6 +90,7 @@ class MapelMappingController extends Controller
       'tingkatPerJenjang',
       'masterMapelList',
       'mapelKelompok',
+      'kurikulumList',
       'isAdmin',
       'isOperator',
     ));
@@ -116,6 +121,9 @@ class MapelMappingController extends Controller
     $query = MapelMapping::with([
       'masterMapel.kelompok',
       'masterMapel.sekolah',
+      'masterMapel.mapelJenjang',
+      'kelompok',
+      'kurikulum',
     ])
       ->where('jenjang', $jenjangDipilih)
       ->where('semester_id', $semester->id);
@@ -140,15 +148,21 @@ class MapelMappingController extends Controller
       ->orderBy('id')
       ->get();
 
-    // === PERUBAHAN UTAMA: Ambil Kelompok dari Data Mapping ===
-    $kelompokDiMapping = $mapels->pluck('masterMapel.kelompok')
+    // Pokok yang dinonaktifkan sekolah ini (untuk Operator)
+    $nonaktifIds = $isOperator
+      ? MapelNonaktifSekolah::where('sekolah_id', $sekolah->id)
+          ->pluck('mapel_mapping_id')->map(fn($id) => (int) $id)->all()
+      : [];
+
+    // === Kelompok diambil dari penempatan mapping, bukan master ===
+    $kelompokDiMapping = $mapels->map(fn($m) => $m->kelompokTampil())
       ->filter()                    // buang null
       ->unique('id')                // unik berdasarkan id
       ->sortBy('urutan');           // urutkan sesuai urutan kelompok
 
     // Grouping mapel per kelompok
     $mapelPerKelompok = $mapels->groupBy(function ($m) {
-      return $m->masterMapel?->kelompok?->nama ?? 'Tidak Ada Kelompok';
+      return $m->kelompokTampil()?->nama ?? 'Tidak Ada Kelompok';
     });
 
     // Susun result
@@ -163,6 +177,20 @@ class MapelMappingController extends Controller
         $canEdit = ($isAdmin && $mapel->jenis === 'pokok')
           || ($isOperator && $mapel->jenis === 'tambahan');
 
+        $lokalInfo = null;
+        if ($mapel->masterMapel?->sekolah_id) {
+          $mj = $mapel->masterMapel->mapelJenjang->firstWhere('jenjang', $jenjangDipilih);
+          $lokalInfo = [
+            'master_id'     => $mapel->masterMapel->id,
+            'nama'          => $mapel->masterMapel->nama,
+            'nama_singkat'  => $mapel->masterMapel->nama_singkat,
+            'nama_sub'      => $mapel->masterMapel->nama_sub_mapel,
+            'kelompok_id'   => $mapel->masterMapel->mapel_kelompok_id,
+            'kelas_mulai'   => $mj?->kelas_mulai,
+            'kelas_selesai' => $mj?->kelas_selesai,
+          ];
+        }
+
         $rows[] = [
           'id'          => $mapel->id,
           'urutan'      => $mapel->urutan,
@@ -172,6 +200,13 @@ class MapelMappingController extends Controller
           'jenis'       => $mapel->jenis,
           'master_id'   => $mapel->mapel_master_id,
           'can_edit'    => $canEdit,
+          'kelompok_id' => $mapel->mapel_kelompok_id ?? $mapel->masterMapel?->mapel_kelompok_id,
+          'kurikulum_id' => $mapel->kurikulum_id,
+          'kurikulum'   => $mapel->kurikulum?->kode,
+          'is_aktif'    => (bool) $mapel->is_aktif,
+          'nonaktif'    => $isOperator && $mapel->jenis === 'pokok' && in_array($mapel->id, $nonaktifIds, true),
+          'can_nonaktif' => $isOperator && $mapel->jenis === 'pokok',
+          'lokal'       => $lokalInfo,
           'is_first'    => $i === 0,
           'is_last'     => $i === $items->count() - 1,
         ];
@@ -203,9 +238,11 @@ class MapelMappingController extends Controller
     }
 
     $request->validate([
-      'mapel_master_id' => 'required|exists:tabel_mapel_master,id',
-      'tingkat'         => 'required|integer|min:1|max:12',
-      'jenjang'         => $isOperator ? 'nullable|in:SD,SMP,SMA,SMK' : 'required|in:SD,SMP,SMA,SMK',
+      'mapel_master_id'   => 'required|exists:tabel_mapel_master,id',
+      'tingkat'           => 'required|integer|min:1|max:12',
+      'jenjang'           => $isOperator ? 'nullable|in:SD,SMP,SMA,SMK' : 'required|in:SD,SMP,SMA,SMK',
+      'kurikulum_id'      => 'nullable|exists:tabel_kurikulum,id',
+      'mapel_kelompok_id' => 'nullable|exists:tabel_mapel_kelompok,id',
     ]);
 
     $semester = session('semester_id');
@@ -225,25 +262,31 @@ class MapelMappingController extends Controller
       return response()->json(['message' => 'Mata pelajaran tidak valid untuk jenjang/sekolah ini.'], 422);
     }
 
-    // Cegah duplikat mapping untuk mapel + tingkat + semester yang sama
-    $sudahAda = MapelMapping::where('mapel_master_id', $request->mapel_master_id)
-      ->where('jenjang', $jenjang)
-      ->where('tingkat', $request->tingkat)
-      ->where('semester_id', $semester)
-      ->where('sekolah_id', $sekolah_id)
-      ->exists();
+    $mapelMaster = MapelMaster::findOrFail($request->mapel_master_id);
 
-    if ($sudahAda) {
+    // Kelompok penempatan: pilihan pengguna, bawaan dari master
+    $kelompokId = $request->mapel_kelompok_id ?? $mapelMaster->mapel_kelompok_id;
+
+    // Kurikulum: pilihan pengguna; tanpa pilihan, warisi penandaan
+    // master bila tepat satu kurikulum — selain itu null (semua)
+    $kurikulumId = $request->kurikulum_id;
+    if ($kurikulumId === null) {
+      $tags = $mapelMaster->kurikulum()->pluck('tabel_kurikulum.id');
+      $kurikulumId = $tags->count() === 1 ? (int) $tags->first() : null;
+    } else {
+      $kurikulumId = (int) $kurikulumId;
+    }
+
+    // Cegah duplikat lintas jenis: mapel yang sudah berlaku untuk
+    // konteks ini (pokok maupun tambahan sekolah) ditolak
+    if ($this->sudahBerlaku((int) $request->mapel_master_id, $jenjang, (int) $request->tingkat, (int) $semester, $sekolah_id, $kurikulumId)) {
       return response()->json([
-        'message' => 'Mata pelajaran ini sudah ada untuk tingkat dan semester yang dipilih.',
+        'message' => 'Mata pelajaran ini sudah berlaku untuk tingkat dan semester yang dipilih.',
       ], 422);
     }
 
-    // Urutan: ambil max urutan dalam kelompok yang sama
-    $mapelMaster = MapelMaster::findOrFail($request->mapel_master_id);
-    $urutanMax   = MapelMapping::whereHas('masterMapel', function ($q) use ($mapelMaster) {
-      $q->where('mapel_kelompok_id', $mapelMaster->mapel_kelompok_id);
-    })
+    // Urutan: ambil max urutan dalam kelompok penempatan yang sama
+    $urutanMax = MapelMapping::where('mapel_kelompok_id', $kelompokId)
       ->where('jenjang', $jenjang)
       ->where('tingkat', $request->tingkat)
       ->where('semester_id', $semester)
@@ -251,13 +294,15 @@ class MapelMappingController extends Controller
       ->max('urutan') ?? 0;
 
     MapelMapping::create([
-      'mapel_master_id' => $request->mapel_master_id,
-      'jenjang'         => $jenjang,
-      'tingkat'         => $request->tingkat,
-      'semester_id'     => $semester,
-      'jenis'           => $jenis,
-      'sekolah_id'      => $sekolah_id,
-      'urutan'          => $urutanMax + 1,
+      'mapel_master_id'   => $request->mapel_master_id,
+      'mapel_kelompok_id' => $kelompokId,
+      'jenjang'           => $jenjang,
+      'tingkat'           => $request->tingkat,
+      'semester_id'       => $semester,
+      'kurikulum_id'      => $kurikulumId,
+      'jenis'             => $jenis,
+      'sekolah_id'        => $sekolah_id,
+      'urutan'            => $urutanMax + 1,
     ]);
 
     return response()->json(['message' => 'Mata pelajaran berhasil ditambahkan.']);
@@ -283,17 +328,30 @@ class MapelMappingController extends Controller
     }
 
     $request->validate([
-      'mapel_master_id' => 'required|exists:tabel_mapel_master,id',
-      'tingkat'         => 'required|integer|min:1|max:12',
+      'mapel_master_id'   => 'required|exists:tabel_mapel_master,id',
+      'tingkat'           => 'required|integer|min:1|max:12',
+      'kurikulum_id'      => 'nullable|exists:tabel_kurikulum,id',
+      'mapel_kelompok_id' => 'nullable|exists:tabel_mapel_kelompok,id',
     ]);
 
     if (!$this->mapelValidUntukKonteks($request->mapel_master_id, $mapel->jenjang, $request->tingkat, $mapel->sekolah_id)) {
       return response()->json(['message' => 'Mata pelajaran tidak valid untuk jenjang/sekolah ini.'], 422);
     }
 
+    $kurikulumId = $request->has('kurikulum_id') ? $request->kurikulum_id : $mapel->kurikulum_id;
+    $kurikulumId = $kurikulumId !== null ? (int) $kurikulumId : null;
+
+    if ($this->sudahBerlaku((int) $request->mapel_master_id, $mapel->jenjang, (int) $request->tingkat, (int) $mapel->semester_id, $mapel->sekolah_id, $kurikulumId, (int) $mapel->id)) {
+      return response()->json([
+        'message' => 'Mata pelajaran ini sudah berlaku untuk tingkat dan semester yang dipilih.',
+      ], 422);
+    }
+
     $mapel->update([
-      'mapel_master_id' => $request->mapel_master_id,
-      'tingkat'         => $request->tingkat,
+      'mapel_master_id'   => $request->mapel_master_id,
+      'mapel_kelompok_id' => $request->mapel_kelompok_id ?? $mapel->mapel_kelompok_id,
+      'kurikulum_id'      => $kurikulumId,
+      'tingkat'           => $request->tingkat,
     ]);
 
     return response()->json(['message' => 'Mata pelajaran berhasil diperbarui.']);
@@ -317,12 +375,20 @@ class MapelMappingController extends Controller
       return response()->json(['message' => 'Akses ditolak.'], 403);
     }
 
+    // Mapping yang sudah memiliki nilai tidak boleh dihapus:
+    // nilai SKHU/SKL menunjuk ke baris ini
+    if ($mapel->skhuNilai()->exists() || $mapel->sklNilai()->exists()) {
+      return response()->json([
+        'message' => 'Mapel ini sudah memiliki nilai SKHU/SKL dan tidak dapat dihapus. Nonaktifkan saja bila tidak dipakai lagi.',
+      ], 422);
+    }
+
     // Simpan info sebelum delete untuk rapikan urutan
     $sekolah_id      = $mapel->sekolah_id;
     $jenjang         = $mapel->jenjang;
     $tingkat         = $mapel->tingkat;
     $semester_id     = $mapel->semester_id;
-    $kelompok_id     = $mapel->masterMapel?->mapel_kelompok_id;
+    $kelompok_id     = $mapel->mapel_kelompok_id ?? $mapel->masterMapel?->mapel_kelompok_id;
 
     $mapel->delete();
 
@@ -411,13 +477,16 @@ class MapelMappingController extends Controller
     try {
       foreach ($mapelSumber as $m) {
         MapelMapping::create([
-          'mapel_master_id' => $m->mapel_master_id,
-          'jenjang'         => $jenjang,
-          'tingkat'         => $m->tingkat,
-          'semester_id'     => $keSemesterId,
-          'jenis'           => 'pokok',
-          'sekolah_id'      => null,
-          'urutan'          => $m->urutan,
+          'mapel_master_id'   => $m->mapel_master_id,
+          'mapel_kelompok_id' => $m->mapel_kelompok_id,
+          'jenjang'           => $jenjang,
+          'tingkat'           => $m->tingkat,
+          'semester_id'       => $keSemesterId,
+          'kurikulum_id'      => $m->kurikulum_id,
+          'jenis'             => 'pokok',
+          'sekolah_id'        => null,
+          'urutan'            => $m->urutan,
+          'is_aktif'          => $m->is_aktif,
         ]);
       }
       DB::commit();
@@ -431,7 +500,212 @@ class MapelMappingController extends Controller
     ]);
   }
 
+  // ── Salin mapel tambahan dari semester lain (Operator) ───────────────────
+  public function salinTambahan(Request $request)
+  {
+    if (!$this->isOperator()) {
+      return response()->json(['message' => 'Hanya Operator Sekolah yang dapat menyalin mapel tambahan.'], 403);
+    }
+
+    $request->validate([
+      'dari_semester' => 'required|exists:tabel_semester,id',
+    ]);
+
+    $sekolahId    = Auth::user()->ptk->sekolah_id;
+    $keSemester   = (int) session('semester_id');
+    $dariSemester = (int) $request->dari_semester;
+
+    if ($dariSemester === $keSemester) {
+      return response()->json(['message' => 'Semester asal tidak boleh sama dengan semester aktif.'], 422);
+    }
+
+    $sumber = MapelMapping::where('sekolah_id', $sekolahId)
+      ->where('jenis', 'tambahan')
+      ->where('semester_id', $dariSemester)
+      ->orderBy('urutan')
+      ->get();
+
+    if ($sumber->isEmpty()) {
+      return response()->json(['message' => 'Tidak ada mapel tambahan pada semester asal.'], 422);
+    }
+
+    $tersalin = 0;
+    $dilewati = 0;
+
+    DB::transaction(function () use ($sumber, $sekolahId, $keSemester, &$tersalin, &$dilewati) {
+      foreach ($sumber as $m) {
+        if ($this->sudahBerlaku($m->mapel_master_id, $m->jenjang, (int) $m->tingkat, $keSemester, (int) $sekolahId, $m->kurikulum_id)) {
+          $dilewati++;
+          continue;
+        }
+
+        $urutanMax = MapelMapping::where('mapel_kelompok_id', $m->mapel_kelompok_id)
+          ->where('jenjang', $m->jenjang)
+          ->where('tingkat', $m->tingkat)
+          ->where('semester_id', $keSemester)
+          ->where('sekolah_id', $sekolahId)
+          ->max('urutan') ?? 0;
+
+        MapelMapping::create([
+          'mapel_master_id'   => $m->mapel_master_id,
+          'mapel_kelompok_id' => $m->mapel_kelompok_id,
+          'jenjang'           => $m->jenjang,
+          'tingkat'           => $m->tingkat,
+          'semester_id'       => $keSemester,
+          'kurikulum_id'      => $m->kurikulum_id,
+          'jenis'             => 'tambahan',
+          'sekolah_id'        => $sekolahId,
+          'urutan'            => $urutanMax + 1,
+          'is_aktif'          => $m->is_aktif,
+        ]);
+        $tersalin++;
+      }
+    });
+
+    return response()->json([
+      'message' => "{$tersalin} mapel tambahan disalin ke semester ini"
+        . ($dilewati ? ", {$dilewati} dilewati (sudah ada)" : '') . '.',
+    ]);
+  }
+
+  // ── Nonaktifkan/aktifkan mapel pokok untuk sekolah sendiri ────────────────
+  public function toggleNonaktif(MapelMapping $mapel)
+  {
+    if (!$this->isOperator()) {
+      return response()->json(['message' => 'Hanya Operator Sekolah.'], 403);
+    }
+
+    if ($mapel->jenis !== 'pokok' || $mapel->sekolah_id !== null) {
+      return response()->json(['message' => 'Hanya mapel pokok yang dapat dinonaktifkan per sekolah.'], 422);
+    }
+
+    $sekolahId = Auth::user()->ptk->sekolah_id;
+
+    $catatan = MapelNonaktifSekolah::where('sekolah_id', $sekolahId)
+      ->where('mapel_mapping_id', $mapel->id)
+      ->first();
+
+    if ($catatan) {
+      $catatan->delete();
+
+      return response()->json([
+        'message'  => 'Mapel pokok diaktifkan kembali untuk sekolah Anda.',
+        'nonaktif' => false,
+      ]);
+    }
+
+    MapelNonaktifSekolah::create([
+      'sekolah_id'       => $sekolahId,
+      'mapel_mapping_id' => $mapel->id,
+    ]);
+
+    return response()->json([
+      'message'  => 'Mapel pokok dinonaktifkan untuk sekolah Anda; tidak akan muncul di SKHU/SKL sekolah Anda.',
+      'nonaktif' => true,
+    ]);
+  }
+
+  // ── Edit data mapel lokal milik sekolah sendiri (Operator) ────────────────
+  public function updateMasterLokal(Request $request, MapelMaster $mapelMaster)
+  {
+    if (!$this->isOperator()) {
+      return response()->json(['message' => 'Hanya Operator Sekolah.'], 403);
+    }
+
+    $sekolah = Sekolah::findOrFail(Auth::user()->ptk->sekolah_id);
+
+    if ((int) $mapelMaster->sekolah_id !== (int) $sekolah->id) {
+      return response()->json(['message' => 'Mapel ini bukan milik sekolah Anda.'], 403);
+    }
+
+    $jenjang = strtoupper($sekolah->jenjang);
+
+    $tingkatPerJenjang = [
+      'SD'  => range(1, 6),
+      'SMP' => range(7, 9),
+      'SMA' => range(10, 12),
+      'SMK' => range(10, 13),
+    ];
+    $tingkatValid = $tingkatPerJenjang[$jenjang] ?? [];
+
+    $request->validate([
+      'mapel_kelompok_id' => 'required|exists:tabel_mapel_kelompok,id',
+      'nama'              => 'required|string|max:100',
+      'nama_singkat'      => 'nullable|string|max:20',
+      'nama_sub_mapel'    => 'nullable|string|max:100',
+      'kelas_mulai'       => 'required|integer|in:' . implode(',', $tingkatValid),
+      'kelas_selesai'     => 'required|integer|in:' . implode(',', $tingkatValid) . '|gte:kelas_mulai',
+    ]);
+
+    $duplikat = MapelMaster::where('sekolah_id', $sekolah->id)
+      ->where('id', '!=', $mapelMaster->id)
+      ->whereRaw('LOWER(nama) = ?', [strtolower(trim($request->nama))])
+      ->exists();
+
+    if ($duplikat) {
+      return response()->json([
+        'message' => 'Mata pelajaran lokal dengan nama ini sudah ada di sekolah Anda.',
+      ], 422);
+    }
+
+    DB::transaction(function () use ($request, $mapelMaster, $jenjang, $sekolah) {
+      $mapelMaster->update([
+        'mapel_kelompok_id' => $request->mapel_kelompok_id,
+        'nama'              => trim($request->nama),
+        'nama_singkat'      => $request->nama_singkat ? trim($request->nama_singkat) : null,
+        'nama_sub_mapel'    => $request->nama_sub_mapel ? trim($request->nama_sub_mapel) : null,
+      ]);
+
+      $mapelMaster->mapelJenjang()->updateOrCreate(
+        ['jenjang' => $jenjang],
+        ['kelas_mulai' => $request->kelas_mulai, 'kelas_selesai' => $request->kelas_selesai]
+      );
+
+      // Kelompok penempatan mapping semester berjalan mengikuti
+      // kelompok master lokal yang baru
+      MapelMapping::where('mapel_master_id', $mapelMaster->id)
+        ->where('sekolah_id', $sekolah->id)
+        ->where('semester_id', session('semester_id'))
+        ->update(['mapel_kelompok_id' => $request->mapel_kelompok_id]);
+    });
+
+    return response()->json(['message' => 'Mata pelajaran lokal berhasil diperbarui.']);
+  }
+
     // ── Private Helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Apakah master ini sudah berlaku untuk konteks tersebut —
+   * sebagai pokok (berlaku ke semua sekolah) atau sebagai
+   * tambahan sekolah itu — dengan tumpang tindih kurikulum
+   * (kurikulum kosong berarti semua kurikulum). Dipakai untuk
+   * mencegah duplikat lintas jenis di store/update/salin.
+   */
+  private function sudahBerlaku(
+    int $masterId,
+    string $jenjang,
+    int $tingkat,
+    int $semesterId,
+    ?int $sekolahId,
+    ?int $kurikulumId,
+    ?int $kecualiId = null
+  ): bool {
+    return MapelMapping::where('mapel_master_id', $masterId)
+      ->where('jenjang', $jenjang)
+      ->where('tingkat', $tingkat)
+      ->where('semester_id', $semesterId)
+      ->when($kecualiId !== null, fn($q) => $q->where('id', '!=', $kecualiId))
+      ->when($kurikulumId !== null, fn($q) => $q->where(
+        fn($q2) => $q2->whereNull('kurikulum_id')->orWhere('kurikulum_id', $kurikulumId)
+      ))
+      ->where(function ($q) use ($sekolahId) {
+        $q->whereNull('sekolah_id');
+        if ($sekolahId !== null) {
+          $q->orWhere('sekolah_id', $sekolahId);
+        }
+      })
+      ->exists();
+  }
 
   /**
    * Cek hak akses edit/urutan berdasarkan role dan kepemilikan mapel.
@@ -467,9 +741,7 @@ class MapelMappingController extends Controller
       ->orderBy('urutan');
 
     if ($kelompok_id) {
-      $query->whereHas('masterMapel', function ($q) use ($kelompok_id) {
-        $q->where('mapel_kelompok_id', $kelompok_id);
-      });
+      $query->where('mapel_kelompok_id', $kelompok_id);
     }
 
     foreach ($query->get() as $i => $m) {
@@ -534,6 +806,7 @@ class MapelMappingController extends Controller
       'mapel_kelompok_id' => 'required|exists:tabel_mapel_kelompok,id',
       'nama'              => 'required|string|max:100',
       'nama_singkat'      => 'nullable|string|max:20',
+      'nama_sub_mapel'    => 'nullable|string|max:100',
       'kelas_mulai'       => 'required|integer|in:' . implode(',', $tingkatValid),
       'kelas_selesai'     => 'required|integer|in:' . implode(',', $tingkatValid) . '|gte:kelas_mulai',
     ]);
@@ -562,6 +835,7 @@ class MapelMappingController extends Controller
         'mapel_kelompok_id' => $request->mapel_kelompok_id,
         'nama'              => trim($request->nama),
         'nama_singkat'      => $request->nama_singkat ? trim($request->nama_singkat) : null,
+        'nama_sub_mapel'    => $request->nama_sub_mapel ? trim($request->nama_sub_mapel) : null,
         'sekolah_id'        => $sekolah->id,
         'is_aktif'          => true,
       ]);
@@ -573,9 +847,7 @@ class MapelMappingController extends Controller
       ]);
 
       foreach ($tingkatList as $tingkat) {
-        $urutanMax = MapelMapping::whereHas('masterMapel', function ($q) use ($request) {
-          $q->where('mapel_kelompok_id', $request->mapel_kelompok_id);
-        })
+        $urutanMax = MapelMapping::where('mapel_kelompok_id', $request->mapel_kelompok_id)
           ->where('jenjang', $jenjang)
           ->where('tingkat', $tingkat)
           ->where('semester_id', $semesterId)
@@ -583,13 +855,15 @@ class MapelMappingController extends Controller
           ->max('urutan') ?? 0;
 
         MapelMapping::create([
-          'mapel_master_id' => $mapelMaster->id,
-          'jenjang'         => $jenjang,
-          'tingkat'         => $tingkat,
-          'semester_id'     => $semesterId,
-          'jenis'           => 'tambahan',
-          'sekolah_id'      => $sekolah->id,
-          'urutan'          => $urutanMax + 1,
+          'mapel_master_id'   => $mapelMaster->id,
+          'mapel_kelompok_id' => $request->mapel_kelompok_id,
+          'jenjang'           => $jenjang,
+          'tingkat'           => $tingkat,
+          'semester_id'       => $semesterId,
+          'kurikulum_id'      => null,
+          'jenis'             => 'tambahan',
+          'sekolah_id'        => $sekolah->id,
+          'urutan'            => $urutanMax + 1,
         ]);
       }
 
