@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <title>SKHU - {{ $skhu->siswa->nama_siswa }}</title>
+  <title>SKHU - {{ $skhu->nama_cetak }}</title>
   <style>
     /* Reset dasar untuk PDF */
     * {
@@ -180,22 +180,22 @@
     <tr>
       <td>Nama Siswa</td>
       <td>:</td>
-      <td><strong>{{ strtoupper($skhu->siswa->nama_siswa) }}</strong></td>
+      <td><strong>{{ strtoupper($skhu->nama_cetak) }}</strong></td>
     </tr>
     <tr>
       <td>Tempat, Tanggal lahir</td>
       <td>:</td>
-      <td>{{ $skhu->siswa->tempat_lahir }}, {{ $skhu->siswa->tgl_lahir->translatedFormat('d F Y') }}</td>
+      <td>{{ $skhu->tempat_lahir_cetak }}, {{ $skhu->tgl_lahir_cetak->translatedFormat('d F Y') }}</td>
     </tr>
     <tr>
       <td>Nama Orang Tua</td>
       <td>:</td>
-      <td>{{ $skhu->siswa->nama_ayah }}</td>
+      <td>{{ $skhu->nama_ayah_cetak }}</td>
     </tr>
     <tr>
       <td>NIS/NISN</td>
       <td>:</td>
-      <td>{{ $skhu->nis }} / {{ $skhu->siswa->nisn }}</td>
+      <td>{{ $skhu->nis }} / {{ $skhu->nisn_cetak }}</td>
     </tr>
     <tr>
       <td>Nomor Ujian Sekolah</td>
@@ -278,6 +278,9 @@
     </tr>
   </table>
 
+  @if (!empty($watermark))
+    <div style="position: fixed; top: 40%; left: -10%; width: 120%; text-align: center; transform: rotate(-30deg); font-size: 120px; font-weight: bold; letter-spacing: 12px; color: rgba(200, 0, 0, 0.15); z-index: 9999;">{{ $watermark }}</div>
+  @endif
 </body>
 
 </html>
