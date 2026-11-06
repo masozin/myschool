@@ -65,6 +65,63 @@ class SklController extends Controller
   }
 
   /**
+   * Id siswa yang boleh dikelola Guru yang login: siswa pada
+   * rombel yang ia wali kelasi di sekolah ini pada semester
+   * itu. Guru lain tidak punya akses ke SKL siswa tersebut.
+   */
+  private function siswaIdsWaliKelas(int $sekolahId, int $semesterId): array
+  {
+    $user = Auth::user();
+
+    if (!$user->hasRole('Guru') || !$user->ptk) {
+      return [];
+    }
+
+    return RombelAnggota::where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->whereHas('rombel', fn($q) => $q->where('ptk_id', $user->ptk->id))
+      ->pluck('siswa_id')
+      ->map(fn($id) => (int) $id)
+      ->all();
+  }
+
+  /** Penjaga per-SKL untuk Guru: hanya siswa rombelnya sendiri. */
+  private function abortUnlessWaliKelasSkl(Skl $skl): void
+  {
+    if (!Auth::user()->hasRole('Guru')) {
+      return;
+    }
+
+    $ids = $this->siswaIdsWaliKelas((int) $skl->sekolah_id, (int) $skl->semester_id);
+
+    abort_unless(
+      in_array((int) $skl->siswa_id, $ids, true),
+      403,
+      'Anda bukan wali kelas siswa ini.'
+    );
+  }
+
+  /**
+   * Cakupan aksi massal: selalu dibatasi sekolah konteks, dan
+   * untuk Guru dibatasi siswa rombelnya (sebelumnya aksi massal
+   * tidak dibatasi sekolah sama sekali — id dari sekolah lain
+   * pun bisa ikut terproses).
+   */
+  private function cakupanMassal($query)
+  {
+    $query->where('sekolah_id', $this->getSekolahId());
+
+    if (Auth::user()->hasRole('Guru')) {
+      $query->whereIn(
+        'siswa_id',
+        $this->siswaIdsWaliKelas($this->getSekolahId(), (int) session('semester_id'))
+      );
+    }
+
+    return $query;
+  }
+
+  /**
    * Tingkat kelas akhir berdasarkan jenjang sekolah.
    * SD=6, SMP=9, SMA/SMK=12
    */
@@ -88,8 +145,14 @@ class SklController extends Controller
     $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semesterId);
 
     if (!$konfigurasi) {
-      return redirect()->route('skl.konfigurasi.edit')
-        ->with('error', 'Silakan lengkapi konfigurasi SKL terlebih dahulu sebelum mengakses menu SKL.');
+      // Hanya Operator yang bisa melengkapi konfigurasi; peran
+      // lain diberi pesan, bukan diarahkan ke halaman terlarang
+      if (Auth::user()->hasRole('Operator Sekolah')) {
+        return redirect()->route('skl.konfigurasi.edit')
+          ->with('error', 'Silakan lengkapi konfigurasi SKL terlebih dahulu sebelum mengakses menu SKL.');
+      }
+
+      return back()->with('error', 'Konfigurasi SKL sekolah ini belum dilengkapi oleh Operator Sekolah.');
     }
 
     // $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) $semesterId);
@@ -103,6 +166,11 @@ class SklController extends Controller
             ->where('tingkat', $tingkatAkhir);
         });
     })->orderBy('nama_siswa');
+
+    // Guru hanya melihat siswa pada rombel yang ia wali kelasi
+    if (Auth::user()->hasRole('Guru')) {
+      $siswaQuery->whereIn('id', $this->siswaIdsWaliKelas($sekolahId, (int) $semesterId));
+    }
 
     if ($request->filled('search')) {
       $siswaQuery->where(function ($q) use ($request) {
@@ -174,6 +242,8 @@ class SklController extends Controller
 
   public function show(Skl $skl)
   {
+    $this->abortUnlessWaliKelasSkl($skl);
+
     $skl->load(['siswa', 'sekolah.detailTerbaru', 'semester']);
     $nilais = $skl->nilaisLengkap();
 
@@ -186,6 +256,16 @@ class SklController extends Controller
   public function store(Request $request)
   {
     $request->validate(['siswa_id' => 'required|exists:tabel_siswa,id']);
+
+    // Guru hanya boleh membuat SKL untuk siswa rombelnya sendiri
+    if (Auth::user()->hasRole('Guru')) {
+      $ids = $this->siswaIdsWaliKelas($this->getSekolahId(), (int) session('semester_id'));
+      abort_unless(
+        in_array((int) $request->siswa_id, $ids, true),
+        403,
+        'Anda bukan wali kelas siswa ini.'
+      );
+    }
 
     $semesterId  = session('semester_id');
     $sekolahId   = $this->getSekolahId();
@@ -324,6 +404,8 @@ class SklController extends Controller
 
   public function editNilai(Skl $skl)
   {
+    $this->abortUnlessWaliKelasSkl($skl);
+
     abort_if(
       !in_array($skl->status, ['draft', 'ditolak']),
       403,
@@ -339,6 +421,8 @@ class SklController extends Controller
 
   public function updateNilai(Request $request, Skl $skl)
   {
+    $this->abortUnlessWaliKelasSkl($skl);
+
     abort_if(
       !in_array($skl->status, ['draft', 'ditolak']),
       403,
@@ -388,6 +472,8 @@ class SklController extends Controller
 
   public function ajukan(Skl $skl)
   {
+    $this->abortUnlessWaliKelasSkl($skl);
+
     abort_if(!in_array($skl->status, ['draft', 'ditolak']), 403);
 
     if (!$skl->sudahLengkap()) {
@@ -404,6 +490,8 @@ class SklController extends Controller
 
   public function setujui(Skl $skl)
   {
+    abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
+
     abort_if($skl->status !== 'pengajuan', 403);
 
     $skl->update(['status' => 'disetujui', 'generated_at' => now()]);
@@ -413,6 +501,8 @@ class SklController extends Controller
 
   public function tolak(Request $request, Skl $skl)
   {
+    abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
+
     abort_if($skl->status !== 'pengajuan', 403);
 
     $request->validate(['catatan' => 'required|string|max:500']);
@@ -424,6 +514,8 @@ class SklController extends Controller
 
   public function destroy(Skl $skl)
   {
+    $this->abortUnlessWaliKelasSkl($skl);
+
     abort_if($skl->status === 'disetujui', 403, 'SKL yang sudah disetujui tidak dapat dihapus.');
 
     $sekolahId = $skl->sekolah_id;
@@ -456,7 +548,7 @@ class SklController extends Controller
     $request->validate(['ids' => 'required|array']);
 
     // Hanya ubah yang statusnya masih draft atau ditolak
-    $affected = Skl::whereIn('id', $request->ids)
+    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->whereIn('status', ['draft', 'ditolak'])
       ->update(['status' => 'pengajuan']);
 
@@ -465,10 +557,12 @@ class SklController extends Controller
 
   public function bulkSetujui(Request $request)
   {
+    abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
+
     $request->validate(['ids' => 'required|array']);
 
     // Hanya ubah yang statusnya pengajuan
-    $affected = Skl::whereIn('id', $request->ids)
+    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', 'pengajuan')
       ->update(['status' => 'disetujui']);
 
@@ -477,11 +571,13 @@ class SklController extends Controller
 
   public function bulkBatalSetujui(Request $request)
   {
+    abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
+
     $request->validate(['ids' => 'required|array']);
 
     // Hanya memproses SKL yang saat ini berstatus 'disetujui'
     // Status dikembalikan ke 'pengajuan' agar bisa diperiksa/diedit kembali
-    $affected = Skl::whereIn('id', $request->ids)
+    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', 'disetujui')
       ->update([
         'status' => 'pengajuan',
@@ -496,13 +592,15 @@ class SklController extends Controller
 
   public function bulkTolak(Request $request)
   {
+    abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
+
     $request->validate([
       'ids' => 'required|array',
       'catatan' => 'required|string'
     ]);
 
     // Update status menjadi ditolak dan isikan catatan
-    $affected = Skl::whereIn('id', $request->ids)
+    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', 'pengajuan')
       ->update([
         'status' => 'ditolak',
@@ -517,7 +615,7 @@ class SklController extends Controller
     $request->validate(['ids' => 'required|array']);
 
     // Opsional: cegah penghapusan data yang sudah disetujui
-    $affected = Skl::whereIn('id', $request->ids)
+    $affected = $this->cakupanMassal(Skl::whereIn('id', $request->ids))
       ->where('status', '!=', 'disetujui')
       ->delete();
 
@@ -551,6 +649,9 @@ class SklController extends Controller
 
   public function sync(Request $request)
   {
+    // Sinkronisasi menyelaraskan SKL seluruh sekolah — khusus Operator
+    abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
+
     $semesterId  = session('semester_id');
     $sekolahId   = $this->getSekolahId();
 
