@@ -37,11 +37,18 @@ class Skl extends Model
     'status',
     'catatan',
     'generated_at',
+    'snapshot_nama',
+    'snapshot_nis',
+    'snapshot_nisn',
+    'snapshot_tempat_lahir',
+    'snapshot_tgl_lahir',
+    'snapshot_nama_ayah',
   ];
 
   protected $casts = [
     'tanggal_terbit' => 'date',
     'generated_at'   => 'datetime',
+    'snapshot_tgl_lahir' => 'date',
     'siswa_id'       => 'integer',
     'sekolah_id'     => 'integer',
     'semester_id'    => 'integer',
@@ -137,7 +144,59 @@ class Skl extends Model
 
   public function getNisAttribute(): string
   {
-    return $this->siswa->registrasiTerbaru->nis ?? '';
+    return $this->snapshot_nis ?? $this->siswa->registrasiTerbaru->nis ?? '';
+  }
+
+  // ── Snapshot identitas ──────────────────────────────────────────────
+  // Diisi saat SKL disetujui, dikosongkan saat persetujuan dibatalkan
+  // atau SKL ditolak. Accessor *Cetak dipakai template cetak: membaca
+  // snapshot bila ada, jatuh ke data induk bila belum ada.
+
+  public function isiSnapshotIdentitas(): void
+  {
+    $siswa = $this->siswa;
+
+    $this->snapshot_nama         = $siswa?->nama_siswa;
+    $this->snapshot_nis          = $this->siswa?->registrasiTerbaru?->nis;
+    $this->snapshot_nisn         = $siswa?->nisn;
+    $this->snapshot_tempat_lahir = $siswa?->tempat_lahir;
+    $this->snapshot_tgl_lahir    = $siswa?->tgl_lahir;
+    $this->snapshot_nama_ayah    = $siswa?->nama_ayah;
+  }
+
+  public function hapusSnapshotIdentitas(): void
+  {
+    $this->snapshot_nama         = null;
+    $this->snapshot_nis          = null;
+    $this->snapshot_nisn         = null;
+    $this->snapshot_tempat_lahir = null;
+    $this->snapshot_tgl_lahir    = null;
+    $this->snapshot_nama_ayah    = null;
+  }
+
+  public function getNamaCetakAttribute(): ?string
+  {
+    return $this->snapshot_nama ?? $this->siswa?->nama_siswa;
+  }
+
+  public function getNisnCetakAttribute(): ?string
+  {
+    return $this->snapshot_nisn ?? $this->siswa?->nisn;
+  }
+
+  public function getTempatLahirCetakAttribute(): ?string
+  {
+    return $this->snapshot_tempat_lahir ?? $this->siswa?->tempat_lahir;
+  }
+
+  public function getTglLahirCetakAttribute()
+  {
+    return $this->snapshot_tgl_lahir ?? $this->siswa?->tgl_lahir;
+  }
+
+  public function getNamaAyahCetakAttribute(): ?string
+  {
+    return $this->snapshot_nama_ayah ?? $this->siswa?->nama_ayah;
   }
 
   // ── Status helper ─────────────────────────────────────────────────────

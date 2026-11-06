@@ -31,6 +31,14 @@ class ValidasiKelulusan extends Controller
     $siswa = Siswa::where('nisn', $nisn)->first();
 
     if (!$siswa) {
+      // NISN pada SKHU terbit dibekukan di snapshot; bila NISN induk
+      // sudah berubah, dokumen lamanya tetap harus bisa ditemukan
+      $siswa = \App\Models\Skhu::where('snapshot_nisn', $nisn)
+        ->where('status', 'final')
+        ->first()?->siswa;
+    }
+
+    if (!$siswa) {
       return response()->json([
         'status'  => 'not_found',
         'message' => 'Data siswa dengan NISN tersebut tidak ditemukan.',
@@ -136,6 +144,14 @@ class ValidasiKelulusan extends Controller
     $siswa = Siswa::where('nisn', $nisn)->first();
 
     if (!$siswa) {
+      // NISN pada SKL terbit dibekukan di snapshot; bila NISN induk
+      // sudah berubah, dokumen lamanya tetap harus bisa ditemukan
+      $siswa = Skl::where('snapshot_nisn', $nisn)
+        ->where('status', 'disetujui')
+        ->first()?->siswa;
+    }
+
+    if (!$siswa) {
       return response()->json([
         'status'  => 'not_found',
         'message' => 'Data siswa dengan NISN tersebut tidak ditemukan.',
@@ -148,7 +164,7 @@ class ValidasiKelulusan extends Controller
       'semester',
       'nilais.mapelMapping.masterMapel.kelompok', 'nilais.mapelMapping.kelompok',
     ])
-      ->whereHas('siswa', fn($q) => $q->where('nisn', $nisn))
+      ->where('siswa_id', $siswa->id)
       ->where('status', 'disetujui')
       ->orderByDesc('tanggal_terbit')
       ->get();
