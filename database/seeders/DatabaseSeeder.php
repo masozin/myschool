@@ -53,10 +53,10 @@ class DatabaseSeeder extends Seeder
       KurikulumSeeder::class,
       MapelSeeder::class,
       MapelMappingSeeder::class,
-      skhutemplateSeeder::class,
+      SkhuTemplateSeeder::class,
 
-      fiturSeeder::class,
-      learningSeeder::class,
+      FiturSeeder::class,
+      LearningSeeder::class,
     ]);
   }
 }
