@@ -175,16 +175,24 @@ class RombelAnggotaController extends Controller
 
       $dataToInsert = [];
       $skipped      = 0;
+      $dipindah     = 0;
 
       foreach ($request->siswa_ids as $siswa_id) {
-        // Cek duplikasi: satu siswa hanya boleh punya satu baris
-        // keanggotaan per semester, di rombel manapun
-        $sudahAktif = RombelAnggota::where('siswa_id', $siswa_id)
+        // Satu baris per siswa per semester: bila siswa sudah punya
+        // baris di semester ini pada rombel LAIN, baris semester itu
+        // DIPINDAH ke rombel ini (di-update, bukan dibuatkan baris
+        // kedua); bila sudah di rombel ini juga, lewati
+        $barisAda = RombelAnggota::where('siswa_id', $siswa_id)
           ->where('semester_id', $semester->id)
-          ->exists();
+          ->first();
 
-        if ($sudahAktif) {
-          $skipped++;
+        if ($barisAda) {
+          if ((int) $barisAda->rombel_id === (int) $request->rombel_id) {
+            $skipped++;
+          } else {
+            $barisAda->update(['rombel_id' => $request->rombel_id]);
+            $dipindah++;
+          }
           continue;
         }
 
@@ -203,9 +211,15 @@ class RombelAnggotaController extends Controller
 
       DB::commit();
 
+      $ringkasan = [];
+      if (count($dataToInsert)) $ringkasan[] = count($dataToInsert) . ' siswa ditambahkan';
+      if ($dipindah) $ringkasan[] = $dipindah . ' siswa dipindahkan dari rombel lain di semester ini';
+      if ($skipped) $ringkasan[] = $skipped . ' siswa dilewati (sudah di rombel ini)';
+
       return response()->json([
-        'message'  => 'Berhasil menambahkan ' . count($dataToInsert) . ' siswa ke rombel.',
+        'message'  => 'Berhasil: ' . (implode(', ', $ringkasan) ?: 'tidak ada perubahan') . '.',
         'ditambah' => count($dataToInsert),
+        'dipindah' => $dipindah,
         'dilewati' => $skipped,
       ]);
     } catch (\Exception $e) {

@@ -79,6 +79,8 @@ class RombelController extends Controller
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'L'))])
       ->withCount(['rombelAnggota as jumlah_p' => fn($q) => $saringAktif($q)
         ->whereHas('siswa', fn($q2) => $q2->where('jenis_kelamin', 'P'))])
+      ->orderBy('tingkat')
+      ->orderBy('nama_rombel')
       ->get();
 
     // Breakdown gender per tingkat (untuk chart)
