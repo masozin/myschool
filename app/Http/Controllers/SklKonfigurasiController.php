@@ -11,6 +11,14 @@ class SklKonfigurasiController extends Controller
 {
   private function getContext(): array
   {
+    // Konfigurasi SKL (mode input satu sekolah) adalah wewenang
+    // Operator Sekolah — Guru diarahkan meminta ke Operator
+    abort_unless(
+      Auth::user()->hasRole('Operator Sekolah'),
+      403,
+      'Konfigurasi SKL hanya dapat diatur oleh Operator Sekolah.'
+    );
+
     $sekolahId = Auth::user()->ptk?->sekolah_id;
     abort_if(!$sekolahId, 403, "Akun Anda belum terhubung ke sekolah.");
     $semesterId = (int) Semester::smtIdKelulusan();

@@ -185,14 +185,17 @@ class SklController extends Controller
     $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semesterId);
 
     if (!$konfigurasi) {
-      // Hanya Operator yang bisa melengkapi konfigurasi; peran
-      // lain diberi pesan, bukan diarahkan ke halaman terlarang
+      // Operator diarahkan melengkapi konfigurasi; peran lain
+      // (Guru) mendapat halaman pemberitahuan di menu SKL itu
+      // sendiri — bukan pantulan kembali tanpa kejelasan
       if (Auth::user()->hasRole('Operator Sekolah')) {
         return redirect()->route('skl.konfigurasi.edit')
           ->with('error', 'Silakan lengkapi konfigurasi SKL terlebih dahulu sebelum mengakses menu SKL.');
       }
 
-      return back()->with('error', 'Konfigurasi SKL sekolah ini belum dilengkapi oleh Operator Sekolah.');
+      return view('content.skl.belum-konfigurasi', [
+        'semester' => Semester::find($semesterId),
+      ]);
     }
 
     // $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) $semesterId);

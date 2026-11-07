@@ -117,9 +117,12 @@
     <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div class="d-flex gap-2 flex-wrap">
         @hasanyrole('Operator Sekolah|Guru')
-          <a href="{{ route('skl.konfigurasi.edit') }}" class="btn btn-label-secondary btn-sm">
-            <i class="icon-base ri ri-equalizer-line me-1"></i>Konfigurasi SKL
-          </a>
+          {{-- Konfigurasi adalah wewenang Operator; Guru cukup menerima pemberitahuan bila belum diatur --}}
+          @hasanyrole('Operator Sekolah')
+            <a href="{{ route('skl.konfigurasi.edit') }}" class="btn btn-label-secondary btn-sm">
+              <i class="icon-base ri ri-equalizer-line me-1"></i>Konfigurasi SKL
+            </a>
+          @endhasanyrole
           @hasanyrole('Operator Sekolah')
             <a href="{{ route('skl.pengaturan-nomor') }}" class="btn btn-label-secondary btn-sm">
               <i class="icon-base ri ri-hashtag me-1"></i>Tanggal &amp; Penomoran
