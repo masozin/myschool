@@ -536,6 +536,7 @@ class SkhuController extends Controller
       'nomor_awal'            => 'nullable|integer|min:0|max:99999',
       'urutan'                => 'required|in:nama,nis',
       'timpa_nomor'           => 'nullable|boolean',
+      'kelompok_rombel'       => 'nullable|boolean',
     ]);
 
     foreach (['pola_nomor_surat' => 'Nomor SKHU', 'pola_nomor_ujian' => 'Nomor ujian'] as $field => $label) {
@@ -575,17 +576,28 @@ class SkhuController extends Controller
       return response()->json(['message' => 'Belum ada siswa kelas akhir pada semester ini.'], 422);
     }
 
-    // Urutan penomoran: nama A–Z, atau NIS (urut alami agar "9" < "10")
-    if ($request->urutan === 'nis') {
-      $anggota = $anggota->sort(function ($a, $b) {
-        $na = (string) ($a->siswa->registrasiTerbaru?->nis ?? '');
-        $nb = (string) ($b->siswa->registrasiTerbaru?->nis ?? '');
-        $cmp = strnatcasecmp($na, $nb);
-        return $cmp !== 0 ? $cmp : strcasecmp($a->siswa->nama_siswa, $b->siswa->nama_siswa);
-      })->values();
-    } else {
-      $anggota = $anggota->sortBy(fn($a) => strtolower($a->siswa->nama_siswa))->values();
-    }
+    // Urutan penomoran: nama A–Z, atau NIS (urut alami agar "9" < "10").
+    // Bila dikelompokkan per rombel, urutan berjalan rombel demi
+    // rombel lebih dulu (nomor tetap berlanjut antarrombel)
+    $kelompokRombel = (bool) $request->input('kelompok_rombel', false);
+    $anggota = $anggota->sort(function ($a, $b) use ($request, $kelompokRombel) {
+      if ($kelompokRombel) {
+        $cmp = strcasecmp($a->rombel?->nama_rombel ?? '', $b->rombel?->nama_rombel ?? '');
+        if ($cmp !== 0) {
+          return $cmp;
+        }
+      }
+      if ($request->urutan === 'nis') {
+        $cmp = strnatcasecmp(
+          (string) ($a->siswa->registrasiTerbaru?->nis ?? ''),
+          (string) ($b->siswa->registrasiTerbaru?->nis ?? '')
+        );
+        if ($cmp !== 0) {
+          return $cmp;
+        }
+      }
+      return strcasecmp($a->siswa->nama_siswa, $b->siswa->nama_siswa);
+    })->values();
 
     $tahun = $request->filled('tanggal_terbit')
       ? (int) date('Y', strtotime($request->tanggal_terbit))

@@ -111,6 +111,13 @@
               Timpa nomor yang sudah ada (bila tidak dicentang, hanya siswa yang nomornya masih kosong yang diberi nomor)
             </label>
           </div>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="kelompok_rombel">
+            <label class="form-check-label" for="kelompok_rombel">
+              Kelompokkan per rombel — urutan berjalan rombel demi rombel (mis. semua 6A dulu, lalu 6B);
+              nomor surat &amp; ujian tetap berlanjut, tidak mulai dari awal
+            </label>
+          </div>
         </div>
       </div>
 
@@ -169,15 +176,21 @@
 
       function urutkan(list) {
         const mode = document.querySelector('input[name="urutan"]:checked').value;
+        const kelompok = el('kelompok_rombel').checked;
         const arr = [...list];
-        if (mode === 'nis') {
-          arr.sort((a, b) => (a.nis ?? '').localeCompare(b.nis ?? '', undefined, {
-              numeric: true
-            }) ||
-            a.nama.localeCompare(b.nama));
-        } else {
-          arr.sort((a, b) => a.nama.localeCompare(b.nama));
-        }
+        arr.sort((a, b) => {
+          if (kelompok) {
+            const perRombel = (a.rombel ?? '').localeCompare(b.rombel ?? '');
+            if (perRombel !== 0) return perRombel;
+          }
+          if (mode === 'nis') {
+            return (a.nis ?? '').localeCompare(b.nis ?? '', undefined, {
+                numeric: true
+              }) ||
+              a.nama.localeCompare(b.nama);
+          }
+          return a.nama.localeCompare(b.nama);
+        });
         return arr;
       }
 
@@ -215,6 +228,7 @@
       [polaSurat, polaUjian, nomorAwal, tglTerbit].forEach(input =>
         input.addEventListener('input', renderPratinjau));
       timpa.addEventListener('change', renderPratinjau);
+      el('kelompok_rombel').addEventListener('change', renderPratinjau);
       document.querySelectorAll('input[name="urutan"]').forEach(r =>
         r.addEventListener('change', renderPratinjau));
       renderPratinjau();
@@ -230,6 +244,7 @@
           nomor_awal: parseInt(nomorAwal.value || '1', 10),
           urutan: document.querySelector('input[name="urutan"]:checked').value,
           timpa_nomor: timpa.checked,
+          kelompok_rombel: el('kelompok_rombel').checked,
         };
 
         const konfirm = await Swal.fire({
