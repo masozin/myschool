@@ -449,14 +449,9 @@
 
           <div class="mb-3">
             <label class="form-label fw-semibold">Nomor SKL</label>
-            <div class="input-group">
-              <input type="text" id="input-nomor-skl" class="form-control" placeholder="Contoh: SKL/001/JUNI/2025">
-              <button class="btn btn-outline-secondary btn-sm" type="button" id="btn-generate-nomor"
-                title="Generate otomatis">
-                <i class="icon-base ri ri-magic-line"></i>
-              </button>
-            </div>
-            <div class="form-text">Klik <i class="ri ri-magic-line"></i> untuk generate nomor otomatis, atau isi manual.
+            <input type="text" id="input-nomor-skl" class="form-control" placeholder="Contoh: SKL/001/JUNI/2025">
+            <div class="form-text">Isi nomor secara manual. Penomoran massal berpola tersedia di halaman
+              Tanggal &amp; Penomoran.
             </div>
           </div>
 
@@ -823,16 +818,6 @@
         inputNomor.value = btn.dataset.nomor || '';
         document.getElementById('nomor-skl-nama-siswa').textContent = 'Siswa: ' + btn.dataset.nama;
         modalNomor.show();
-      });
-
-      // Generate nomor otomatis
-      document.getElementById('btn-generate-nomor')?.addEventListener('click', async function() {
-        if (!nomorSklId) return;
-        this.disabled = true;
-        const res = await apiFetch(`/skl/${nomorSklId}/generate-nomor`);
-        const data = await res.json();
-        if (res.ok) inputNomor.value = data.nomor;
-        this.disabled = false;
       });
 
       // Simpan nomor SKL

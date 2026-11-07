@@ -707,27 +707,6 @@ class SklController extends Controller
     return response()->json(['message' => "$affected data SKL berhasil dihapus permanen."]);
   }
 
-  // ── Auto-generate nomor SKL ───────────────────────────────────────────
-
-  public function generateNomor(Skl $skl)
-  {
-    $sekolahId  = $this->getSekolahId();
-    // Format: SKL/{urutan}/{bulan-romawi}/{tahun}
-    // Contoh: SKL/001/VI/2025
-    $prefix  = 'SKL';
-    $tahun   = now()->year;
-    $bulan   = strtoupper(\Carbon\Carbon::now()->isoFormat('MMMM'));
-
-    $urutan  = Skl::where('sekolah_id', $sekolahId)
-      ->whereYear('created_at', $tahun)
-      ->whereNotNull('nomor_skl')
-      ->count() + 1;
-
-    $nomor = sprintf('%s/%03d/%s/%d', $prefix, $urutan, $bulan, $tahun);
-
-    return response()->json(['nomor' => $nomor]);
-  }
-
   // ── Pengaturan Nomor SKL Massal ─────────────────────────────────────
   // Penomoran massal berpola seperti Pengaturan Angkatan SKHU: nomor
   // mengikuti POSISI siswa dalam urutan yang dipilih (nama/NIS,
