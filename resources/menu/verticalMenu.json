@@ -99,7 +99,8 @@
       "name": "Presensi",
       "slug": "Presensi",
       "roles": [
-        "Admin"
+        "Admin",
+        "Operator Sekolah"
       ]
     },
     {
