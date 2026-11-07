@@ -161,13 +161,15 @@
   <div class="header">
     <h1>SURAT KETERANGAN LULUS (SKL)</h1>
     <h2>TAHUN PELAJARAN {{ $skl->tahun_pelajaran }}</h2>
-    <div class="nomor">Nomor : {{ $skl->nomor_surat }}</div>
+    <div class="nomor">Nomor : {{ $skl->nomor_skl }}</div>
   </div>
 
   @php
     $sekolah = $skl->sekolah->detailPerSemester;
     $namaSekolah = $sekolah->nama_sekolah ?? '';
     $desa = $sekolah->village->name ?? '';
+    $konfigurasi = \App\Models\SklKonfigurasi::untukSekolah($skl->sekolah_id, $skl->semester_id);
+    $tempatTerbit = $konfigurasi?->tempat_terbit ?: $desa;
     $kepalaSekolah = $sekolah->kepala_sekolah ?? '';
     $nipKs = $sekolah->nip ?? '';
   @endphp
@@ -234,7 +236,7 @@
           <tr>
             <td class="center">{{ $index + 1 }}</td>
             <td>{{ $item->mapelMapping->masterMapel->nama ?? '-' }}</td>
-            <td class="center">{{ number_format($item->nilai, 2) }}</td>
+            <td class="center">{{ number_format($item->nilai_akhir, 2) }}</td>
           </tr>
         @endforeach
       @endforeach
@@ -270,7 +272,7 @@
       <!-- Tanda Tangan -->
       <td width="40%">
         <div class="ttd-container">
-          {{ $desa }}, {{ $skl->tanggal_terbit ? $skl->tanggal_terbit->translatedFormat('d F Y') : '' }}<br>
+          {{ $tempatTerbit }}, {{ $skl->tanggal_terbit ? $skl->tanggal_terbit->translatedFormat('d F Y') : '' }}<br>
           Kepala Sekolah,<br><br>
 
           <div class="nama-pejabat">{{ $kepalaSekolah }}</div>
