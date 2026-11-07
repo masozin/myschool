@@ -310,8 +310,9 @@
                   @if (!$skl)
                     @hasanyrole('Operator Sekolah|Guru')
                       <button class="btn btn-sm btn-icon btn-text-primary rounded-pill btn-buat-skl"
-                        data-siswa-id="{{ $siswa->id }}" data-nama="{{ $siswa->nama_siswa }}" title="Buat SKL">
-                        <i class="icon-base ri ri-add-circle-line icon-18px"></i>
+                        data-siswa-id="{{ $siswa->id }}" data-nama="{{ $siswa->nama_siswa }}"
+                        title="Input Nilai (SKL dibuat otomatis)">
+                        <i class="icon-base ri ri-pencil-line icon-18px"></i>
                       </button>
                     @endhasanyrole
                   @else
@@ -771,58 +772,43 @@
         });
       }
 
-      // ── Buat SKL baru ─────────────────────────────────────────────────────────
+      // ── Input nilai siswa yang belum punya SKL ─────────────────────────
+      // Seperti SKHU: satu klik langsung membuka form nilai; baris SKL
+      // beserta struktur nilainya dibuat otomatis oleh endpoint store.
       document.addEventListener('click', async function(e) {
         const btn = e.target.closest('.btn-buat-skl');
-        if (!btn) return;
+        if (!btn || btn.disabled) return;
 
-        const konfirm = await Swal.fire({
-          icon: 'question',
-          title: 'Buat Data SKL?',
-          text: `Buat data SKL untuk ${btn.dataset.nama}?`,
-          showCancelButton: true,
-          confirmButtonText: 'Ya, Buat',
-          cancelButtonText: 'Batal',
-          customClass: {
-            confirmButton: 'btn btn-primary me-3',
-            cancelButton: 'btn btn-outline-secondary'
-          },
-          buttonsStyling: false,
-        });
-        if (!konfirm.isConfirmed) return;
+        btn.disabled = true;
+        const ikonAsli = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
-        const res = await apiFetch('{{ route('skl.store') }}', {
-          siswa_id: btn.dataset.siswaId
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: data.message,
-            showCancelButton: true,
-            confirmButtonText: 'Input Nilai Sekarang',
-            cancelButtonText: 'Nanti',
-            customClass: {
-              confirmButton: 'btn btn-primary me-3',
-              cancelButton: 'btn btn-outline-secondary'
-            },
-            buttonsStyling: false,
-          }).then(r => {
-            if (r.isConfirmed && data.edit_url) {
-              window.location = data.edit_url;
-            } else {
-              location.reload();
-            }
+        try {
+          const res = await apiFetch('{{ route('skl.store') }}', {
+            siswa_id: btn.dataset.siswaId
           });
-        } else {
+          const data = await res.json();
+
+          if (res.ok && data.edit_url) {
+            window.location = data.edit_url;
+            return;
+          }
+
+          Swal.fire({
+            icon: 'error',
+            title: 'Belum Bisa Dibuat',
+            text: data.message ?? 'Terjadi kesalahan.'
+          });
+        } catch (err) {
           Swal.fire({
             icon: 'error',
             title: 'Gagal',
-            text: data.message ?? 'Terjadi kesalahan.'
+            text: 'Tidak dapat menghubungi server.'
           });
         }
+
+        btn.disabled = false;
+        btn.innerHTML = ikonAsli;
       });
 
       // ── Modal Nomor SKL ───────────────────────────────────────────────────────
