@@ -128,6 +128,14 @@
       </ul>
     </div>
     @endunless
+
+    {{-- Mode wali kelas: hanya unduhan Excel kelasnya yang dibuka --}}
+    @isset($rombel)
+      <button class="btn btn-secondary btn-sm" id="btn-export-excel">
+        <i class="ri ri-download-2-line me-1"></i>
+        <span>Download</span>
+      </button>
+    @endisset
   </div>
 </div>
 
@@ -1089,7 +1097,7 @@
       document.getElementById('btn-export-excel')?.addEventListener('click', function() {
         const params = new URLSearchParams({
           sekolah_id: $('#filter_sekolah').val() || '',
-          rombel_id: $('#filter_rombel').val() || ''
+          rombel_id: document.querySelector('#tabel-siswa')?.dataset.rombelId || $('#filter_rombel').val() || ''
         });
         window.location = `{{ route('siswa.export') }}?${params.toString()}`;
       });

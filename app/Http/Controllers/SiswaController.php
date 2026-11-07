@@ -648,6 +648,17 @@ class SiswaController extends Controller
       : $user->ptk->sekolah_id;
 
     $rombelId = $request->input('rombel_id');
+
+    // Guru hanya boleh mengekspor rombel yang ia wali kelasi
+    if (
+      $rombelId && $user->hasRole('Guru') && !$user->hasRole('Operator Sekolah')
+    ) {
+      $milikGuru = \App\Models\Rombel::where('id', $rombelId)
+        ->where('ptk_id', $user->ptk?->id)
+        ->exists();
+      abort_unless($milikGuru, 403, 'Rombel ini bukan kelas yang Anda ampu.');
+    }
+
     $semesterId = session('semester_id');
 
     return Excel::download(
