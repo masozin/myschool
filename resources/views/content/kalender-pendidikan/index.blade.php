@@ -59,9 +59,9 @@
   {{-- TOOLBAR                                                       --}}
   {{-- =========================================================== --}}
   <div class="card mb-4">
-    <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
-      <div class="d-flex gap-2 flex-wrap align-items-center">
-        <input type="text" id="search-kalender" class="form-control form-control-sm" style="max-width:220px"
+    <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-2 gap-md-3">
+      <div class="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
+        <input type="text" id="search-kalender" class="form-control form-control-sm" style="max-width:220px; min-width:150px;"
           placeholder="Cari kegiatan...">
         <div class="btn-group btn-group-sm" role="group">
           <button type="button" id="btn-view-tabel" class="btn btn-primary">
@@ -74,7 +74,6 @@
       </div>
       <div class="d-flex gap-3 align-items-center">
         <button id="btn-download-pdf" type="button" class="btn btn-outline-primary btn-sm">
-
           <i class="ri ri-file-pdf-2-line me-1"></i> <span class="d-none d-sm-inline-block">Download PDF</span>
         </button>
         @can('create', App\Models\KalenderPendidikan::class)
@@ -95,6 +94,22 @@
   {{-- Legenda jenis: klik untuk menyaring tabel per jenis --}}
   <div id="legend-jenis" class="d-flex flex-wrap gap-2 mb-4"></div>
 
+  {{-- Bilah aksi massal: muncul hanya bila ada baris tercentang --}}
+  <div id="bulk-bar" class="card mb-4 d-none" style="border: 1px solid var(--bs-danger);">
+    <div class="card-body py-2">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="small"><i class="ri ri-checkbox-multiple-line me-1 text-danger"></i><strong id="bulk-count">0</strong>
+          kegiatan terpilih</span>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" id="btn-bulk-batal" class="btn btn-sm btn-outline-secondary">Batalkan Pilihan</button>
+          <button type="button" id="btn-bulk-hapus" class="btn btn-sm btn-danger">
+            <i class="ri ri-delete-bin-line me-1"></i>Hapus Terpilih
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {{-- =========================================================== --}}
   {{-- VIEW TABEL (input langsung di dalam baris tabel)              --}}
   {{-- =========================================================== --}}
@@ -104,6 +119,9 @@
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
             <tr>
+              <th width="36" class="text-center">
+                <input type="checkbox" id="check-semua" class="form-check-input" title="Pilih semua pada tampilan ini">
+              </th>
               <th width="40" class="text-center">#</th>
               <th width="150">Tanggal Mulai</th>
               <th width="150">Tanggal Selesai</th>
@@ -116,7 +134,7 @@
           </thead>
           <tbody id="tbody-kalender">
             <tr>
-              <td colspan="8" class="text-center py-4 text-muted">
+              <td colspan="9" class="text-center py-4 text-muted">
                 <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...
               </td>
             </tr>
@@ -274,6 +292,7 @@
       let currentView = 'tabel'; // 'tabel' | 'kalender'
       let editingRowId = null; // null | 'new' | <id>
       let presetTanggalBaru = null; // dipakai saat tambah baris lewat klik tanggal di kalender
+      const selectedIds = new Set(); // id baris tercentang untuk aksi massal
 
       // ── Helper rentang tahun pelajaran aktif ─────────────────────────────────
       // Dihitung langsung dari string "2025/2026" (1 Juli tahun awal - 30 Juni tahun akhir),
@@ -291,7 +310,7 @@
 
       // ── Load Tabel (plain AJAX) ───────────────────────────────────────────────
       async function loadTabelKalender() {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-muted">
           <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...</td></tr>`;
 
         try {
@@ -307,7 +326,7 @@
           renderTabel();
           if (currentView === 'kalender') renderRingkasanSemester();
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-danger">
+          tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4 text-danger">
             <i class="ri ri-error-warning-line me-1"></i> ${err.message}</td></tr>`;
         }
       }
@@ -412,8 +431,13 @@
           '<span class="badge bg-label-primary">Ganjil</span>' :
           '<span class="badge bg-label-info">Genap</span>';
 
+        const selCheck = (row.can_delete ?? false) ?
+          `<input type="checkbox" class="form-check-input check-baris" data-id="${row.id}" ${selectedIds.has(String(row.id)) ? 'checked' : ''}>` :
+          '';
+
         return `
           <tr data-id="${row.id}">
+            <td class="text-center">${selCheck}</td>
             <td class="text-center">${nomor}</td>
             <td>${formatTanggal(row.tanggal_mulai)}</td>
             <td>${formatTanggal(row.tanggal_selesai)}</td>
@@ -435,6 +459,7 @@
 
         return `
           <tr data-id="${id}" data-editing="true">
+            <td></td>
             <td class="text-center">${nomor}</td>
             <td><input type="date" class="form-control form-control-sm inp-mulai" value="${tglMulai}" ${minAttr} ${maxAttr}></td>
             <td><input type="date" class="form-control form-control-sm inp-selesai" value="${tglSelesai}" ${minAttr} ${maxAttr} placeholder="Opsional"></td>
@@ -470,11 +495,12 @@
         }
 
         if (!data.length && editingRowId !== 'new') {
-          tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">
+          tbody.innerHTML = `<tr><td colspan="9" class="text-center py-5 text-muted">
             <i class="ri ri-calendar-line ri-36px d-block mb-2"></i>
             Belum ada kegiatan pada pilihan ini.<br>
             <small>Klik <strong>Tambah Kegiatan</strong> untuk input manual, atau <strong>Import Excel</strong> untuk memasukkan banyak kegiatan sekaligus.</small>
             </td></tr>`;
+          perbaruiBilahMassal();
           return;
         }
 
@@ -487,7 +513,102 @@
 
         tbody.innerHTML = rows;
         presetTanggalBaru = null;
+        perbaruiBilahMassal();
       }
+
+      // ── Pilihan massal (centang baris) ──────────────────────────────────────
+      function perbaruiBilahMassal() {
+        const bar = document.getElementById('bulk-bar');
+        document.getElementById('bulk-count').textContent = selectedIds.size;
+        bar.classList.toggle('d-none', selectedIds.size === 0);
+
+        // Keadaan kotak centang kepala: mengikuti baris yang tampil
+        const kepala = document.getElementById('check-semua');
+        const tampilBisaHapus = dataTerfilter().filter(r => r.can_delete);
+        const terpilihTampil = tampilBisaHapus.filter(r => selectedIds.has(String(r.id))).length;
+        kepala.checked = tampilBisaHapus.length > 0 && terpilihTampil === tampilBisaHapus.length;
+        kepala.indeterminate = terpilihTampil > 0 && terpilihTampil < tampilBisaHapus.length;
+      }
+
+      document.addEventListener('change', function(e) {
+        if (e.target.classList?.contains('check-baris')) {
+          const id = String(e.target.dataset.id);
+          if (e.target.checked) selectedIds.add(id);
+          else selectedIds.delete(id);
+          perbaruiBilahMassal();
+        }
+      });
+
+      document.getElementById('check-semua')?.addEventListener('change', function() {
+        dataTerfilter().filter(r => r.can_delete).forEach(r => {
+          if (this.checked) selectedIds.add(String(r.id));
+          else selectedIds.delete(String(r.id));
+        });
+        renderTabel();
+      });
+
+      document.getElementById('btn-bulk-batal')?.addEventListener('click', function() {
+        selectedIds.clear();
+        renderTabel();
+      });
+
+      document.getElementById('btn-bulk-hapus')?.addEventListener('click', async function() {
+        if (!selectedIds.size) return;
+
+        const jumlah = selectedIds.size;
+        const confirm = await Swal.fire({
+          title: `Hapus ${jumlah} kegiatan?`,
+          text: 'Kegiatan terpilih akan dihapus secara permanen!',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: 'Ya, Hapus Semua!',
+          cancelButtonText: 'Batal',
+          customClass: {
+            confirmButton: 'btn btn-danger me-3',
+            cancelButton: 'btn btn-outline-secondary'
+          },
+          buttonsStyling: false
+        });
+        if (!confirm.isConfirmed) return;
+
+        const btn = this;
+        const ikonAsli = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menghapus...';
+
+        let berhasil = 0;
+        const gagal = [];
+        for (const id of [...selectedIds]) {
+          try {
+            const res = await fetch(`/kalender-pendidikan/${id}`, {
+              method: 'DELETE',
+              headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                Accept: 'application/json'
+              }
+            });
+            if (!res.ok) throw new Error();
+            berhasil++;
+            selectedIds.delete(id);
+          } catch {
+            gagal.push(id);
+          }
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = ikonAsli;
+
+        await Swal.fire({
+          icon: gagal.length ? 'warning' : 'success',
+          title: 'Hapus Massal Selesai',
+          text: gagal.length ?
+            `${berhasil} kegiatan terhapus, ${gagal.length} gagal dihapus.` :
+            `${berhasil} kegiatan berhasil dihapus.`
+        });
+
+        editingRowId = null;
+        await loadTabelKalender();
+      });
 
       // ── Tambah baris baru ─────────────────────────────────────────────────
       document.getElementById('btn-tambah-kalender')?.addEventListener('click', function() {
