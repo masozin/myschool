@@ -1213,7 +1213,7 @@ class SkhuController extends Controller
         $jenis = ucfirst($mapel->jenis ?? 'Pokok');
         $comment->getText()->createTextRun("Mapel: {$namaMapel}\nKelompok: {$kelompokNama}\nJenis: {$jenis}");
 
-        $sheet->getColumnDimensionByColumn($currentCol)->setWidth(14);
+        $sheet->getColumnDimensionByColumn($currentCol)->setWidth(9);
         $currentCol++;
       }
 

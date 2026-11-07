@@ -1512,14 +1512,23 @@ class SklController extends Controller
       $rowLagi++;
     }
 
-    // 7. AUTO-FIT COLUMN WIDTH (Lebar kolom otomatis menyesuaikan panjang karakter teks)
+    // 7. LEBAR KOLOM: profil siswa (B–E) auto-fit; kolom nilai
+    // (F ke atas — mapel/komponen) tetap ramping 9 dengan tajuk
+    // terbungkus (wrap text pada gaya header di atas), agar
+    // belasan kolom mapel tidak melebar mengikuti isinya.
     // Iterasi per indeks ANGKA: range('B', $maxColStr) meledak di
     // PHP 8 begitu kolom melewati Z (huruf kolom menjadi 2 byte,
     // mis. 'AX') — persis yang terjadi pada template mode manual
     // dengan banyak mapel × sub.
     for ($colIdx = 2; $colIdx <= $maxCol; $colIdx++) {
       $columnID = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
-      $sheet->getColumnDimension($columnID)->setAutoSize(true);
+      if ($colIdx >= 6) {
+        $dimensi = $sheet->getColumnDimension($columnID);
+        $dimensi->setAutoSize(false);
+        $dimensi->setWidth(9);
+      } else {
+        $sheet->getColumnDimension($columnID)->setAutoSize(true);
+      }
     }
   }
 
