@@ -13,7 +13,7 @@ class SklKonfigurasiController extends Controller
   {
     $sekolahId = Auth::user()->ptk?->sekolah_id;
     abort_if(!$sekolahId, 403, "Akun Anda belum terhubung ke sekolah.");
-    $semesterId = (int) session('semester_id');
+    $semesterId = (int) Semester::smtIdKelulusan();
     $semester   = Semester::findOrFail($semesterId);
 
     return [$sekolahId, $semesterId, $semester];

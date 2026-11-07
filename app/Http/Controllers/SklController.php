@@ -142,7 +142,7 @@ class SklController extends Controller
     if (Auth::user()->hasRole('Guru')) {
       $query->whereIn(
         'siswa_id',
-        $this->siswaIdsWaliKelas($this->getSekolahId(), (int) session('semester_id'))
+        $this->siswaIdsWaliKelas($this->getSekolahId(), (int) Semester::smtIdKelulusan())
       );
     }
 
@@ -167,7 +167,7 @@ class SklController extends Controller
 
   public function index(Request $request)
   {
-    $semesterId = session('semester_id');
+    $semesterId = Semester::smtIdKelulusan();
 
     // Admin tanpa konteks sekolah (beberapa sekolah, belum memilih)
     // mendapat halaman pemilih, bukan 403
@@ -304,7 +304,7 @@ class SklController extends Controller
 
     // Guru hanya boleh membuat SKL untuk siswa rombelnya sendiri
     if (Auth::user()->hasRole('Guru')) {
-      $ids = $this->siswaIdsWaliKelas($this->getSekolahId(), (int) session('semester_id'));
+      $ids = $this->siswaIdsWaliKelas($this->getSekolahId(), (int) Semester::smtIdKelulusan());
       abort_unless(
         in_array((int) $request->siswa_id, $ids, true),
         403,
@@ -312,7 +312,7 @@ class SklController extends Controller
       );
     }
 
-    $semesterId  = session('semester_id');
+    $semesterId  = Semester::smtIdKelulusan();
     $sekolahId   = $this->getSekolahId();
     $semester    = Semester::findOrFail($semesterId);
 
@@ -687,7 +687,7 @@ class SklController extends Controller
   public function generateNomor(Skl $skl)
   {
     $sekolahId  = $this->getSekolahId();
-    $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) session('semester_id'));
+    $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) Semester::smtIdKelulusan());
 
     // Format: {prefix}/{urutan}/{bulan}/{tahun}
     // Contoh: SKL/001/VI/2025
@@ -712,7 +712,7 @@ class SklController extends Controller
     // Sinkronisasi menyelaraskan SKL seluruh sekolah — khusus Operator
     abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
 
-    $semesterId  = session('semester_id');
+    $semesterId  = Semester::smtIdKelulusan();
     $sekolahId   = $this->getSekolahId();
 
     $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semesterId);
@@ -942,7 +942,7 @@ class SklController extends Controller
     }
 
     // 1. Ambil Semester & Data Sekolah PERSIS seperti menu SKHU Anda
-    $semester = Semester::where('id', session('semester_id'))->first()
+    $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
 
     $sekolahId = $user->ptk->sekolah_id;
@@ -1250,7 +1250,7 @@ class SklController extends Controller
     ]);
 
     $sekolahId  = $this->getSekolahId();
-    $semesterId = session('semester_id');
+    $semesterId = Semester::smtIdKelulusan();
 
     $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semesterId);
 
@@ -1421,7 +1421,7 @@ class SklController extends Controller
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::findOrFail($this->getSekolahId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
 
     $query = Skl::with([
       'siswa',

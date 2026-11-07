@@ -55,7 +55,7 @@ class SkhuController extends Controller
     }
 
     $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])->findOrFail($sekolahId);
-    $semester = Semester::find(session('semester_id'));
+    $semester = Semester::find(Semester::smtIdKelulusan());
 
     if (!$semester) {
       return back()->with('error', 'Semester aktif tidak ditemukan.');
@@ -209,7 +209,7 @@ class SkhuController extends Controller
     $user     = Auth::user();
     $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])
       ->findOrFail($this->sekolahKonteksId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang  = strtoupper($sekolah->jenjang);
 
     // Validasi siswa memang berada di kelas akhir sekolah ini
@@ -288,7 +288,7 @@ class SkhuController extends Controller
     ]);
 
     $siswa    = \App\Models\Siswa::findOrFail($siswaId);
-    $semester = Semester::where('id', session('semester_id'))->first()
+    $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
 
     $sekolahId = Auth::user()->ptk->sekolah_id
@@ -414,7 +414,7 @@ class SkhuController extends Controller
     }
 
     $sekolahId = Auth::user()->ptk->sekolah_id;
-    $semester  = Semester::where('id', session('semester_id'))->first()
+    $semester  = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
 
     $skhuList = Skhu::where('sekolah_id', $sekolahId)
@@ -480,7 +480,7 @@ class SkhuController extends Controller
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::with(['detailTerbaru'])->findOrFail($this->sekolahKonteksId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang  = strtoupper($sekolah->jenjang);
     $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? null;
 
@@ -556,7 +556,7 @@ class SkhuController extends Controller
 
     $sekolahId = $this->sekolahKonteksId();
     $sekolah   = Sekolah::findOrFail($sekolahId);
-    $semester  = Semester::findOrFail(session('semester_id'));
+    $semester  = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang   = strtoupper($sekolah->jenjang);
     $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? null;
 
@@ -832,7 +832,7 @@ class SkhuController extends Controller
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::findOrFail($this->sekolahKonteksId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang  = strtoupper($sekolah->jenjang);
 
     $skhu = Skhu::with([
@@ -877,7 +877,7 @@ class SkhuController extends Controller
   {
     $user     = Auth::user();
     $sekolah  = Sekolah::findOrFail($this->sekolahKonteksId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang  = strtoupper($sekolah->jenjang);
 
     $skhu = Skhu::with([
@@ -940,7 +940,7 @@ class SkhuController extends Controller
     $user     = Auth::user();
     $sekolah  = Sekolah::with(['detailTerbaru', 'asets'])
       ->findOrFail($this->sekolahKonteksId());
-    $semester = Semester::findOrFail(session('semester_id'));
+    $semester = Semester::findOrFail(Semester::smtIdKelulusan());
     $jenjang  = strtoupper($sekolah->jenjang);
 
     $skhus = Skhu::with([
@@ -1012,7 +1012,7 @@ class SkhuController extends Controller
       abort(403);
     }
 
-    $semester = Semester::where('id', session('semester_id'))->first()
+    $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
 
     $sekolahId = $user->ptk->sekolah_id;
@@ -1354,7 +1354,7 @@ class SkhuController extends Controller
       'file_excel'            => 'required|file|mimes:xlsx,xls|max:10240',
     ]);
 
-    $semester = Semester::where('id', session('semester_id'))->first()
+    $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
 
     if (!$semester) {

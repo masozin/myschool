@@ -147,6 +147,42 @@ class Semester extends Model
   }
 
   /**
+   * Id semester kerja dokumen kelulusan (SKHU/SKL). Dokumen
+   * kelulusan selalu milik semester Genap tahun pelajarannya,
+   * jadi bila semester sesi adalah Ganjil, yang dipakai adalah
+   * semester Genap tahun pelajaran SEBELUMNYA — pengolahan SKHU/
+   * SKL memang lazim berlanjut di awal tahun ajaran berikutnya.
+   * Bila semester Genap sebelumnya tidak ada, pakai semester sesi.
+   */
+  public static function smtIdKelulusan(): ?int
+  {
+    $sesi = static::find(session('semester_id'));
+
+    if (!$sesi) {
+      return session('semester_id');
+    }
+
+    if ($sesi->semester === 'Genap') {
+      return (int) $sesi->id;
+    }
+
+    $parts = explode('/', (string) $sesi->tahun_pelajaran);
+
+    if (count($parts) === 2 && is_numeric($parts[0]) && is_numeric($parts[1])) {
+      $tpLalu    = ((int) $parts[0] - 1) . '/' . ((int) $parts[1] - 1);
+      $genapLalu = static::where('tahun_pelajaran', $tpLalu)
+        ->where('semester', 'Genap')
+        ->first();
+
+      if ($genapLalu) {
+        return (int) $genapLalu->id;
+      }
+    }
+
+    return (int) $sesi->id;
+  }
+
+  /**
    * supaya tidak menyimpan data dengan semester_id kosong.
    */
   public static function sessionSemesterId(): int

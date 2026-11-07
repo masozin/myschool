@@ -12,6 +12,15 @@
 
 @section('content')
 
+  @if ((int) session('semester_id') !== (int) $semester->id)
+    <div class="alert alert-info">
+      <i class="icon-base ri ri-information-line me-1"></i>
+      Anda login pada semester <strong>{{ $namaSemester }}</strong>. Dokumen kelulusan selalu milik semester
+      <strong>Genap</strong>, jadi yang ditampilkan di sini adalah data
+      <strong>{{ $semester->tahun_pelajaran }} — {{ $semester->semester }}</strong>.
+    </div>
+  @endif
+
   {{-- ── Info Header ──────────────────────────────────────────────────────── --}}
   <div class="row mb-4 g-4">
     <div class="col-12 col-md-7">
