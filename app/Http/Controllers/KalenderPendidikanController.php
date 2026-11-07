@@ -10,6 +10,7 @@ use App\Models\Semester;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Conditional;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
@@ -223,15 +224,42 @@ class KalenderPendidikanController extends Controller
     $validasiJenis->setType(DataValidation::TYPE_LIST)
       ->setAllowBlank(true)
       ->setShowDropDown(false)
-      ->setFormula1('"' . implode(',', self::JENIS_KEGIATAN) . '"');
+      ->setFormula1('"' . implode(',', self::JENIS_KEGIATAN) . '"')
+      // Isian di luar daftar DITOLAK di tempat dengan pesan yang
+      // menyebut pilihan yang sah (bukan sekadar panah dropdown)
+      ->setShowErrorMessage(true)
+      ->setErrorStyle(DataValidation::STYLE_STOP)
+      ->setErrorTitle('Jenis tidak dikenal')
+      ->setError('Jenis harus salah satu dari: ' . implode(', ', self::JENIS_KEGIATAN) . '.')
+      ->setShowInputMessage(true)
+      ->setPromptTitle('Pilih jenis kegiatan')
+      ->setPrompt('Pilihan yang bisa dimasukkan: ' . implode(', ', self::JENIS_KEGIATAN) . '.');
     $sheet->setDataValidation('C2:C200', $validasiJenis);
 
     $validasiLibur = new DataValidation();
     $validasiLibur->setType(DataValidation::TYPE_LIST)
       ->setAllowBlank(true)
       ->setShowDropDown(false)
-      ->setFormula1('"Ya,Tidak"');
+      ->setFormula1('"Ya,Tidak"')
+      ->setShowErrorMessage(true)
+      ->setErrorStyle(DataValidation::STYLE_STOP)
+      ->setErrorTitle('Isian Libur tidak dikenal')
+      ->setError('Kolom Libur hanya boleh diisi Ya atau Tidak.');
     $sheet->setDataValidation('D2:D200', $validasiLibur);
+
+    // Format bersyarat: tanggal mulai MELEBIHI tanggal selesai
+    // (dan tanggal selesai terisi) → kedua sel tanggal merah,
+    // supaya kekeliruan rentang terlihat sebelum file diimpor
+    foreach (['A2:A200', 'B2:B200'] as $rentangSel) {
+      $bersyarat = new Conditional();
+      $bersyarat->setConditionType(Conditional::CONDITION_EXPRESSION);
+      $bersyarat->addCondition('AND($B2<>"",$A2>$B2)');
+      $bersyarat->getStyle()->applyFromArray([
+        'font' => ['color' => ['rgb' => 'FF9D1B29'], 'bold' => true],
+        'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FFF8D7DA']],
+      ]);
+      $sheet->getStyle($rentangSel)->setConditionalStyles([$bersyarat]);
+    }
 
     $sheet->getColumnDimension('A')->setWidth(14);
     $sheet->getColumnDimension('B')->setWidth(14);
