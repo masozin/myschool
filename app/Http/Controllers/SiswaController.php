@@ -358,8 +358,30 @@ class SiswaController extends Controller
   /**
    * Ambil data tunggal untuk modal Edit.
    */
+  /**
+   * Guru hanya boleh mengedit siswa pada rombel yang ia wali
+   * kelasi di semester sesi; peran lain tidak dibatasi di sini.
+   */
+  private function pastikanBolehEditSiswa($siswaId): void
+  {
+    $user = Auth::user();
+
+    if (!$user->hasRole('Guru') || $user->hasAnyRole(['Admin', 'Operator Sekolah'])) {
+      return;
+    }
+
+    $milikGuru = RombelAnggota::where('siswa_id', $siswaId)
+      ->where('semester_id', session('semester_id'))
+      ->whereHas('rombel', fn($q) => $q->where('ptk_id', $user->ptk?->id))
+      ->exists();
+
+    abort_unless($milikGuru, 403, 'Siswa ini bukan anggota kelas yang Anda ampu.');
+  }
+
   public function edit($id)
   {
+    $this->pastikanBolehEditSiswa($id);
+
     try {
       $siswa = Siswa::with('siswaRegistrasi')->findOrFail($id);
 
@@ -381,6 +403,8 @@ class SiswaController extends Controller
 
   public function update(Request $request, $id)
   {
+    $this->pastikanBolehEditSiswa($id);
+
     // 1. Ambil data siswa & registrasi
     $siswa = Siswa::findOrFail($id);
     $registrasi = SiswaRegistrasi::where('siswa_id', $id)->firstOrFail();

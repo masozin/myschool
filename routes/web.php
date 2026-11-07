@@ -150,6 +150,10 @@ Route::controller(SiswaController::class)
   ->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/{id}/show', 'show')->name('show');
+    // Edit biodata juga untuk Guru — di controller dikurung ke
+    // siswa rombel yang ia wali kelasi
+    Route::get('/{id}/edit', 'edit')->name('edit');
+    Route::put('/{id}', 'update')->name('update');
     Route::get('/tabel', 'tabel')->name('tabel');
     Route::get('/export', 'export')->name('export');
     Route::get('/alumni', 'alumni')->name('alumni');
@@ -166,9 +170,7 @@ Route::controller(SiswaController::class)
   ->group(function () {
     Route::get('/download-template', 'downloadTemplate')->name('download-template');
     Route::post('/import', 'import')->name('import');
-    Route::get('/{id}/edit', 'edit')->name('edit');
     Route::post('/', 'store')->name('store');
-    Route::put('/{id}', 'update')->name('update');
     Route::put('/{id}/registrasi', 'registrasi')->name('registrasi');
     Route::post('/alumni/{id}/batal-lulus', 'batalkanKelulusan')->name('alumni.batal-lulus');
     Route::post('/keluar/{id}/batal', 'batalkanKeluar')->name('keluar.batal');
