@@ -330,7 +330,7 @@
                       @if ($skl->status == 'disetujui')
                         <a href="{{ route('skl.preview', $skl->id) }}" target="_blank"
                           class="btn btn-sm btn-icon btn-text-secondary rounded-pill" title="Preview SKL">
-                          <i class="ri ri-eye-line text-info icon-18px"></i>
+                          <i class="ri ri-printer-line text-info icon-18px"></i>
                         </a>
 
                         {{-- Button Download Langsung --}}
@@ -353,6 +353,7 @@
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end">
                         @hasanyrole('Operator Sekolah|Guru')
+                          @if ($skl->status !== 'disetujui')
                           <li>
                             <button class="dropdown-item btn-nomor-skl" data-id="{{ $skl->id }}"
                               data-nomor="{{ $skl->nomor_skl ?? '' }}"
@@ -361,6 +362,7 @@
                               <i class="ri ri-hashtag me-2"></i> Input Nomor
                             </button>
                           </li>
+                          @endif
 
                           @if (in_array($skl->status, ['draft', 'ditolak']))
                             <li>
