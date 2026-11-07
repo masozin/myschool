@@ -1333,7 +1333,7 @@ class SklController extends Controller
 
       // Baris 2 & 3: Merge vertikal, diisi Nama Singkat Mapel
       $sheet->mergeCells([$col, 2, $col, 3]);
-      $sheet->setCellValue([$col, 2], $mapel->masterMapel->nama_singkat ?? $mapel->masterMapel->nama);
+      $sheet->setCellValue([$col, 2], trim((string) ($mapel->masterMapel->nama_singkat ?? '')) !== '' ? $mapel->masterMapel->nama_singkat : $mapel->masterMapel->nama);
 
       // Tambahkan Hover Comment Nama Panjang Mapel
       $colStr = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
@@ -1366,7 +1366,7 @@ class SklController extends Controller
           $sheet->setCellValue([$col, 1], "mapel_{$mapel->id}_komp_{$komponen->id}_sub_{$sub->id}");
 
           // Baris 3: Nama Singkat Mapel Master
-          $sheet->setCellValue([$col, 3], $mapel->masterMapel->nama_singkat ?? $mapel->masterMapel->nama);
+          $sheet->setCellValue([$col, 3], trim((string) ($mapel->masterMapel->nama_singkat ?? '')) !== '' ? $mapel->masterMapel->nama_singkat : $mapel->masterMapel->nama);
 
           // Beri Hover Comment Nama Lengkap Mapel pada Baris 3
           $colStr = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
@@ -1386,7 +1386,7 @@ class SklController extends Controller
       foreach ($mapels as $mapel) {
         $sheet->setCellValue([$col, 1], "mapel_{$mapel->id}_komp_{$komponen->id}");
         $sheet->mergeCells([$col, 2, $col, 3]);
-        $sheet->setCellValue([$col, 2], $mapel->masterMapel->nama_singkat ?? $mapel->masterMapel->nama);
+        $sheet->setCellValue([$col, 2], trim((string) ($mapel->masterMapel->nama_singkat ?? '')) !== '' ? $mapel->masterMapel->nama_singkat : $mapel->masterMapel->nama);
 
         $colStr = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
         $sheet->getComment("{$colStr}2")->getText()->createTextRun($mapel->masterMapel->nama);

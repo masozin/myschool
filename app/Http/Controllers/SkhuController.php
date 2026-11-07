@@ -1181,8 +1181,11 @@ class SkhuController extends Controller
 
       foreach ($items as $mapel) {
         $namaMapel = $mapel->masterMapel->nama;
-        // Baris 3: Nama Mapel Visual
-        $sheet->setCellValue([$currentCol, 3], $namaMapel);
+        // Baris 3: Nama SINGKAT mapel sebagai tajuk kolom (nama
+        // asli terlalu lebar); nama lengkapnya hidup di komentar
+        // sel di bawah, persis pola template SKL
+        $namaSingkat = trim((string) ($mapel->masterMapel->nama_singkat ?? ''));
+        $sheet->setCellValue([$currentCol, 3], $namaSingkat !== '' ? $namaSingkat : $namaMapel);
         $sheet->getStyle([$currentCol, 3])->applyFromArray([
           'font'      => ['bold' => true, 'color' => ['rgb' => 'FF1A56A4'], 'size' => 9],
           'fill'      => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => $colorMapelHead]],
