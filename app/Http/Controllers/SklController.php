@@ -490,6 +490,9 @@ class SklController extends Controller
       'Nilai tidak dapat diubah pada status ' . $skl->status
     );
 
+    // Terima koma desimal ala Excel Indonesia ("85,5" → 85.5)
+    $this->normalisasiDesimal($request);
+
     DB::transaction(function () use ($request, $skl) {
       if ($skl->mode_input === 'jadi') {
         $this->simpanNilaiJadi($request, $skl);
@@ -1067,6 +1070,28 @@ class SklController extends Controller
 
   // ── Private Helpers ───────────────────────────────────────────────────
 
+  /**
+   * Ubah koma desimal menjadi titik pada isian nilai ("85,5"
+   * menjadi "85.5") sebelum validasi numeric berjalan. Menyalin
+   * angka dari Excel Indonesia menghasilkan koma, dan tanpa ini
+   * nilainya ditolak validasi atau terbaca keliru.
+   */
+  private function normalisasiDesimal(Request $request): void
+  {
+    foreach (['nilai', 'sub'] as $grup) {
+      $data = $request->input($grup);
+      if (!is_array($data)) {
+        continue;
+      }
+      array_walk_recursive($data, function (&$v) {
+        if (is_string($v)) {
+          $v = str_replace(',', '.', trim($v));
+        }
+      });
+      $request->merge([$grup => $data]);
+    }
+  }
+
   private function simpanNilaiJadi(Request $request, Skl $skl): void
   {
     $rules = [];
@@ -1092,8 +1117,10 @@ class SklController extends Controller
     foreach ($skl->nilais as $sklNilai) {
       foreach ($sklNilai->komponens as $kn) {
         if ($kn->komponen->komponenSub->isNotEmpty()) {
-          foreach ($kn->nilaiKomponenSub as $nsk) {
-            $rules["sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->komponen_sub_id}"]
+          // Aturan dibangun dari sub MASTER: form menampilkan semua
+          // sub master, termasuk yang baris nilainya belum terbentuk
+          foreach ($kn->komponen->komponenSub as $sub) {
+            $rules["sub.{$sklNilai->id}.{$kn->komponen_id}.{$sub->id}"]
               = 'nullable|numeric|min:0|max:100';
           }
         } else {
@@ -1107,10 +1134,18 @@ class SklController extends Controller
     foreach ($skl->nilais as $sklNilai) {
       foreach ($sklNilai->komponens as $kn) {
         if ($kn->komponen->komponenSub->isNotEmpty()) {
-          foreach ($kn->nilaiKomponenSub as $nsk) {
+          foreach ($kn->komponen->komponenSub as $sub) {
+            // Baris nilai dibentuk bila belum ada. Sub yang ditambah
+            // Admin SETELAH SKL dibuat belum punya baris, dan tanpa
+            // ini isian form untuk sub itu hilang senyap saat
+            // disimpan — notifikasi tetap "berhasil", nilainya tidak.
+            $nsk = SklNilaiKomponenSub::firstOrCreate([
+              'skl_nilai_komponen_id' => $kn->id,
+              'komponen_sub_id'       => $sub->id,
+            ]);
             $nsk->update([
               'nilai' => $request->input(
-                "sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->komponen_sub_id}"
+                "sub.{$sklNilai->id}.{$kn->komponen_id}.{$sub->id}"
               ),
             ]);
           }

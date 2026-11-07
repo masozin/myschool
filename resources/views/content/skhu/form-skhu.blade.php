@@ -180,7 +180,7 @@
                       @endif
                     </td>
                     <td class="p-1">
-                      <input type="number" class="form-control form-control-sm text-center input-nilai"
+                      <input type="text" inputmode="decimal" class="form-control form-control-sm text-center input-nilai"
                         name="nilai[{{ $mapel->id }}]" id="nilai-{{ $mapel->id }}" min="0" max="100"
                         step="1" value="{{ number_format($nilaiExisting[$mapel->id] ?? 0, 2, '.', '') }}"
                         {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
@@ -247,13 +247,19 @@
       }
 
       // ── Hitung rata-rata nilai secara realtime ────────────────────────────
+      // Baca angka dengan toleransi koma desimal: "85,5" → 85.5
+      function parseNilai(v) {
+        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+      }
+
       function hitungRataRata() {
         const inputs = document.querySelectorAll('.input-nilai');
         let total = 0,
           count = 0;
         inputs.forEach(input => {
-          const val = parseFloat(input.value);
-          if (!isNaN(val) && val > 0) {
+          const val = parseNilai(input.value);
+          if (val > 0) {
             total += val;
             count++;
           }
@@ -270,7 +276,7 @@
         const nilai = {};
         document.querySelectorAll('.input-nilai').forEach(input => {
           const match = input.name.match(/nilai\[(\d+)\]/);
-          if (match) nilai[match[1]] = parseFloat(input.value) || 0;
+          if (match) nilai[match[1]] = parseNilai(input.value);
         });
 
         return {

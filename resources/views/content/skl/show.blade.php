@@ -288,7 +288,7 @@
                       </td>
                       <td class="{{ $isEdit ? 'p-1' : 'text-center fw-semibold' }}">
                         @if ($isEdit)
-                          <input type="number" class="form-control form-control-sm text-center input-nilai"
+                          <input type="text" inputmode="decimal" class="form-control form-control-sm text-center input-nilai"
                             name="nilai[{{ $sklNilai->id }}]" min="0" max="100" step="0.01"
                             {{-- value="{{ number_format($sklNilai->nilai_akhir ?? 0, 2, '.', '') }}" --}}
                             value="{{ $sklNilai->nilai_akhir !== null ? number_format($sklNilai->nilai_akhir, 2, '.', '') : '' }}"
@@ -465,7 +465,7 @@
                                       @endif
                                     </td>
                                     <td class="p-1">
-                                      <input type="number"
+                                      <input type="text" inputmode="decimal"
                                         class="form-control form-control-sm text-center input-komponen"
                                         name="nilai[{{ $sklNilai->id }}][{{ $komp->id }}]" min="0"
                                         max="100" step="0.01" {{-- value="{{ number_format($kn?->nilai ?? 0, 2, '.', '') }}" --}}
@@ -554,7 +554,7 @@
                                               @endif
                                             </td>
                                             <td class="p-1">
-                                              <input type="number"
+                                              <input type="text" inputmode="decimal"
                                                 class="form-control form-control-sm text-center input-sub"
                                                 name="sub[{{ $sklNilai->id }}][{{ $komp->id }}][{{ $sub->id }}]"
                                                 min="0" max="100" step="0.01" {{-- value="{{ number_format($nsk?->nilai ?? 0, 2, '.', '') }}" --}}
@@ -714,18 +714,34 @@
       const isEdit = {{ $isEdit ? 'true' : 'false' }};
       const isManual = {{ $isManual ? 'true' : 'false' }};
 
+      // Input nilai kini type=text agar tempelan dari Excel (koma
+      // desimal) tidak dibuang browser; semua perilaku lama yang
+      // dulu menempel pada type=number kini mengenali kelasnya.
+      function isInputNilai(el) {
+        return el && el.tagName === 'INPUT' &&
+          (el.classList.contains('input-nilai') ||
+            el.classList.contains('input-komponen') ||
+            el.classList.contains('input-sub'));
+      }
+
+      // Baca angka dengan toleransi koma desimal: "85,5" → 85.5
+      function parseNilai(v) {
+        const n = parseFloat(String(v ?? '').replace(',', '.'));
+        return isNaN(n) ? 0 : n;
+      }
+
       document.addEventListener("wheel", function(event) {
-        if (document.activeElement.type === "number") {
+        if (isInputNilai(document.activeElement)) {
           document.activeElement.blur();
         }
       });
 
       document.addEventListener('input', function(e) {
-        // Hanya jalankan jika target adalah input type="number"
-        if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+        // Hanya jalankan untuk input nilai
+        if (isInputNilai(e.target)) {
           const min = parseFloat(e.target.getAttribute('min') ?? 0);
           const max = parseFloat(e.target.getAttribute('max') ?? 100);
-          let val = parseFloat(e.target.value);
+          let val = parseFloat(e.target.value.replace(',', '.'));
 
           // Jika nilainya bukan angka (misal user menghapus semua), abaikan
           if (isNaN(val)) return;
@@ -739,7 +755,7 @@
         }
       });
 
-      const numberInputs = document.querySelectorAll('input[type="number"]');
+      const numberInputs = document.querySelectorAll('.input-nilai, .input-komponen, .input-sub');
       numberInputs.forEach(input => {
         // Saat input kehilangan fokus (selesai mengetik), format menjadi 2 desimal
         input.addEventListener('blur', function() {
@@ -747,7 +763,7 @@
 
           if (val == "") return;
 
-          let num = parseFloat(val);
+          let num = parseFloat(val.replace(',', '.'));
           if (!isNaN(num)) {
             // Set value dengan 2 angka di belakang koma
             this.value = num.toFixed(2);
@@ -758,7 +774,7 @@
       });
 
       document.addEventListener('keydown', function(e) {
-        if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+        if (isInputNilai(e.target)) {
           // Daftar karakter yang dilarang (misalnya 'e', '+')
           if (['e', 'E', '+'].includes(e.key)) {
             e.preventDefault();
@@ -767,8 +783,8 @@
       });
 
       document.addEventListener('focus', function(e) {
-        // Pastikan yang difokus adalah input type="number"
-        if (e.target.tagName === 'INPUT' && e.target.type === 'number') {
+        // Pastikan yang difokus adalah input nilai
+        if (isInputNilai(e.target)) {
           // Gunakan setTimeout agar pemilihan teks terjadi setelah event fokus selesai
           setTimeout(() => {
             e.target.select();
@@ -838,7 +854,7 @@
           )];
           if (!inputs.length) return 0;
           // rata-rata dari semua sub yang terisi (kosong dianggap 0)
-          const total = inputs.reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+          const total = inputs.reduce((s, i) => s + parseNilai(i.value), 0);
           return total / inputs.length;
         }
 
@@ -849,7 +865,7 @@
           // 1. Komponen tanpa sub (input-komponen)
           document.querySelectorAll(`.input-komponen[data-nilai-id="${nilaiId}"]`).forEach(inp => {
             const bobot = parseFloat(inp.dataset.bobot) || 0;
-            const val = parseFloat(inp.value) || 0;
+            const val = parseNilai(inp.value);
             total += val * bobot / 100;
 
             // Sync ke elemen ringkasan (jika ada class ring)
@@ -899,13 +915,13 @@
               const nilaiId = el.dataset.nilaiId;
               if (!seen.has(nilaiId)) {
                 seen.add(nilaiId);
-                total += parseFloat(el.textContent) || 0;
+                total += parseNilai(el.textContent);
                 count++;
               }
             });
           } else {
             document.querySelectorAll('.input-nilai').forEach(i => {
-              total += parseFloat(i.value) || 0;
+              total += parseNilai(i.value);
               count++;
             });
           }
