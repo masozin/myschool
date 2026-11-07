@@ -44,7 +44,7 @@
           <select id="filter-tahun" class="form-select">
             <option value="">Semua Tahun Pelajaran</option>
             @foreach ($daftarTahunPelajaran as $tp)
-              <option value="{{ $tp }}">{{ $tp }}</option>
+              <option value="{{ $tp }}" {{ $tp === ($tahunPelajaranSesi ?? null) ? 'selected' : '' }}>{{ $tp }}</option>
             @endforeach
           </select>
           <small class="text-muted mt-1">

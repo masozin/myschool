@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\KalenderPendidikan;
 use App\Models\SekolahDetail;
 use App\Models\SekolahLogo;
+use App\Models\Semester;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -61,23 +62,38 @@ class KalenderPendidikanController extends Controller
 
   /**
    * Tampilkan halaman utama.
-   * Daftar tahun pelajaran untuk filter di-generate terprogram (rolling window),
-   * TIDAK bergantung pada tabel_semester — supaya kalender tahun ajaran depan
-   * tetap bisa disiapkan meski Semester untuk tahun itu belum "berjalan"/dibuat.
+   * Daftar tahun pelajaran untuk filter = gabungan tiga sumber,
+   * terurut menaik:
+   *  - tahun yang benar-benar ada di tabel_semester (termasuk
+   *    tahun sesi login — sumber lama hanya memakai jam dinding,
+   *    jadi tahun sesi yang lampau tidak pernah muncul);
+   *  - tahun yang sudah memiliki data kalender;
+   *  - jendela berjalan (tahun lalu s/d +2) supaya kalender
+   *    tahun ajaran depan tetap bisa disiapkan meski Semester
+   *    untuk tahun itu belum dibuat.
+   * Tahun pelajaran sesi login ditandai untuk dipilih otomatis.
    */
   public function index()
   {
-    $tahunSekarang = now()->year;
+    $dariSemester = Semester::query()->distinct()->pluck('tahun_pelajaran');
+    $dariData     = KalenderPendidikan::query()->distinct()->pluck('tahun_pelajaran');
+    $jendela      = collect(range(now()->year - 1, now()->year + 2))
+      ->map(fn($t) => $t . '/' . ($t + 1));
 
-    // Rentang -1 s/d +2 dari tahun berjalan, cukup luas untuk input kalender
-    // tahun ajaran depan sekaligus masih bisa lihat/edit tahun ajaran lalu.
-    $daftarTahunPelajaran = collect(range($tahunSekarang - 1, $tahunSekarang + 2))
-      ->map(fn($t) => $t . '/' . ($t + 1))
+    $daftarTahunPelajaran = $dariSemester
+      ->merge($dariData)
+      ->merge($jendela)
+      ->filter()
+      ->unique()
+      ->sort()
       ->values();
+
+    $semesterSesi = Semester::find(session('semester_id'));
 
     return view('content.kalender-pendidikan.index', [
       'daftarTahunPelajaran' => $daftarTahunPelajaran,
       'jenisKegiatan'        => self::JENIS_KEGIATAN,
+      'tahunPelajaranSesi'   => $semesterSesi?->tahun_pelajaran,
     ]);
   }
 

@@ -9,7 +9,6 @@ class KalenderPendidikan extends Model
 {
   use HasFactory;
 
-  // Sesuaikan kalau nama tabelmu berbeda.
   protected $table = 'kalender_pendidikan';
 
   protected $fillable = [

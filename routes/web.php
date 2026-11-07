@@ -518,7 +518,7 @@ Route::middleware(['fitur:elearning'])->group(function () {
 Route::controller(KalenderPendidikanController::class)
   ->prefix('kalender-pendidikan')
   ->name('kalender-pendidikan.')
-  ->middleware(['fitur:kaldik'])
+  ->middleware(['auth:sanctum', 'fitur:kaldik'])
   ->group(function () {
     Route::get('/cetak', 'cetak')->name('cetak');
     Route::get('/cetak-tabel', 'cetakTabel')->name('cetak-tabel');
