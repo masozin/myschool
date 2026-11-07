@@ -522,6 +522,8 @@ Route::controller(KalenderPendidikanController::class)
   ->group(function () {
     Route::get('/cetak', 'cetak')->name('cetak');
     Route::get('/cetak-tabel', 'cetakTabel')->name('cetak-tabel');
+    Route::get('/import/template', 'downloadTemplateImport')->name('import-template');
+    Route::post('/import', 'import')->name('import');
     Route::get('/', 'index')->name('index');
     Route::get('/tabel', 'tabel');
     Route::post('/', 'store');

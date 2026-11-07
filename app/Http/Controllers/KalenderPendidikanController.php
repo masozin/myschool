@@ -2,10 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\KalenderPendidikanImport;
 use App\Models\KalenderPendidikan;
 use App\Models\SekolahDetail;
 use App\Models\SekolahLogo;
 use App\Models\Semester;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\DataValidation;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -170,6 +177,119 @@ class KalenderPendidikanController extends Controller
 
     return response()->json([
       'message' => 'Kegiatan kalender berhasil dihapus',
+    ]);
+  }
+
+  /**
+   * GET /kalender-pendidikan/import/template
+   * Unduh template Excel untuk impor: tajuk + contoh terisi +
+   * daftar pilihan pada kolom Jenis dan Libur.
+   */
+  public function downloadTemplateImport()
+  {
+    $this->authorize('create', KalenderPendidikan::class);
+
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('Kalender Pendidikan');
+
+    $headers = ['Tanggal Mulai', 'Tanggal Selesai', 'Jenis', 'Libur', 'Kegiatan'];
+    foreach ($headers as $i => $label) {
+      $sheet->setCellValue([$i + 1, 1], $label);
+    }
+    $sheet->getStyle('A1:E1')->applyFromArray([
+      'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFFFF'], 'size' => 10],
+      'fill'      => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FF1A56A4']],
+      'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+    ]);
+
+    $contoh = [
+      ['2025-07-14', '2025-07-18', 'Lainnya', 'Tidak', 'Masa Pengenalan Lingkungan Sekolah (MPLS)'],
+      ['2025-08-17', '2025-08-17', 'Libur Nasional', 'Ya', 'Hari Kemerdekaan RI'],
+      ['2025-12-08', '2025-12-12', 'Penilaian', 'Tidak', 'Asesmen Sumatif Akhir Semester'],
+      ['2025-12-20', '2025-12-20', 'Pembagian Rapor', 'Tidak', 'Pembagian rapor semester ganjil'],
+    ];
+    foreach ($contoh as $r => $baris) {
+      foreach ($baris as $c => $nilai) {
+        $sheet->setCellValue([$c + 1, $r + 2], $nilai);
+      }
+      $sheet->getComment('A' . ($r + 2))->getText()
+        ->createTextRun('Baris contoh — boleh dihapus sebelum mengimpor.');
+    }
+    $sheet->getStyle('A2:B200')->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+
+    // Daftar pilihan untuk kolom Jenis (C) & Libur (D)
+    $validasiJenis = new DataValidation();
+    $validasiJenis->setType(DataValidation::TYPE_LIST)
+      ->setAllowBlank(true)
+      ->setShowDropDown(false)
+      ->setFormula1('"' . implode(',', self::JENIS_KEGIATAN) . '"');
+    $sheet->setDataValidation('C2:C200', $validasiJenis);
+
+    $validasiLibur = new DataValidation();
+    $validasiLibur->setType(DataValidation::TYPE_LIST)
+      ->setAllowBlank(true)
+      ->setShowDropDown(false)
+      ->setFormula1('"Ya,Tidak"');
+    $sheet->setDataValidation('D2:D200', $validasiLibur);
+
+    $sheet->getColumnDimension('A')->setWidth(14);
+    $sheet->getColumnDimension('B')->setWidth(14);
+    $sheet->getColumnDimension('C')->setWidth(24);
+    $sheet->getColumnDimension('D')->setWidth(9);
+    $sheet->getColumnDimension('E')->setWidth(52);
+    $sheet->freezePane('A2');
+
+    $petunjuk = $spreadsheet->createSheet();
+    $petunjuk->setTitle('Petunjuk');
+    $barisPetunjuk = [
+      'PETUNJUK IMPOR KALENDER PENDIDIKAN',
+      '',
+      '1. Tahun pelajaran TIDAK ditulis di file — diambil dari filter tahun yang aktif di halaman saat mengimpor.',
+      '2. Semua tanggal harus berada di dalam rentang tahun pelajaran itu (1 Juli tahun awal s/d 30 Juni tahun akhir).',
+      '3. Tanggal Selesai boleh dikosongkan bila kegiatan hanya satu hari.',
+      '4. Jenis harus salah satu dari: ' . implode(', ', self::JENIS_KEGIATAN) . '.',
+      '5. Kolom Libur diisi Ya atau Tidak.',
+      '6. Baris yang sama persis dengan data yang sudah ada akan dilewati (tidak diduplikat).',
+      '7. Baris contoh pada lembar pertama boleh dihapus sebelum mengimpor.',
+    ];
+    foreach ($barisPetunjuk as $i => $teks) {
+      $petunjuk->setCellValue([1, $i + 1], $teks);
+    }
+    $petunjuk->getColumnDimension('A')->setWidth(120);
+
+    $spreadsheet->setActiveSheetIndex(0);
+
+    $writer = new XlsxWriter($spreadsheet);
+
+    return response()->streamDownload(function () use ($writer) {
+      $writer->save('php://output');
+    }, 'template-impor-kalender-pendidikan.xlsx', [
+      'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]);
+  }
+
+  /**
+   * POST /kalender-pendidikan/import
+   * Tahun pelajaran dari filter aktif (dikirim form), bukan dari file.
+   */
+  public function import(Request $request)
+  {
+    $this->authorize('create', KalenderPendidikan::class);
+
+    $request->validate([
+      'file_excel'      => 'required|file|mimes:xlsx,xls|max:5120',
+      'tahun_pelajaran' => ['required', 'string', 'regex:/^\d{4}\/\d{4}$/'],
+    ]);
+
+    $import = new KalenderPendidikanImport($request->tahun_pelajaran);
+    Excel::import($import, $request->file('file_excel'));
+
+    return response()->json([
+      'message'   => "Impor selesai. {$import->berhasil} kegiatan ditambahkan, {$import->dilewati} dilewati (duplikat).",
+      'berhasil'  => $import->berhasil,
+      'dilewati'  => $import->dilewati,
+      'errors'    => $import->errors,
     ]);
   }
 

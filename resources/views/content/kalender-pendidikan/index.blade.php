@@ -78,6 +78,12 @@
           <i class="ri ri-file-pdf-2-line me-1"></i> <span class="d-none d-sm-inline-block">Download PDF</span>
         </button>
         @can('create', App\Models\KalenderPendidikan::class)
+          <button id="btn-import-kalender" type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal"
+            data-bs-target="#modal-import-kalender">
+            <i class="ri ri-file-excel-line me-1"></i> <span class="d-none d-sm-inline-block">Import Excel</span>
+          </button>
+        @endcan
+        @can('create', App\Models\KalenderPendidikan::class)
           <button id="btn-tambah-kalender" type="button" class="btn btn-primary btn-sm">
             <i class="ri ri-add-line me-1"></i> <span class="d-none d-sm-inline-block">Tambah Kegiatan</span>
           </button>
@@ -131,6 +137,43 @@
       </div>
     </div>
 
+  </div>
+
+  {{-- =========================================================== --}}
+  {{-- MODAL: Import Excel                                          --}}
+  {{-- =========================================================== --}}
+  <div class="modal fade" id="modal-import-kalender" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="ri ri-file-excel-line me-2 text-success"></i>Import Kalender dari Excel</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info small mb-3">
+            Tahun pelajaran mengikuti filter yang aktif: <strong id="import-info-tahun">—</strong>.
+            Semua tanggal di file harus berada dalam rentang tahun itu.
+          </div>
+          <div class="mb-3">
+            <a href="{{ route('kalender-pendidikan.import-template') }}" class="btn btn-outline-primary btn-sm">
+              <i class="ri ri-download-line me-1"></i> Download Template
+            </a>
+          </div>
+          <label class="form-label" for="file-import-kalender">File Excel (.xlsx / .xls)</label>
+          <input type="file" id="file-import-kalender" class="form-control" accept=".xlsx,.xls">
+          <div class="form-text">
+            Kolom: Tanggal Mulai, Tanggal Selesai, Jenis, Libur (Ya/Tidak), Kegiatan.
+            Baris duplikat dilewati; baris yang tidak valid dilaporkan, sisanya tetap diimpor.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-success" id="btn-proses-import">
+            <i class="ri ri-upload-line me-1"></i> Import
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <style>
@@ -892,6 +935,80 @@
           tempat: tempatTtd
         });
         window.location.href = `${rute}?${params.toString()}`;
+      });
+
+      // ── Import Excel ────────────────────────────────────────────────────────
+      const modalImport = document.getElementById('modal-import-kalender');
+      modalImport?.addEventListener('show.bs.modal', function() {
+        document.getElementById('import-info-tahun').textContent = filterTahun.value || '(belum dipilih)';
+        document.getElementById('file-import-kalender').value = '';
+      });
+
+      document.getElementById('btn-proses-import')?.addEventListener('click', async function() {
+        if (!filterTahun.value) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Pilih tahun pelajaran dulu',
+            text: 'Silakan pilih tahun pelajaran pada filter di atas sebelum mengimpor.'
+          });
+          return;
+        }
+
+        const fileInput = document.getElementById('file-import-kalender');
+        if (!fileInput.files.length) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'File belum dipilih',
+            text: 'Pilih file Excel yang akan diimpor.'
+          });
+          return;
+        }
+
+        const formData = new FormData();
+        formData.set('file_excel', fileInput.files[0]);
+        formData.set('tahun_pelajaran', filterTahun.value);
+
+        const btn = this;
+        const ikonAsli = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Mengimpor...';
+
+        try {
+          const response = await fetch('/kalender-pendidikan/import', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json'
+            }
+          });
+          const res = await response.json();
+          if (!response.ok) throw new Error(res.message || 'Gagal mengimpor file');
+
+          bootstrap.Modal.getInstance(modalImport)?.hide();
+
+          let html = `<p>${res.message}</p>`;
+          if (res.errors && res.errors.length) {
+            html += '<ul style="text-align:left">' + res.errors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+          }
+          await Swal.fire({
+            icon: res.errors && res.errors.length ? 'warning' : 'success',
+            title: 'Import Selesai',
+            html
+          });
+
+          await loadTabelKalender();
+        } catch (err) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Import Gagal',
+            text: err.message
+          });
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = ikonAsli;
+        }
       });
 
       loadTabelKalender();
