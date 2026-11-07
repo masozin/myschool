@@ -16,8 +16,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int         $sekolah_id
  * @property int         $semester_id
  * @property string|null $nomor_skl
- * @property \Carbon\Carbon|null $tanggal_terbit
- * @property string      $mode_input   jadi | manual
  * @property string      $status       draft | pengajuan | disetujui | ditolak
  * @property string|null $catatan
  * @property \Carbon\Carbon|null $generated_at
@@ -32,8 +30,6 @@ class Skl extends Model
     'sekolah_id',
     'semester_id',
     'nomor_skl',
-    'tanggal_terbit',
-    'mode_input',
     'status',
     'catatan',
     'generated_at',
@@ -46,7 +42,6 @@ class Skl extends Model
   ];
 
   protected $casts = [
-    'tanggal_terbit' => 'date',
     'generated_at'   => 'datetime',
     'snapshot_tgl_lahir' => 'date',
     'siswa_id'       => 'integer',
@@ -151,6 +146,37 @@ class Skl extends Model
   // Diisi saat SKL disetujui, dikosongkan saat persetujuan dibatalkan
   // atau SKL ditolak. Accessor *Cetak dipakai template cetak: membaca
   // snapshot bila ada, jatuh ke data induk bila belum ada.
+
+  // ── Konfigurasi angkatan ─────────────────────────────────────────
+  // Mode input dan tanggal terbit adalah milik konfigurasi SKL
+  // (tabel_skl_konfigurasi), bukan baris SKL. Accessor ini
+  // mempertahankannya terbaca sebagai atribut SKL
+  // ($skl->mode_input, $skl->tanggal_terbit) untuk form & cetakan.
+
+  private ?SklKonfigurasi $konfigurasiCache = null;
+  private bool $konfigurasiDimuat = false;
+
+  public function konfigurasi(): ?SklKonfigurasi
+  {
+    if (!$this->konfigurasiDimuat) {
+      $this->konfigurasiCache = ($this->sekolah_id && $this->semester_id)
+        ? SklKonfigurasi::untukSekolah((int) $this->sekolah_id, (int) $this->semester_id)
+        : null;
+      $this->konfigurasiDimuat = true;
+    }
+
+    return $this->konfigurasiCache;
+  }
+
+  public function getModeInputAttribute(): string
+  {
+    return $this->konfigurasi()?->mode_input ?? 'jadi';
+  }
+
+  public function getTanggalTerbitAttribute()
+  {
+    return $this->konfigurasi()?->tanggal_terbit;
+  }
 
   public function isiSnapshotIdentitas(): void
   {

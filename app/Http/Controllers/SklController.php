@@ -411,7 +411,6 @@ class SklController extends Controller
         'siswa_id'    => $request->siswa_id,
         'sekolah_id'  => $sekolahId,
         'semester_id' => $semesterId,
-        'mode_input'  => $modeInput,
         'status'      => 'draft',
       ]);
 
@@ -513,9 +512,10 @@ class SklController extends Controller
   {
     abort_if(!in_array($skl->status, ['draft', 'ditolak', 'disetujui']), 403);
 
+    // Tanggal terbit tidak lagi per siswa — ia milik konfigurasi
+    // angkatan dan diatur di halaman Tanggal & Penomoran
     $data = $request->validate([
-      'nomor_skl'      => 'nullable|string|max:100',
-      'tanggal_terbit' => 'nullable|date',
+      'nomor_skl' => 'nullable|string|max:100',
     ]);
 
     $skl->update($data);
@@ -708,11 +708,9 @@ class SklController extends Controller
   public function generateNomor(Skl $skl)
   {
     $sekolahId  = $this->getSekolahId();
-    $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) Semester::smtIdKelulusan());
-
-    // Format: {prefix}/{urutan}/{bulan}/{tahun}
+    // Format: SKL/{urutan}/{bulan-romawi}/{tahun}
     // Contoh: SKL/001/VI/2025
-    $prefix  = $konfigurasi->prefix_nomor ?? 'SKL';
+    $prefix  = 'SKL';
     $tahun   = now()->year;
     $bulan   = strtoupper(\Carbon\Carbon::now()->isoFormat('MMMM'));
 
@@ -745,7 +743,6 @@ class SklController extends Controller
       'semester'    => $data['semester'],
       'baris'       => $data['baris'],
       'konfigurasi' => $konfigurasi,
-      'prefix'      => $konfigurasi->prefix_nomor ?? 'SKL',
     ]);
   }
 
@@ -761,29 +758,24 @@ class SklController extends Controller
       'timpa'           => 'nullable|boolean',
       'tanggal_terbit'  => 'nullable|date',
       'tempat_terbit'   => 'nullable|string|max:100',
-      'prefix_nomor'    => 'nullable|string|max:20',
     ]);
 
     ['sekolahId' => $sekolahId, 'semester' => $semester, 'baris' => $baris]
       = $this->dataPengaturanNomor();
 
-    // Tempat terbit, tanggal terbit default, dan prefix kini tinggal
-    // di halaman ini (Konfigurasi SKL hanya memilih mode input):
-    // simpan ke konfigurasi lebih dulu, lalu pakai untuk generate
+    // Tempat terbit dan tanggal terbit kini tinggal di halaman ini
+    // (Konfigurasi SKL hanya memilih mode input): simpan ke
+    // konfigurasi lebih dulu, lalu pakai untuk generate
     $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) $semester->id);
 
     if (array_key_exists('tempat_terbit', $data)) {
       $konfigurasi->tempat_terbit = $data['tempat_terbit'] ?: null;
-    }
-    if (!empty($data['prefix_nomor'])) {
-      $konfigurasi->prefix_nomor = $data['prefix_nomor'];
     }
     if (!empty($data['tanggal_terbit'])) {
       $konfigurasi->tanggal_terbit = $data['tanggal_terbit'];
     }
     $konfigurasi->save();
 
-    $prefix      = $konfigurasi->prefix_nomor ?? 'SKL';
     $timpa       = !empty($data['timpa']);
 
     $terurut = $this->urutkanBarisNomor($baris, $data['urutan'], !empty($data['kelompok_rombel']));
@@ -799,8 +791,7 @@ class SklController extends Controller
         $hasil[$b['skl']->id] = $this->formatNomorSkl(
           $data['pola_nomor'],
           $data['nomor_awal'] + $i,
-          $tahun,
-          $prefix
+          $tahun
         );
       }
     }
@@ -838,13 +829,9 @@ class SklController extends Controller
           continue;
         }
 
-        $update = ['nomor_skl' => $hasil[$skl->id]];
-
-        if (!empty($data['tanggal_terbit'])) {
-          $update['tanggal_terbit'] = $data['tanggal_terbit'];
-        }
-
-        $skl->update($update);
+        // Tanggal terbit tidak ditulis ke baris SKL — ia sudah
+        // tersimpan di konfigurasi angkatan di atas
+        $skl->update(['nomor_skl' => $hasil[$skl->id]]);
         $terisi++;
       }
     });
@@ -907,7 +894,7 @@ class SklController extends Controller
     })->values();
   }
 
-  private function formatNomorSkl(string $pola, int $nomorUrut, int $tahun, string $prefix): string
+  private function formatNomorSkl(string $pola, int $nomorUrut, int $tahun): string
   {
     $hasil = preg_replace_callback(
       '/\{no(?::(\d+)|;(\d+))?\}/',
@@ -920,11 +907,7 @@ class SklController extends Controller
       $pola
     );
 
-    return str_replace(
-      ['{tahun}', '{prefix}'],
-      [(string) $tahun, $prefix],
-      $hasil
-    );
+    return str_replace('{tahun}', (string) $tahun, $hasil);
   }
 
   // ── Sinkronisasi Struktur & Perhitungan Ulang Nilai SKL ─────────────────
@@ -1627,11 +1610,6 @@ class SklController extends Controller
       ->where('sekolah_id', $sekolah->id)
       ->findOrFail($sklId);
 
-    // Update timestamp generated_at jika kolomnya tersedia di database Anda
-    if (Schema::hasColumn('skls', 'generated_at')) {
-      $skl->update(['generated_at' => now()]);
-    }
-
     // Tetap buat QR Code agar hasil download resmi memiliki QR Code
     $urlCekSkl = route('api.skl', ['nisn' => $skl->siswa->nisn]);
     $options   = new QROptions(['version' => 5, 'outputType' => 'svg', 'eccLevel' => 1, 'scale' => 10, 'imageBase64' => true]);
@@ -1695,10 +1673,6 @@ class SklController extends Controller
     $zip->open($zipPath, ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
     foreach ($skls as $skl) {
-      if (\Schema::hasColumn('skls', 'generated_at')) {
-        $skl->update(['generated_at' => now()]);
-      }
-
       $urlCekSkl = route('api.skl', ['nisn' => $skl->siswa->nisn]);
       $options   = new QROptions(['version' => 5, 'outputType' => 'svg', 'eccLevel' => 1, 'scale' => 10, 'imageBase64' => true]);
       $qrCodeBase64 = (new QRCode($options))->render($urlCekSkl);

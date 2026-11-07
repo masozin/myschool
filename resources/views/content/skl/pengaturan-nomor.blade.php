@@ -39,12 +39,6 @@
             <div class="form-text">Diterapkan ke semua SKL yang belum disetujui, dan disimpan sebagai tanggal
               default. Kosongkan bila tidak ingin mengubah tanggal.</div>
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Prefix Nomor</label>
-            <input type="text" name="prefix_nomor" id="input-prefix" class="form-control"
-              value="{{ $prefix }}">
-            <div class="form-text">Dipakai penanda <code>{prefix}</code> pada pola nomor.</div>
-          </div>
         </div>
 
         <hr>
@@ -54,11 +48,11 @@
           <div class="col-md-5">
             <label class="form-label fw-semibold">Pola Nomor</label>
             <input type="text" name="pola_nomor" id="input-pola" class="form-control"
-              value="{prefix}/{no:3}/{tahun}">
+              value="SKL/{no:3}/{tahun}">
             <div class="form-text">
               Penanda: <code>{no}</code> nomor urut, <code>{no:3}</code> atau <code>{no;3}</code> urut dengan nol di
-              depan (3 digit), <code>{tahun}</code> tahun tanggal terbit, <code>{prefix}</code> awalan dari
-              isian Prefix Nomor di atas. Contoh hasil: <code>SKL/007/{{ now()->year }}</code>
+              depan (3 digit), <code>{tahun}</code> tahun tanggal terbit. Teks lain di luar penanda tercetak
+              apa adanya — awalan seperti "SKL" cukup ditulis langsung di pola. Contoh hasil: <code>SKL/007/{{ now()->year }}</code>
             </div>
           </div>
           <div class="col-md-2">
@@ -156,7 +150,6 @@
     const inputTanggal = document.getElementById('input-tanggal');
     const inputTimpa = document.getElementById('input-timpa');
     const inputKelompok = document.getElementById('input-kelompok');
-    const inputPrefix = document.getElementById('input-prefix');
 
     function formatNomor(pola, urut, tahun) {
       return pola
@@ -164,8 +157,7 @@
           const lebar = parseInt(a ?? b ?? '0', 10);
           return String(urut).padStart(lebar, '0');
         })
-        .replaceAll('{tahun}', String(tahun))
-        .replaceAll('{prefix}', inputPrefix.value.trim() || 'SKL');
+        .replaceAll('{tahun}', String(tahun));
     }
 
     function renderPratinjau() {
@@ -212,7 +204,7 @@
       }).join('');
     }
 
-    [inputPola, inputAwal, inputTanggal, inputTimpa, inputKelompok, inputPrefix].forEach(el =>
+    [inputPola, inputAwal, inputTanggal, inputTimpa, inputKelompok].forEach(el =>
       el.addEventListener('input', renderPratinjau));
     document.querySelectorAll('input[name="urutan"]').forEach(el =>
       el.addEventListener('change', renderPratinjau));
@@ -239,7 +231,6 @@
           timpa: inputTimpa.checked,
           tanggal_terbit: inputTanggal.value || null,
           tempat_terbit: document.getElementById('input-tempat').value.trim(),
-          prefix_nomor: inputPrefix.value.trim() || null,
         }),
       });
       const data = await res.json();

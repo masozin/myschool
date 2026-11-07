@@ -89,8 +89,7 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
           'semester_id' => $this->semesterId,
         ],
         [
-          'mode_input' => $this->modeInput,
-          'status'     => 'draft',
+          'status' => 'draft',
         ]
       );
 

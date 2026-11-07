@@ -451,16 +451,10 @@
             </div>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Tanggal Terbit</label>
-            <input type="date" id="input-tanggal-skl" class="form-control">
-            <div class="form-text">
-              @if ($konfigurasi?->tanggal_terbit ?? 'Tempat terbit belum diatur')
-                Default dari konfigurasi: {{ $konfigurasi?->tanggal_terbit?->translatedFormat('d F Y') }}
-              @else
-                Tanggal terbit SKL (opsional).
-              @endif
-            </div>
+          <div class="form-text">
+            Tanggal terbit mengikuti konfigurasi angkatan
+            ({{ $konfigurasi?->tanggal_terbit?->translatedFormat('d F Y') ?? 'belum diatur' }}) —
+            ubah di halaman Tanggal &amp; Penomoran.
           </div>
         </div>
         <div class="modal-footer">
@@ -827,15 +821,12 @@
       let nomorSklId = null;
       const modalNomor = new bootstrap.Modal(document.getElementById('modal-nomor-skl'));
       const inputNomor = document.getElementById('input-nomor-skl');
-      const inputTanggal = document.getElementById('input-tanggal-skl');
-      const defaultTanggal = '{{ $konfigurasi?->tanggal_terbit?->format('Y-m-d') ?? 'Tanggal SKL belum diatur' }}';
 
       document.addEventListener('click', function(e) {
         const btn = e.target.closest('.btn-nomor-skl');
         if (!btn) return;
         nomorSklId = btn.dataset.id;
         inputNomor.value = btn.dataset.nomor || '';
-        inputTanggal.value = btn.dataset.tanggal || defaultTanggal;
         document.getElementById('nomor-skl-nama-siswa').textContent = 'Siswa: ' + btn.dataset.nama;
         modalNomor.show();
       });
@@ -856,7 +847,6 @@
         this.disabled = true;
         const res = await apiFetch(`/skl/${nomorSklId}/nomor`, {
           nomor_skl: inputNomor.value,
-          tanggal_terbit: inputTanggal.value,
         }, 'PUT');
         const data = await res.json();
         this.disabled = false;

@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
  * @property bool   $is_terkunci   dikunci setelah SKL pertama dibuat (hanya mode_input)
  * @property string|null $tempat_terbit   Kota/tempat penerbitan SKL
  * @property \Carbon\Carbon|null $tanggal_terbit  Tanggal terbit default untuk SKL
- * @property string|null $prefix_nomor    Prefix nomor SKL, misal: "SKL"
  */
 class SklKonfigurasi extends Model
 {
@@ -30,7 +29,6 @@ class SklKonfigurasi extends Model
     'is_terkunci',
     'tempat_terbit',
     'tanggal_terbit',
-    'prefix_nomor',
   ];
 
   protected $casts = [
@@ -61,7 +59,7 @@ class SklKonfigurasi extends Model
 
   /**
    * Ambil atau buat konfigurasi default.
-   * Default: mode jadi, belum terkunci, prefix SKL.
+   * Default: mode jadi, belum terkunci.
    */
   public static function firstOrDefault(int $sekolahId, int $semesterId): static
   {
@@ -73,7 +71,6 @@ class SklKonfigurasi extends Model
       [
         'mode_input'    => 'jadi',
         'is_terkunci'   => false,
-        'prefix_nomor'  => 'SKL',
         'tempat_terbit' => null,
         'tanggal_terbit' => null,
       ]
