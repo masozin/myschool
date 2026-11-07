@@ -43,9 +43,9 @@ class SklKomponen extends Model
     return $this->belongsTo(Semester::class);
   }
 
-  public function subKomponen(): HasMany
+  public function komponenSub(): HasMany
   {
-    return $this->hasMany(SklSubKomponen::class, 'komponen_id')->orderBy('urutan');
+    return $this->hasMany(SklKomponenSub::class, 'komponen_id')->orderBy('urutan');
   }
 
   public function nilaiKomponen(): HasMany
@@ -70,7 +70,7 @@ class SklKomponen extends Model
 
   public function punyaSub(): bool
   {
-    return $this->subKomponen()->exists();
+    return $this->komponenSub()->exists();
   }
 
   /** Total bobot semua komponen untuk semester + jenjang tertentu. */

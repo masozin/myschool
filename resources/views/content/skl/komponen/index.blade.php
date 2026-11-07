@@ -139,7 +139,7 @@
                 </td>
                 <td class="text-muted small">{{ $komp->keterangan ?? '-' }}</td>
                 <td>
-                  @php $subCount = $komp->subKomponen->count(); @endphp
+                  @php $subCount = $komp->komponenSub->count(); @endphp
                   @if ($subCount > 0)
                     <a href="{{ route('skl.komponen.sub.index', $komp) }}"
                       class="badge bg-label-info text-decoration-none">

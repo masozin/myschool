@@ -414,7 +414,7 @@
                 {{-- Tab content komponen --}}
                 <div class="tab-content" id="content-komponen">
                   @foreach ($komponenHeaders as $ki => $komp)
-                    @php $subHeaders = $komp->subKomponen ?? collect(); @endphp
+                    @php $subHeaders = $komp->komponenSub ?? collect(); @endphp
 
                     <div class="tab-pane fade {{ $ki === 0 ? 'show active' : '' }}" id="panel-k{{ $komp->id }}"
                       role="tabpanel">
@@ -535,9 +535,9 @@
                                         @foreach ($items as $sklNilai)
                                           @php
                                             $kn = $sklNilai->komponens->firstWhere('komponen_id', $komp->id);
-                                            $nsk = $kn?->nilaiSubKomponen->firstWhere('sub_komponen_id', $sub->id);
+                                            $nsk = $kn?->nilaiKomponenSub->firstWhere('komponen_sub_id', $sub->id);
                                             $rataSub = $kn
-                                                ? $kn->nilaiSubKomponen->whereNotNull('nilai')->avg('nilai')
+                                                ? $kn->nilaiKomponenSub->whereNotNull('nilai')->avg('nilai')
                                                 : null;
                                           @endphp
                                           <tr>

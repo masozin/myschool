@@ -34,7 +34,7 @@ class SklKomponenController extends Controller
     $semester = $this->getSemester();
     $jenjang  = $request->get('jenjang', 'SD');
 
-    $komponens  = SklKomponen::untuk($semester->id, $jenjang)->with('subKomponen')->get();
+    $komponens  = SklKomponen::untuk($semester->id, $jenjang)->with('komponenSub')->get();
     $totalBobot = SklKomponen::totalBobot($semester->id, $jenjang);
 
     return view('content.skl.komponen.index', compact(

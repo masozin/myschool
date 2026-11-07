@@ -3,35 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\SklKomponen;
-use App\Models\SklSubKomponen;
+use App\Models\SklKomponenSub;
 use Illuminate\Http\Request;
 
 /**
  * Kelola sub-komponen dari sebuah komponen nilai SKL.
  * Diakses hanya oleh Admin.
  */
-class SklSubKomponenController extends Controller
+class SklKomponenSubController extends Controller
 {
   public function index(SklKomponen $komponen)
   {
-    $subKomponen = $komponen->subKomponen()->orderBy('urutan')->get();
+    $komponenSub = $komponen->komponenSub()->orderBy('urutan')->get();
 
-    return view('content.skl.komponen.sub', compact('komponen', 'subKomponen'));
+    return view('content.skl.komponen.sub', compact('komponen', 'komponenSub'));
   }
 
   public function store(Request $request, SklKomponen $komponen)
   {
     $data = $request->validate([
-      'label'  => 'required|string|max:100',
-      'urutan' => 'required|integer|min:0',
+      'label'      => 'required|string|max:100',
+      'keterangan' => 'nullable|string|max:100',
+      'urutan'     => 'required|integer|min:0',
     ]);
 
-    $sub = $komponen->subKomponen()->create($data);
+    $sub = $komponen->komponenSub()->create($data);
 
     if ($request->expectsJson()) {
       return response()->json([
         'message'      => 'Sub-komponen berhasil ditambahkan.',
-        'sub_komponen' => $sub,
+        'komponen_sub' => $sub,
       ]);
     }
 
@@ -40,11 +41,12 @@ class SklSubKomponenController extends Controller
       ->with('success', 'Sub-komponen berhasil ditambahkan.');
   }
 
-  public function update(Request $request, SklKomponen $komponen, SklSubKomponen $sub)
+  public function update(Request $request, SklKomponen $komponen, SklKomponenSub $sub)
   {
     $data = $request->validate([
-      'label'  => 'required|string|max:100',
-      'urutan' => 'required|integer|min:0',
+      'label'      => 'required|string|max:100',
+      'keterangan' => 'nullable|string|max:100',
+      'urutan'     => 'required|integer|min:0',
     ]);
 
     $sub->update($data);
@@ -58,7 +60,7 @@ class SklSubKomponenController extends Controller
       ->with('success', 'Sub-komponen berhasil diperbarui.');
   }
 
-  public function destroy(SklKomponen $komponen, SklSubKomponen $sub)
+  public function destroy(SklKomponen $komponen, SklKomponenSub $sub)
   {
     $sub->delete();
 

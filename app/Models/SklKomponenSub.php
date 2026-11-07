@@ -7,11 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class SklSubKomponen extends Model
+/**
+ * Sub-komponen nilai SKL (dulu SklSubKomponen / tabel_skl_sub_komponen;
+ * diganti nama mengikuti pola induk-dulu: skl_komponen_sub).
+ */
+class SklKomponenSub extends Model
 {
   use HasFactory;
 
-  protected $table    = 'tabel_skl_sub_komponen';
+  protected $table    = 'tabel_skl_komponen_sub';
   protected $fillable = ['komponen_id', 'label', 'keterangan', 'urutan'];
 
   public function komponen(): BelongsTo
@@ -19,8 +23,8 @@ class SklSubKomponen extends Model
     return $this->belongsTo(SklKomponen::class, 'komponen_id');
   }
 
-  public function nilaiSubKomponen(): HasMany
+  public function nilaiKomponenSub(): HasMany
   {
-    return $this->hasMany(SklNilaiSubKomponen::class, 'sub_komponen_id');
+    return $this->hasMany(SklNilaiKomponenSub::class, 'komponen_sub_id');
   }
 }

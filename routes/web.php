@@ -24,7 +24,7 @@ use App\Http\Controllers\SkhuController;
 use App\Http\Controllers\SklController;
 use App\Http\Controllers\SklKomponenController;
 use App\Http\Controllers\SklKonfigurasiController;
-use App\Http\Controllers\SklSubKomponenController;
+use App\Http\Controllers\SklKomponenSubController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidasiKelulusan;
 use App\Http\Controllers\WaliKelasController;
@@ -323,10 +323,10 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::delete('/{komponen}', 'destroy')->name('destroy');
 
       // Sub-komponen (nested resource)
-      Route::get('/{komponen}/sub', [SklSubKomponenController::class, 'index'])->name('sub.index');
-      Route::post('/{komponen}/sub', [SklSubKomponenController::class, 'store'])->name('sub.store');
-      Route::put('/{komponen}/sub/{sub}', [SklSubKomponenController::class, 'update'])->name('sub.update');
-      Route::delete('/{komponen}/sub/{sub}', [SklSubKomponenController::class, 'destroy'])->name('sub.destroy');
+      Route::get('/{komponen}/sub', [SklKomponenSubController::class, 'index'])->name('sub.index');
+      Route::post('/{komponen}/sub', [SklKomponenSubController::class, 'store'])->name('sub.store');
+      Route::put('/{komponen}/sub/{sub}', [SklKomponenSubController::class, 'update'])->name('sub.update');
+      Route::delete('/{komponen}/sub/{sub}', [SklKomponenSubController::class, 'destroy'])->name('sub.destroy');
     });
 
   // SKL - Persetujuan (Kepala Sekolah)

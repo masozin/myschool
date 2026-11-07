@@ -79,7 +79,7 @@ class Skl extends Model
   public function nilaisLengkap()
   {
     return $this->nilais()
-      ->with('mapelMapping.masterMapel.kelompok', 'mapelMapping.kelompok', 'komponens.komponen.subKomponen', 'komponens.nilaiSubKomponen')
+      ->with('mapelMapping.masterMapel.kelompok', 'mapelMapping.kelompok', 'komponens.komponen.komponenSub', 'komponens.nilaiKomponenSub')
       ->get();
   }
 

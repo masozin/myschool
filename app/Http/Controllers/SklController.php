@@ -13,7 +13,7 @@ use App\Models\SklKomponen;
 use App\Models\SklKonfigurasi;
 use App\Models\SklNilai;
 use App\Models\SklNilaiKomponen;
-use App\Models\SklNilaiSubKomponen;
+use App\Models\SklNilaiKomponenSub;
 use App\Models\SklTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
 use chillerlan\QRCode\QRCode;
@@ -232,8 +232,8 @@ class SklController extends Controller
     // Ambil SKL yang sudah ada untuk semester & sekolah ini (Eager Loading tingkat mendalam)
     $sklExisting = Skl::with([
       'siswa',
-      'nilais.komponens.komponen.subKomponen',
-      'nilais.komponens.nilaiSubKomponen'
+      'nilais.komponens.komponen.komponenSub',
+      'nilais.komponens.nilaiKomponenSub'
     ])
       ->where('sekolah_id', $sekolahId)
       ->where('semester_id', $semesterId)
@@ -363,7 +363,7 @@ class SklController extends Controller
     $komponens = collect();
     if ($modeInput === 'manual') {
       $komponens = SklKomponen::untuk((int) $semesterId, $jenjang)
-        ->with('subKomponen')
+        ->with('komponenSub')
         ->get();
 
       // B1. Apakah komponen sudah dibuat?
@@ -432,10 +432,10 @@ class SklController extends Controller
               'nilai'        => null,
             ]);
 
-            foreach ($komponen->subKomponen as $sub) {
-              SklNilaiSubKomponen::create([
+            foreach ($komponen->komponenSub as $sub) {
+              SklNilaiKomponenSub::create([
                 'skl_nilai_komponen_id' => $sklNilaiKomponen->id,
-                'sub_komponen_id'       => $sub->id,
+                'komponen_sub_id'       => $sub->id,
                 'nilai'                 => null,
               ]);
             }
@@ -955,7 +955,7 @@ class SklController extends Controller
     // 3. Ambil Master Komponen Terbaru
     $komponens = collect();
     if ($modeInput === 'manual') {
-      $komponens = SklKomponen::untuk((int) $semesterId, $jenjang)->with('subKomponen')->get();
+      $komponens = SklKomponen::untuk((int) $semesterId, $jenjang)->with('komponenSub')->get();
 
       // Validasi total bobot wajib 100%
       if ($komponens->sum('bobot') != 100) {
@@ -997,10 +997,10 @@ class SklController extends Controller
                   'nilai'        => null,
                 ]);
 
-                foreach ($komponen->subKomponen as $sub) {
-                  SklNilaiSubKomponen::create([
+                foreach ($komponen->komponenSub as $sub) {
+                  SklNilaiKomponenSub::create([
                     'skl_nilai_komponen_id' => $sklNilaiKomponen->id,
-                    'sub_komponen_id'       => $sub->id,
+                    'komponen_sub_id'       => $sub->id,
                     'nilai'                 => null,
                   ]);
                 }
@@ -1029,17 +1029,17 @@ class SklController extends Controller
                 'komponen_id'  => $komponen->id,
               ]);
 
-              foreach ($komponen->subKomponen as $sub) {
-                SklNilaiSubKomponen::firstOrCreate([
+              foreach ($komponen->komponenSub as $sub) {
+                SklNilaiKomponenSub::firstOrCreate([
                   'skl_nilai_komponen_id' => $kn->id,
-                  'sub_komponen_id'       => $sub->id,
+                  'komponen_sub_id'       => $sub->id,
                 ]);
               }
             }
 
             // Jalankan perhitungan ulang secara sekuensial memanfaatkan method pembantu yang sudah Anda buat
             foreach ($sklNilai->komponens as $kn) {
-              if ($kn->komponen->subKomponen->isNotEmpty()) {
+              if ($kn->komponen->komponenSub->isNotEmpty()) {
                 $kn->refresh()->hitungDariSub();
               }
             }
@@ -1091,9 +1091,9 @@ class SklController extends Controller
     $rules = [];
     foreach ($skl->nilais as $sklNilai) {
       foreach ($sklNilai->komponens as $kn) {
-        if ($kn->komponen->subKomponen->isNotEmpty()) {
-          foreach ($kn->nilaiSubKomponen as $nsk) {
-            $rules["sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->sub_komponen_id}"]
+        if ($kn->komponen->komponenSub->isNotEmpty()) {
+          foreach ($kn->nilaiKomponenSub as $nsk) {
+            $rules["sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->komponen_sub_id}"]
               = 'nullable|numeric|min:0|max:100';
           }
         } else {
@@ -1106,11 +1106,11 @@ class SklController extends Controller
 
     foreach ($skl->nilais as $sklNilai) {
       foreach ($sklNilai->komponens as $kn) {
-        if ($kn->komponen->subKomponen->isNotEmpty()) {
-          foreach ($kn->nilaiSubKomponen as $nsk) {
+        if ($kn->komponen->komponenSub->isNotEmpty()) {
+          foreach ($kn->nilaiKomponenSub as $nsk) {
             $nsk->update([
               'nilai' => $request->input(
-                "sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->sub_komponen_id}"
+                "sub.{$sklNilai->id}.{$kn->komponen_id}.{$nsk->komponen_sub_id}"
               ),
             ]);
           }
@@ -1231,7 +1231,7 @@ class SklController extends Controller
       // MODE MANUAL: Multi-Sheet berdasarkan Master Komponen Nilai SKL
       $komponens = SklKomponen::where('semester_id', $semester->id)
         ->where('jenjang', $jenjang)
-        ->with('subKomponen')
+        ->with('komponenSub')
         ->get();
 
       if ($komponens->isEmpty()) {
@@ -1320,9 +1320,9 @@ class SklController extends Controller
     $sheet->setCellValue('E1', 'nomor_skl');
 
     $col = 6;
-    if ($komponen->subKomponen->isNotEmpty()) {
+    if ($komponen->komponenSub->isNotEmpty()) {
       // LOOP 1: Sub-Komponen diletakkan di atas (Baris 2)
-      foreach ($komponen->subKomponen as $sub) {
+      foreach ($komponen->komponenSub as $sub) {
         $startCol = $col;
 
         // LOOP 2: Mapel diletakkan di bawahnya (Baris 3)
@@ -1512,7 +1512,7 @@ class SklController extends Controller
     $komponens = collect();
     if ($modeInput === 'manual') {
       $komponens = SklKomponen::untuk((int) $semesterId, $jenjang)
-        ->with('subKomponen')
+        ->with('komponenSub')
         ->get();
 
       // B1. Apakah komponen sudah dibuat?

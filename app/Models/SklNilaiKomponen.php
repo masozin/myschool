@@ -26,18 +26,18 @@ class SklNilaiKomponen extends Model
     return $this->belongsTo(SklKomponen::class, 'komponen_id');
   }
 
-  public function nilaiSubKomponen(): HasMany
+  public function nilaiKomponenSub(): HasMany
   {
-    return $this->hasMany(SklNilaiSubKomponen::class, 'skl_nilai_komponen_id')
-      ->with('subKomponen')
-      ->join('tabel_skl_sub_komponen', 'tabel_skl_nilai_sub_komponen.sub_komponen_id', '=', 'tabel_skl_sub_komponen.id')
-      ->orderBy('tabel_skl_sub_komponen.urutan')
-      ->select('tabel_skl_nilai_sub_komponen.*');
+    return $this->hasMany(SklNilaiKomponenSub::class, 'skl_nilai_komponen_id')
+      ->with('komponenSub')
+      ->join('tabel_skl_komponen_sub', 'tabel_skl_nilai_komponen_sub.komponen_sub_id', '=', 'tabel_skl_komponen_sub.id')
+      ->orderBy('tabel_skl_komponen_sub.urutan')
+      ->select('tabel_skl_nilai_komponen_sub.*');
   }
 
   public function hitungDariSub(): void
   {
-    $nilais = $this->nilaiSubKomponen->pluck('nilai')->filter(fn($v) => $v !== null);
+    $nilais = $this->nilaiKomponenSub->pluck('nilai')->filter(fn($v) => $v !== null);
     if ($nilais->isEmpty()) return;
     $this->update(['nilai' => round($nilais->avg(), 2)]);
   }

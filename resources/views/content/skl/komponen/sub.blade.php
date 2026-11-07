@@ -69,7 +69,7 @@
             <div class="col-12 col-md-3">
               <label class="form-label form-label-sm">Urutan</label>
               <input type="number" id="input-urutan" class="form-control form-control-sm" min="0"
-                value="{{ $subKomponen->count() }}">
+                value="{{ $komponenSub->count() }}">
             </div>
             <div class="col-12 col-md-2">
               <button type="button" class="btn btn-primary btn-sm w-100" id="btn-tambah-sub">
@@ -85,11 +85,11 @@
       <div class="card">
         <div class="card-header border-bottom d-flex justify-content-between align-items-center">
           <h6 class="mb-0">Daftar Sub-komponen</h6>
-          <span class="badge bg-label-primary" id="badge-jumlah">{{ $subKomponen->count() }} item</span>
+          <span class="badge bg-label-primary" id="badge-jumlah">{{ $komponenSub->count() }} item</span>
         </div>
 
         <div id="list-sub">
-          @if ($subKomponen->isEmpty())
+          @if ($komponenSub->isEmpty())
             <div id="empty-state" class="text-center py-5">
               <i class="icon-base ri ri-inbox-line ri-36px text-muted d-block mb-2"></i>
               <p class="text-muted small mb-0">Belum ada sub-komponen. Tambahkan di atas.</p>
@@ -101,7 +101,7 @@
             </div>
           @endif
 
-          <table class="table table-sm table-bordered mb-0 {{ $subKomponen->isEmpty() ? 'd-none' : '' }}" id="tabel-sub">
+          <table class="table table-sm table-bordered mb-0 {{ $komponenSub->isEmpty() ? 'd-none' : '' }}" id="tabel-sub">
             <thead>
               <tr>
                 <th width="50" class="text-center">No</th>
@@ -111,7 +111,7 @@
               </tr>
             </thead>
             <tbody id="tbody-sub">
-              @foreach ($subKomponen as $i => $sub)
+              @foreach ($komponenSub as $i => $sub)
                 <tr id="row-{{ $sub->id }}">
                   <td class="text-center">{{ $i + 1 }}</td>
                   <td>
@@ -144,11 +144,11 @@
         </div>
 
         {{-- Footer: info kalkulasi --}}
-        @if ($subKomponen->isNotEmpty())
+        @if ($komponenSub->isNotEmpty())
           <div class="card-footer py-2">
             <small class="text-muted">
               <i class="icon-base ri ri-function-line me-1"></i>
-              Nilai komponen = ({{ $subKomponen->pluck('label')->join(' + ') }}) ÷ {{ $subKomponen->count() }}
+              Nilai komponen = ({{ $komponenSub->pluck('label')->join(' + ') }}) ÷ {{ $komponenSub->count() }}
             </small>
           </div>
         @endif
@@ -234,7 +234,7 @@
 
         // Tambah baris ke tabel
         const tbody = document.getElementById('tbody-sub');
-        const sub = data.sub_komponen;
+        const sub = data.komponen_sub;
         const tr = document.createElement('tr');
         tr.id = `row-${sub.id}`;
         tr.innerHTML = `

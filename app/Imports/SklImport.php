@@ -5,7 +5,7 @@ namespace App\Imports;
 use App\Models\Skl;
 use App\Models\SklNilai;
 use App\Models\SklNilaiKomponen;
-use App\Models\SklNilaiSubKomponen;
+use App\Models\SklNilaiKomponenSub;
 use App\Models\SklKonfigurasi;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -110,10 +110,10 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
                 'nilai'        => null,
               ]);
 
-              foreach ($komponen->subKomponen as $sub) {
-                SklNilaiSubKomponen::create([
+              foreach ($komponen->komponenSub as $sub) {
+                SklNilaiKomponenSub::create([
                   'skl_nilai_komponen_id' => $sklNilaiKomponen->id,
-                  'sub_komponen_id'       => $sub->id,
+                  'komponen_sub_id'       => $sub->id,
                   'nilai'                 => null,
                 ]);
               }
@@ -183,10 +183,10 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
               ]);
 
               if ($subId) {
-                SklNilaiSubKomponen::updateOrCreate(
+                SklNilaiKomponenSub::updateOrCreate(
                   [
                     'skl_nilai_komponen_id' => $sklNilaiKomponen->id,
-                    'sub_komponen_id'       => $subId,
+                    'komponen_sub_id'       => $subId,
                   ],
                   ['nilai' => $nilaiClean]
                 );
@@ -203,7 +203,7 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
       if ($memilikiPerubahanNilai && $this->modeInput === 'manual') {
         foreach ($skl->nilais as $n) {
           foreach ($n->komponens as $kn) {
-            if ($kn->komponen->subKomponen->isNotEmpty()) {
+            if ($kn->komponen->komponenSub->isNotEmpty()) {
               $kn->refresh()->hitungDariSub();
             }
           }

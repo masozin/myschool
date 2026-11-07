@@ -223,8 +223,8 @@
                       foreach ($skl->nilais as $sklNilai) {
                           foreach ($sklNilai->komponens as $kn) {
                               // Jika komponen memiliki sub-komponen, hitung jumlah sub-komponennya
-                              if ($kn->komponen && $kn->komponen->subKomponen->isNotEmpty()) {
-                                  foreach ($kn->nilaiSubKomponen as $nsk) {
+                              if ($kn->komponen && $kn->komponen->komponenSub->isNotEmpty()) {
+                                  foreach ($kn->nilaiKomponenSub as $nsk) {
                                       $totalInput++;
                                       if ($nsk->nilai !== null) {
                                           $sudahInput++;
