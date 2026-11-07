@@ -26,11 +26,23 @@
       <form id="form-pengaturan-nomor">
         <div class="row g-3">
           <div class="col-md-4">
+            <label class="form-label fw-semibold">Tempat Terbit</label>
+            <input type="text" name="tempat_terbit" id="input-tempat" class="form-control"
+              placeholder="misal: Totorejo" value="{{ $konfigurasi?->tempat_terbit }}">
+            <div class="form-text">Tercetak sebelum tanggal pada baris tanda tangan SKL.</div>
+          </div>
+          <div class="col-md-4">
             <label class="form-label fw-semibold">Tanggal Terbit (massal)</label>
             <input type="date" name="tanggal_terbit" id="input-tanggal" class="form-control"
               value="{{ $konfigurasi?->tanggal_terbit?->format('Y-m-d') }}">
-            <div class="form-text">Diterapkan ke semua SKL yang belum disetujui. Kosongkan bila tidak ingin
-              mengubah tanggal.</div>
+            <div class="form-text">Diterapkan ke semua SKL yang belum disetujui, dan disimpan sebagai tanggal
+              default. Kosongkan bila tidak ingin mengubah tanggal.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Prefix Nomor</label>
+            <input type="text" name="prefix_nomor" id="input-prefix" class="form-control"
+              value="{{ $prefix }}">
+            <div class="form-text">Dipakai penanda <code>{prefix}</code> pada pola nomor.</div>
           </div>
         </div>
 
@@ -45,7 +57,7 @@
             <div class="form-text">
               Penanda: <code>{no}</code> nomor urut, <code>{no:3}</code> atau <code>{no;3}</code> urut dengan nol di
               depan (3 digit), <code>{tahun}</code> tahun tanggal terbit, <code>{prefix}</code> awalan dari
-              konfigurasi (saat ini: <strong>{{ $prefix }}</strong>). Contoh hasil: <code>{{ $prefix }}/007/{{ now()->year }}</code>
+              isian Prefix Nomor di atas. Contoh hasil: <code>SKL/007/{{ now()->year }}</code>
             </div>
           </div>
           <div class="col-md-2">
@@ -123,7 +135,7 @@
 
 @section('page-script')
   <script>
-    const PREFIX = @json($prefix);
+
     const DATA = [
       @foreach ($baris as $b)
         {
@@ -143,6 +155,7 @@
     const inputTanggal = document.getElementById('input-tanggal');
     const inputTimpa = document.getElementById('input-timpa');
     const inputKelompok = document.getElementById('input-kelompok');
+    const inputPrefix = document.getElementById('input-prefix');
 
     function formatNomor(pola, urut, tahun) {
       return pola
@@ -151,7 +164,7 @@
           return String(urut).padStart(lebar, '0');
         })
         .replaceAll('{tahun}', String(tahun))
-        .replaceAll('{prefix}', PREFIX);
+        .replaceAll('{prefix}', inputPrefix.value.trim() || 'SKL');
     }
 
     function renderPratinjau() {
@@ -198,7 +211,7 @@
       }).join('');
     }
 
-    [inputPola, inputAwal, inputTanggal, inputTimpa, inputKelompok].forEach(el =>
+    [inputPola, inputAwal, inputTanggal, inputTimpa, inputKelompok, inputPrefix].forEach(el =>
       el.addEventListener('input', renderPratinjau));
     document.querySelectorAll('input[name="urutan"]').forEach(el =>
       el.addEventListener('change', renderPratinjau));
@@ -224,6 +237,8 @@
           kelompok_rombel: inputKelompok.checked,
           timpa: inputTimpa.checked,
           tanggal_terbit: inputTanggal.value || null,
+          tempat_terbit: document.getElementById('input-tempat').value.trim(),
+          prefix_nomor: inputPrefix.value.trim() || null,
         }),
       });
       const data = await res.json();

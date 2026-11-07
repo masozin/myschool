@@ -760,12 +760,29 @@ class SklController extends Controller
       'kelompok_rombel' => 'nullable|boolean',
       'timpa'           => 'nullable|boolean',
       'tanggal_terbit'  => 'nullable|date',
+      'tempat_terbit'   => 'nullable|string|max:100',
+      'prefix_nomor'    => 'nullable|string|max:20',
     ]);
 
     ['sekolahId' => $sekolahId, 'semester' => $semester, 'baris' => $baris]
       = $this->dataPengaturanNomor();
 
-    $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semester->id);
+    // Tempat terbit, tanggal terbit default, dan prefix kini tinggal
+    // di halaman ini (Konfigurasi SKL hanya memilih mode input):
+    // simpan ke konfigurasi lebih dulu, lalu pakai untuk generate
+    $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, (int) $semester->id);
+
+    if (array_key_exists('tempat_terbit', $data)) {
+      $konfigurasi->tempat_terbit = $data['tempat_terbit'] ?: null;
+    }
+    if (!empty($data['prefix_nomor'])) {
+      $konfigurasi->prefix_nomor = $data['prefix_nomor'];
+    }
+    if (!empty($data['tanggal_terbit'])) {
+      $konfigurasi->tanggal_terbit = $data['tanggal_terbit'];
+    }
+    $konfigurasi->save();
+
     $prefix      = $konfigurasi->prefix_nomor ?? 'SKL';
     $timpa       = !empty($data['timpa']);
 

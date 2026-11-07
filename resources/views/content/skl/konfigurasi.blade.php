@@ -108,64 +108,12 @@
               </div>
             </div>
 
-            <hr>
-
-            {{-- ── Tempat & Tanggal Terbit ─────────────────────────────────── --}}
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="icon-base ri ri-map-pin-line me-1"></i>Tempat Penerbitan SKL
-              </label>
-              <input type="text" name="tempat_terbit" class="form-control @error('tempat_terbit') is-invalid @enderror"
-                placeholder="misal: Jakarta" value="{{ old('tempat_terbit', $konfigurasi?->tempat_terbit) }}">
-              <div class="form-text">
-                Nama kota/kabupaten yang akan tercetak di baris tanda tangan SKL,
-                misal: <em>Jakarta, 15 Juni 2025</em>.
-              </div>
-              @error('tempat_terbit')
-                <div class="invalid-feedback">{{ $message }}</div>
-              @enderror
-            </div>
-
-            <div class="mb-4">
-              <label class="form-label fw-semibold">
-                <i class="icon-base ri ri-calendar-line me-1"></i>Tanggal Terbit Default
-              </label>
-              <input type="date" name="tanggal_terbit"
-                class="form-control @error('tanggal_terbit') is-invalid @enderror" style="max-width:220px"
-                value="{{ old('tanggal_terbit', $konfigurasi?->tanggal_terbit?->format('Y-m-d')) }}">
-              <div class="form-text">
-                Tanggal default yang akan otomatis terisi saat membuat nomor SKL.
-                Bisa diubah per-siswa saat input nomor.
-              </div>
-              @error('tanggal_terbit')
-                <div class="invalid-feedback">{{ $message }}</div>
-              @enderror
-            </div>
-
-            {{-- ── Prefix Nomor ────────────────────────────────────────────── --}}
-            <div class="mb-5">
-              <label class="form-label fw-semibold">
-                <i class="icon-base ri ri-hashtag me-1"></i>Prefix Nomor SKL
-              </label>
-              <div class="input-group" style="max-width: 240px">
-                <input type="text" name="prefix_nomor" class="form-control @error('prefix_nomor') is-invalid @enderror"
-                  placeholder="SKL" value="{{ old('prefix_nomor', $konfigurasi?->prefix_nomor ?? 'SKL') }}">
-                <span class="input-group-text text-muted">/001/JUNI/2025</span>
-              </div>
-              <div class="form-text">
-                Prefix untuk nomor SKL yang di-generate otomatis.
-                Format lengkap: <code>PREFIX/001/BULAN/TAHUN</code>.
-              </div>
-              @error('prefix_nomor')
-                <div class="invalid-feedback">{{ $message }}</div>
-              @enderror
-            </div>
-
-            {{-- Preview lokasi & tanggal --}}
-            <div class="alert alert-light border mb-5" id="preview-lokasi">
-              <small class="text-muted d-block mb-1 fw-semibold">PREVIEW TANDA TANGAN SKL</small>
-              <div id="preview-lokasi-text" class="text-muted fst-italic small">
-                {{ $konfigurasi?->lokasiTanggalTerbit() }}
+            <div class="alert alert-info py-2 mb-4 d-flex gap-2">
+              <i class="icon-base ri ri-information-line mt-1 flex-shrink-0"></i>
+              <div class="small">
+                Tempat terbit, tanggal terbit, dan penomoran SKL kini diatur di halaman
+                <a href="{{ route('skl.pengaturan-nomor') }}" class="alert-link">Tanggal &amp; Penomoran</a>
+                (tombol di daftar SKL). Halaman ini hanya untuk memilih mode input nilai.
               </div>
             </div>
 
@@ -200,26 +148,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-      // Live preview lokasi & tanggal
-      const inputTempat = document.querySelector('input[name="tempat_terbit"]');
-      const inputTanggal = document.querySelector('input[name="tanggal_terbit"]');
-      const previewEl = document.getElementById('preview-lokasi-text');
-
-      function updatePreview() {
-        const tempat = inputTempat?.value?.trim() || '...';
-        const tanggal = inputTanggal?.value ?
-          new Date(inputTanggal.value).toLocaleDateString('id-ID', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          }) :
-          '...';
-        previewEl.textContent = `${tempat}, ${tanggal}`;
-      }
-
-      inputTempat?.addEventListener('input', updatePreview);
-      inputTanggal?.addEventListener('change', updatePreview);
-
       // Radio card click
       document.getElementById('mode-jadi')?.addEventListener('change', () => selectMode('jadi'));
       document.getElementById('mode-manual')?.addEventListener('change', () => selectMode('manual'));
