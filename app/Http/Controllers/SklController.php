@@ -1496,7 +1496,12 @@ class SklController extends Controller
     }
 
     // 7. AUTO-FIT COLUMN WIDTH (Lebar kolom otomatis menyesuaikan panjang karakter teks)
-    foreach (range('B', $maxColStr) as $columnID) {
+    // Iterasi per indeks ANGKA: range('B', $maxColStr) meledak di
+    // PHP 8 begitu kolom melewati Z (huruf kolom menjadi 2 byte,
+    // mis. 'AX') — persis yang terjadi pada template mode manual
+    // dengan banyak mapel × sub.
+    for ($colIdx = 2; $colIdx <= $maxCol; $colIdx++) {
+      $columnID = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx);
       $sheet->getColumnDimension($columnID)->setAutoSize(true);
     }
   }
