@@ -37,7 +37,6 @@ class SklKonfigurasiController extends Controller
       'mode_input'      => 'required|in:jadi,manual',
       'tempat_terbit'   => 'nullable|string|max:100',
       'tanggal_terbit'  => 'nullable|date',
-      'prefix_nomor'    => 'nullable|string|max:20',
     ]);
 
     $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, $semesterId);
