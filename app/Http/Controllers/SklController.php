@@ -368,7 +368,7 @@ class SklController extends Controller
 
       // B1. Apakah komponen sudah dibuat?
       if ($komponens->isEmpty()) {
-        $pesanError = "Komponen nilai SKL (mode manual berbobot) belum dikonfigurasi oleh Admin.";
+        $pesanError = "Komponen nilai SKL (mode manual berbobot) belum dikonfigurasi oleh Admin. Admin mengaturnya di halaman Komponen Nilai SKL (dari Konfigurasi SKL atau daftar SKL), dan total bobotnya harus 100%.";
         if ($request->expectsJson()) return response()->json(['message' => $pesanError], 422);
         return back()->with('error', $pesanError);
       }
@@ -1517,7 +1517,7 @@ class SklController extends Controller
 
       // B1. Apakah komponen sudah dibuat?
       if ($komponens->isEmpty()) {
-        $pesanError = "Komponen nilai SKL (mode manual berbobot) belum dikonfigurasi oleh Admin.";
+        $pesanError = "Komponen nilai SKL (mode manual berbobot) belum dikonfigurasi oleh Admin. Admin mengaturnya di halaman Komponen Nilai SKL (dari Konfigurasi SKL atau daftar SKL), dan total bobotnya harus 100%.";
         if ($request->expectsJson()) return response()->json(['message' => $pesanError], 422);
         return back()->with('error', $pesanError);
       }

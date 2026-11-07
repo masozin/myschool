@@ -117,6 +117,19 @@
               </div>
             </div>
 
+            <div class="alert alert-warning py-2 mb-4 d-flex gap-2">
+              <i class="icon-base ri ri-scales-3-line mt-1 flex-shrink-0"></i>
+              <div class="small">
+                Mode <strong>Manual (berbobot)</strong> hanya bisa dipakai bila komponen nilainya sudah
+                diatur dan total bobotnya 100% untuk jenjang sekolah ini pada semester kelulusan.
+                @hasanyrole('Admin')
+                  <a href="{{ route('skl.komponen.index') }}" class="alert-link">Kelola Komponen Nilai</a>
+                @else
+                  Pengaturan komponen adalah wewenang Admin — hubungi Admin bila mode manual belum bisa dipakai.
+                @endhasanyrole
+              </div>
+            </div>
+
             <div class="d-flex justify-content-end gap-2">
               <a href="{{ route('skl.index') }}" class="btn btn-outline-secondary">Batal</a>
               <button type="submit" class="btn btn-primary">

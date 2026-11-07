@@ -25,11 +25,23 @@
     </div>
   </div>
 
+  @if ((int) session('semester_id') !== $semester->id)
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-4" role="alert">
+      <i class="icon-base ri ri-information-line icon-20px mt-1"></i>
+      <div>
+        Anda login pada semester Ganjil, sehingga komponen diatur untuk
+        <strong>semester kelulusan {{ $semester->tahun_pelajaran }} ({{ $semester->semester }})</strong> —
+        semester yang sama dengan yang diperiksa saat SKL dibuat. Ini disengaja: dokumen kelulusan
+        hanya berasal dari semester Genap.
+      </div>
+    </div>
+  @endif
+
   {{-- ── Toolbar ──────────────────────────────────────────────────────────── --}}
   <div class="card mb-4">
     <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
 
-      {{-- Filter Jenjang (semester sudah fix dari session) --}}
+      {{-- Filter Jenjang (semester mengikuti semester kerja kelulusan) --}}
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="text-muted small fw-semibold">Jenjang:</span>
         @foreach (['SD', 'SMP', 'SMA', 'SMK'] as $j)

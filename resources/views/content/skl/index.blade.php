@@ -100,9 +100,14 @@
             @endforeach
           </select>
         </form>
-        <a href="{{ url('/skl/template') }}" class="btn btn-label-secondary btn-sm ms-auto">
-          <i class="icon-base ri ri-layout-line me-1"></i>Kelola Template Cetak
-        </a>
+        <span class="ms-auto d-flex gap-2">
+          <a href="{{ route('skl.komponen.index') }}" class="btn btn-label-secondary btn-sm">
+            <i class="icon-base ri ri-scales-3-line me-1"></i>Komponen Nilai
+          </a>
+          <a href="{{ url('/skl/template') }}" class="btn btn-label-secondary btn-sm">
+            <i class="icon-base ri ri-layout-line me-1"></i>Kelola Template Cetak
+          </a>
+        </span>
       </div>
     </div>
   @endhasanyrole

@@ -9,20 +9,22 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Diakses hanya oleh Admin.
- * Kelola komponen nilai SKL per jenjang untuk semester aktif (dari session).
- * Tidak ada input tahun pelajaran — semua mengacu ke semester_id dari session.
+ * Kelola komponen nilai SKL per jenjang untuk SEMESTER KERJA
+ * KELULUSAN (Semester::smtIdKelulusan) — semester yang sama dengan
+ * yang dipakai pembuatan SKL memeriksa komponen. Sebelumnya halaman
+ * ini memakai semester sesi biasa, sehingga komponen yang diatur
+ * saat login di semester Ganjil tersimpan di semester yang salah
+ * dan pembuatan SKL tetap melaporkannya "belum dikonfigurasi".
  */
 class SklKomponenController extends Controller
 {
   /**
-   * Ambil semester_id + objek Semester dari session.
-   * Abort jika tidak ditemukan (semester belum dipilih).
+   * Semester kerja kelulusan: sesi Genap → semester sesi; sesi
+   * Ganjil → Genap tahun pelajaran sebelumnya.
    */
   private function getSemester(): Semester
   {
-    $semesterId = session('semester_id');
-    abort_if(!$semesterId, 403, 'Semester belum dipilih. Pilih semester terlebih dahulu.');
-    return Semester::findOrFail($semesterId);
+    return Semester::findOrFail((int) Semester::smtIdKelulusan());
   }
 
   // ── Index ─────────────────────────────────────────────────────────────
