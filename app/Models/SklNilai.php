@@ -44,6 +44,16 @@ class SklNilai extends Model
 
   public function hitungNilaiAkhir(): void
   {
+    // Bila belum ada satu pun komponen yang terisi, nilai akhir
+    // tetap KOSONG — jangan jadikan 0,00: angka itu terlihat
+    // seperti nilai jadi dan membuat pemeriksaan kelengkapan
+    // (pengajuan) lolos padahal belum ada nilai apa pun.
+    // Komponen yang memang dinilai 0 tetap terhitung terisi.
+    if ($this->komponens->every(fn($k) => $k->nilai === null)) {
+      $this->update(['nilai_akhir' => null, 'nilai_huruf' => null]);
+      return;
+    }
+
     $total = $this->komponens
       ->sum(fn($k) => ($k->nilai ?? 0) * ($k->komponen->bobot / 100));
 
