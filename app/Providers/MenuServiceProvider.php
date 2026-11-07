@@ -26,6 +26,20 @@ class MenuServiceProvider extends ServiceProvider
         $verticalMenuData->menu   = $this->filterMenu($verticalMenuData->menu);
         $horizontalMenuData->menu = $this->filterMenu($horizontalMenuData->menu);
 
+        // Menu Dokumen Kelulusan (SKHU/SKL) hanya untuk Guru yang
+        // menjadi wali kelas tingkat AKHIR di semester kelulusan;
+        // Guru lain tidak memerlukannya (dan halamannya memang
+        // kosong baginya). Peran lain tidak disentuh.
+        $user = Auth::user();
+        if (
+          $user->hasRole('Guru')
+          && !$user->hasAnyRole(['Admin', 'Operator Sekolah', 'Kepala Sekolah'])
+          && !$this->guruPunyaKelasAkhir($user)
+        ) {
+          $verticalMenuData->menu   = $this->cabutMenuKelulusan($verticalMenuData->menu);
+          $horizontalMenuData->menu = $this->cabutMenuKelulusan($horizontalMenuData->menu);
+        }
+
         // Inject menu rombel dinamis untuk Guru
         if (Auth::user()->hasRole('Guru') && Auth::user()->ptk) {
           $semesterId = Session::get('semester_id');
@@ -120,19 +134,119 @@ class MenuServiceProvider extends ServiceProvider
 
   private function injectMenuRombel(array $menu, $rombels): array
   {
-    $menuBaru = [];
+    $items = [];
+    foreach ($rombels as $rombel) {
+      $items[] = $this->buildMenuRombel($rombel);
+    }
+
+    $menuBaru  = [];
+    $terpasang = false;
 
     foreach ($menu as $item) {
       $menuBaru[] = $item;
 
       if (isset($item->menuHeader) && $item->menuHeader === 'Wali Kelas') {
-        foreach ($rombels as $rombel) {
-          $menuBaru[] = $this->buildMenuRombel($rombel);
-        }
+        $menuBaru  = array_merge($menuBaru, $items);
+        $terpasang = true;
       }
     }
 
-    return $menuBaru;
+    if ($terpasang) {
+      return $menuBaru;
+    }
+
+    // Jangkar 'Wali Kelas' tidak ada di file menu (keadaan selama
+    // ini — akibatnya menu kelas Guru tidak pernah muncul).
+    // Sisipkan section-nya sendiri sebelum header 'Pengaturan',
+    // atau di ujung menu bila header itu pun tidak ada.
+    $hasil     = [];
+    $tersisip  = false;
+
+    foreach ($menuBaru as $item) {
+      if (!$tersisip && isset($item->menuHeader) && $item->menuHeader === 'Pengaturan') {
+        $hasil[]  = (object) ['menuHeader' => 'Wali Kelas'];
+        $hasil    = array_merge($hasil, $items);
+        $tersisip = true;
+      }
+      $hasil[] = $item;
+    }
+
+    if (!$tersisip) {
+      $hasil[] = (object) ['menuHeader' => 'Wali Kelas'];
+      $hasil   = array_merge($hasil, $items);
+    }
+
+    return $hasil;
+  }
+
+  /** Apakah Guru ini wali kelas tingkat akhir pada semester kelulusan? */
+  private function guruPunyaKelasAkhir($user): bool
+  {
+    if (!$user->ptk) {
+      return false;
+    }
+
+    $sekolah = \App\Models\Sekolah::find($user->ptk->sekolah_id);
+    if (!$sekolah) {
+      return false;
+    }
+
+    $tingkatAkhir = [
+      'SD'  => 6,
+      'SMP' => 9,
+      'SMA' => 12,
+      'SMK' => 12,
+    ][strtoupper($sekolah->jenjang ?? '')] ?? null;
+
+    if ($tingkatAkhir === null) {
+      return false;
+    }
+
+    return Rombel::where('ptk_id', $user->ptk->id)
+      ->where('semester_id', (int) \App\Models\Semester::smtIdKelulusan())
+      ->where('tingkat', $tingkatAkhir)
+      ->exists();
+  }
+
+  /**
+   * Buang item SKHU/SKL (slug skhu/skl) dari menu, termasuk induk
+   * yang submenunya menjadi kosong dan header section yang
+   * kehilangan seluruh isinya.
+   */
+  private function cabutMenuKelulusan(array $menu): array
+  {
+    $menu = array_values(array_filter(
+      $menu,
+      fn($item) => !in_array($item->slug ?? '', ['skhu', 'skl'], true)
+    ));
+
+    foreach ($menu as $item) {
+      if (isset($item->submenu) && is_array($item->submenu)) {
+        $item->submenu = $this->cabutMenuKelulusan($item->submenu);
+      }
+    }
+
+    // Induk tanpa url yang submenunya kosong ikut dibuang
+    $menu = array_values(array_filter(
+      $menu,
+      fn($item) => !(isset($item->submenu) && is_array($item->submenu)
+        && empty($item->submenu) && empty($item->url))
+    ));
+
+    // Header yang section-nya kosong ikut dibuang
+    $hasil = [];
+    $total = count($menu);
+    foreach ($menu as $i => $item) {
+      if (isset($item->menuHeader)) {
+        $berikut = $menu[$i + 1] ?? null;
+        if ($berikut === null || isset($berikut->menuHeader)) {
+          continue;
+        }
+      }
+      $hasil[] = $item;
+    }
+
+    return $hasil;
   }
 
   private function buildMenuRombel(Rombel $rombel): object
