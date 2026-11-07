@@ -53,7 +53,11 @@ class ValidasiKelulusan extends Controller
         'nilais',
       ])
       ->where('status', 'final')
-      ->orderByDesc('tanggal_terbit')
+      // tanggal_terbit sudah pindah ke tabel_skhu_konfigurasi
+      // (dibaca lewat accessor di model); untuk urutan SQL pakai
+      // waktu finalisasi dokumen
+      ->orderByDesc('generated_at')
+      ->orderByDesc('id')
       ->get();
 
     if ($skhuList->isEmpty()) {
@@ -166,7 +170,11 @@ class ValidasiKelulusan extends Controller
     ])
       ->where('siswa_id', $siswa->id)
       ->where('status', 'disetujui')
-      ->orderByDesc('tanggal_terbit')
+      // tanggal_terbit pada SKL kini dibaca dari konfigurasi
+      // (accessor), bukan kolom tabel_skl — urutkan dari yang
+      // terakhir diperbarui (persetujuan memperbarui baris)
+      ->orderByDesc('updated_at')
+      ->orderByDesc('id')
       ->get();
 
     if ($sklList->isEmpty()) {
