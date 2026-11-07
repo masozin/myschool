@@ -19,7 +19,26 @@
     </a>
   </div>
 
-  @php $isFinal = $skhu?->status === 'final'; @endphp
+  @php
+    $isFinal = $skhu?->status === 'final';
+    // $canEdit: true hanya untuk Operator dan Guru wali kelas siswa
+    // ini (Guru bukan wali sudah ditolak controller sebelum sampai
+    // ke form). Admin/Kepala Sekolah mode lihat. Fallback ke peran
+    // langsung supaya form ini benar sendiri tanpa bergantung pada
+    // variabel dari controller.
+    $canEdit = $canEdit ?? auth()->user()?->hasAnyRole(['Operator Sekolah', 'Guru']) ?? false;
+  @endphp
+
+  {{-- Banner mode lihat (Admin / Kepala Sekolah) --}}
+  @if (!$canEdit)
+    <div class="alert alert-info d-flex align-items-center gap-3 mb-4">
+      <i class="icon-base ri ri-eye-line ri-24px flex-shrink-0"></i>
+      <div>
+        <strong>Mode lihat.</strong>
+        Akun ini hanya boleh melihat SKHU — pengisian dan finalisasi dilakukan Operator Sekolah atau wali kelas siswa ini.
+      </div>
+    </div>
+  @endif
 
   {{-- Banner terkunci jika final --}}
   @if ($isFinal)
@@ -29,9 +48,11 @@
         <strong>SKHU ini sudah difinalisasi.</strong>
         Semua field tidak dapat diedit. Klik <em>Batalkan Finalisasi</em> untuk membuka kunci.
       </div>
-      <button type="button" class="btn btn-warning btn-sm flex-shrink-0" id="btn-batal-final">
-        <i class="icon-base ri ri-lock-unlock-line me-1"></i>Batalkan Finalisasi
-      </button>
+      @if ($canEdit)
+        <button type="button" class="btn btn-warning btn-sm flex-shrink-0" id="btn-batal-final">
+          <i class="icon-base ri ri-lock-unlock-line me-1"></i>Batalkan Finalisasi
+        </button>
+      @endif
     </div>
   @endif
 
@@ -85,31 +106,31 @@
           <div class="mb-4">
             <label class="form-label">Nomor Surat</label>
             <input type="text" id="nomor_surat" class="form-control form-control-sm" placeholder="nomor skhu"
-              value="{{ $skhu?->nomor_surat }}" {{ $isFinal ? 'disabled' : '' }}>
+              value="{{ $skhu?->nomor_surat }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
           <div class="mb-4">
             <label class="form-label">Nomor Ujian Sekolah</label>
             <input type="text" id="nomor_ujian" class="form-control form-control-sm" placeholder="nomor ujian"
-              value="{{ $skhu?->nomor_ujian }}" {{ $isFinal ? 'disabled' : '' }}>
+              value="{{ $skhu?->nomor_ujian }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
           <div class="mb-4">
             <label class="form-label">Tanggal Mulai Ujian</label>
             <input type="text" id="tanggal_mulai_ujian" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_mulai_ujian?->format('Y-m-d') }}" {{ $isFinal ? 'disabled' : '' }}>
+              value="{{ $skhu?->tanggal_mulai_ujian?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
           <div class="mb-4">
             <label class="form-label">Tanggal Selesai Ujian</label>
             <input type="text" id="tanggal_selesai_ujian" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_selesai_ujian?->format('Y-m-d') }}" {{ $isFinal ? 'disabled' : '' }}>
+              value="{{ $skhu?->tanggal_selesai_ujian?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
           <div class="mb-4">
             <label class="form-label">Tanggal Terbit</label>
             <input type="text" id="tanggal_terbit" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_terbit?->format('Y-m-d') }}" {{ $isFinal ? 'disabled' : '' }}>
+              value="{{ $skhu?->tanggal_terbit?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
           @if ($skhu)
@@ -165,7 +186,7 @@
                       <input type="number" class="form-control form-control-sm text-center input-nilai"
                         name="nilai[{{ $mapel->id }}]" id="nilai-{{ $mapel->id }}" min="0" max="100"
                         step="1" value="{{ number_format($nilaiExisting[$mapel->id] ?? 0, 2, '.', '') }}"
-                        {{ $isFinal ? 'disabled' : '' }}>
+                        {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
                     </td>
                   </tr>
                 @endforeach
@@ -184,13 +205,18 @@
             @endif
           </div>
 
-          @if (!$isFinal)
+          @if (!$isFinal && $canEdit)
             <div class="d-flex gap-2">
               <button class="btn btn-outline-primary btn-sm" id="btn-simpan-draft">
                 <i class="icon-base ri ri-save-line me-1"></i>
                 <span class="d-none d-md-inline">Simpan Draft</span>
               </button>
             </div>
+          @elseif (!$canEdit)
+            {{-- Mode lihat — tidak ada tombol simpan --}}
+            <span class="text-muted fw-semibold small">
+              <i class="icon-base ri ri-eye-line me-1"></i>Mode lihat
+            </span>
           @else
             {{-- Sudah final — hanya tampilkan info --}}
             <span class="text-success fw-semibold small">
@@ -211,9 +237,10 @@
       const siswaId = {{ $siswa->id }};
       const skhuId = {{ $skhu?->id ?? 'null' }};
       const isFinal = {{ $isFinal ? 'true' : 'false' }};
+      const canEdit = {{ $canEdit ? 'true' : 'false' }};
 
-      // ── Init Flatpickr (hanya jika tidak final) ───────────────────────────
-      if (!isFinal) {
+      // ── Init Flatpickr (hanya jika bisa edit dan tidak final) ─────────────
+      if (!isFinal && canEdit) {
         document.querySelectorAll('.flatpickr-date').forEach(el => {
           flatpickr(el, {
             dateFormat: 'Y-m-d',
