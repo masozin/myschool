@@ -4,125 +4,138 @@
 
 @section('content')
 
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card bg-primary text-white">
-        <div class="card-body d-flex align-items-center">
-          <i class="icon-base ri ri-hashtag icon-36px me-3"></i>
-          <div>
-            <h5 class="text-white mb-0">Tanggal &amp; Penomoran SKL — {{ $semester->tahun_pelajaran }}
-              ({{ $semester->semester }})</h5>
-            <small class="text-white-50">Terapkan tanggal terbit & generate nomor SKL untuk seluruh siswa kelas
-              akhir sekaligus, dengan pola seperti pada SKHU. SKL yang sudah <strong>disetujui</strong> tidak pernah
-              diubah.</small>
-          </div>
-        </div>
-      </div>
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{{ route('skl.index') }}" class="btn btn-label-secondary btn-sm">
+      <i class="icon-base ri ri-arrow-left-line me-1"></i>Kembali
+    </a>
+    <div>
+      <h4 class="mb-0">Tanggal &amp; Penomoran SKL</h4>
+      <small class="text-muted">
+        Kelas akhir, Tahun Pelajaran {{ $semester->tahun_pelajaran }} {{ $semester->semester }}
+      </small>
     </div>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-body">
+  @php $jumlahDisetujui = $baris->filter(fn($b) => $b['skl']?->status === 'disetujui')->count(); @endphp
+  @if ($jumlahDisetujui > 0)
+    <div class="alert alert-warning">
+      <i class="icon-base ri ri-lock-line me-1"></i>
+      Ada <strong>{{ $jumlahDisetujui }} SKL berstatus disetujui</strong> pada angkatan ini.
+      Pengaturan di halaman ini <strong>tidak mengubah</strong> SKL yang sudah disetujui.
+    </div>
+  @endif
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-5">
       <form id="form-pengaturan-nomor">
-        <h6 class="mb-3"><i class="icon-base ri ri-calendar-line me-1"></i>Tanggal &amp; Tempat Terbit</h6>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Tempat Terbit</label>
-            <input type="text" name="tempat_terbit" id="input-tempat" class="form-control"
-              placeholder="misal: Totorejo" value="{{ $konfigurasi?->tempat_terbit }}">
-            <div class="form-text">Tercetak sebelum tanggal pada baris tanda tangan SKL.</div>
+        {{-- Tanggal & Tempat Terbit --}}
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Tanggal &amp; Tempat Terbit</h5>
+            <small class="text-muted">Satu tanggal untuk seluruh angkatan — diterapkan ke semua SKL yang belum disetujui.</small>
           </div>
-          <div class="col-md-4">
-            <label class="form-label fw-semibold">Tanggal Terbit (massal)</label>
-            <input type="date" name="tanggal_terbit" id="input-tanggal" class="form-control"
-              value="{{ $konfigurasi?->tanggal_terbit?->format('Y-m-d') }}">
-            <div class="form-text">Diterapkan ke semua SKL yang belum disetujui, dan disimpan sebagai tanggal
-              default. Kosongkan bila tidak ingin mengubah tanggal.</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label" for="input-tempat">Tempat Terbit</label>
+              <input type="text" name="tempat_terbit" id="input-tempat" class="form-control"
+                placeholder="misal: Totorejo" value="{{ $konfigurasi?->tempat_terbit }}">
+              <small class="text-muted">Tercetak sebelum tanggal pada baris tanda tangan SKL.</small>
+            </div>
+            <div>
+              <label class="form-label" for="input-tanggal">Tanggal Terbit (massal)</label>
+              <input type="date" name="tanggal_terbit" id="input-tanggal" class="form-control"
+                value="{{ $konfigurasi?->tanggal_terbit?->format('Y-m-d') }}">
+              <small class="text-muted">Diterapkan ke semua SKL yang belum disetujui, dan disimpan sebagai tanggal
+                default. Kosongkan bila tidak ingin mengubah tanggal.</small>
+            </div>
           </div>
         </div>
 
-        <hr>
+        {{-- Penomoran --}}
+        <div class="card">
+          <div class="card-header">
+            <h5 class="card-title mb-0">Penomoran</h5>
+            <small class="text-muted">Nomor massal berpola untuk seluruh angkatan.</small>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label" for="input-pola">Pola Nomor</label>
+              <input type="text" name="pola_nomor" id="input-pola" class="form-control"
+                value="SKL/{no:3}/{tahun}">
+              <small class="text-muted">
+                Penanda: <code>{no}</code> nomor urut, <code>{no:3}</code> atau <code>{no;3}</code> urut dengan nol di
+                depan (3 digit), <code>{tahun}</code> tahun tanggal terbit. Teks lain di luar penanda tercetak
+                apa adanya — awalan seperti "SKL" cukup ditulis langsung di pola. Contoh hasil: <code>SKL/007/{{ now()->year }}</code>
+              </small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="input-awal">Nomor Awal</label>
+              <input type="number" name="nomor_awal" id="input-awal" class="form-control" value="1" min="0">
+            </div>
+            <div class="mb-3">
+              <label class="form-label d-block">Urutan Penomoran</label>
+              <div class="form-check form-check-inline mt-2">
+                <input class="form-check-input" type="radio" name="urutan" id="urutan-nama" value="nama" checked>
+                <label class="form-check-label" for="urutan-nama">Nama siswa (A–Z)</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="urutan" id="urutan-nis" value="nis">
+                <label class="form-check-label" for="urutan-nis">NIS</label>
+              </div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="kelompok_rombel" id="input-kelompok" value="1">
+                <label class="form-check-label" for="input-kelompok">
+                  Kelompokkan per rombel — urutan berjalan rombel demi rombel (mis. semua 6A dulu, lalu 6B);
+                  nomor tetap berlanjut, tidak mulai dari awal
+                </label>
+              </div>
+            </div>
 
-        <h6 class="mb-3"><i class="icon-base ri ri-magic-line me-1"></i>Penomoran</h6>
-        <div class="row g-3">
-          <div class="col-md-5">
-            <label class="form-label fw-semibold">Pola Nomor</label>
-            <input type="text" name="pola_nomor" id="input-pola" class="form-control"
-              value="SKL/{no:3}/{tahun}">
-            <div class="form-text">
-              Penanda: <code>{no}</code> nomor urut, <code>{no:3}</code> atau <code>{no;3}</code> urut dengan nol di
-              depan (3 digit), <code>{tahun}</code> tahun tanggal terbit. Teks lain di luar penanda tercetak
-              apa adanya — awalan seperti "SKL" cukup ditulis langsung di pola. Contoh hasil: <code>SKL/007/{{ now()->year }}</code>
-            </div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label fw-semibold">Nomor Awal</label>
-            <input type="number" name="nomor_awal" id="input-awal" class="form-control" value="1" min="0">
-          </div>
-          <div class="col-md-5">
-            <label class="form-label fw-semibold d-block">Urutan Penomoran</label>
-            <div class="form-check form-check-inline mt-2">
-              <input class="form-check-input" type="radio" name="urutan" id="urutan-nama" value="nama" checked>
-              <label class="form-check-label" for="urutan-nama">Nama siswa (A–Z)</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="urutan" id="urutan-nis" value="nis">
-              <label class="form-check-label" for="urutan-nis">NIS</label>
-            </div>
-            <div class="form-check mt-2">
-              <input class="form-check-input" type="checkbox" name="kelompok_rombel" id="input-kelompok" value="1">
-              <label class="form-check-label" for="input-kelompok">
-                Kelompokkan per rombel — urutan berjalan rombel demi rombel (mis. semua 6A dulu, lalu 6B);
-                nomor tetap berlanjut, tidak mulai dari awal
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" name="timpa" id="input-timpa" value="1">
+              <label class="form-check-label" for="input-timpa">
+                Timpa nomor yang sudah terisi (bila tidak dicentang, hanya SKL yang nomornya masih kosong yang diisi)
               </label>
             </div>
+
+            <div class="mt-4">
+              <button type="submit" class="btn btn-primary" id="btn-simpan">
+                <i class="icon-base ri ri-save-line me-1"></i>Simpan Pengaturan
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div class="form-check mt-3">
-          <input class="form-check-input" type="checkbox" name="timpa" id="input-timpa" value="1">
-          <label class="form-check-label" for="input-timpa">
-            Timpa nomor yang sudah terisi (bila tidak dicentang, hanya SKL yang nomornya masih kosong yang diisi)
-          </label>
-        </div>
-
-        <div class="mt-4">
-          <button type="submit" class="btn btn-primary" id="btn-simpan">
-            <i class="icon-base ri ri-save-line me-1"></i>Simpan Pengaturan
-          </button>
-          <a href="{{ route('skl.index') }}" class="btn btn-outline-secondary">
-            <i class="icon-base ri ri-arrow-left-line me-1"></i>Kembali
-          </a>
         </div>
       </form>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Pratinjau Penomoran</h5>
-      <span class="badge bg-label-info">{{ $baris->count() }} siswa kelas akhir</span>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-hover mb-0" id="tabel-pratinjau">
-        <thead>
-          <tr>
-            <th style="width: 60px">No</th>
-            <th>Siswa</th>
-            <th>Rombel</th>
-            <th>NIS</th>
-            <th>Status SKL</th>
-            <th>Nomor Saat Ini</th>
-            <th>Nomor Hasil</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="card-footer text-muted small">
-      Nomor mengikuti posisi siswa pada urutan yang dipilih — termasuk siswa yang belum memiliki SKL. Siswa yang
-      belum punya SKL tidak diisi nomornya sekarang, tetapi posisinya dicadangkan: menjalankan halaman ini lagi
-      setelah SKL-nya dibuat akan memberinya nomor pada posisi yang sama.
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Pratinjau Hasil</h5>
+          <small class="text-muted">Urutan dan nomor yang akan diterima setiap siswa. Berubah mengikuti pola &amp; urutan di samping.</small>
+        </div>
+        <div class="table-responsive" style="max-height: 640px; overflow-y: auto;">
+          <table class="table table-hover mb-0" id="tabel-pratinjau">
+            <thead>
+              <tr>
+                <th style="width: 60px">No</th>
+                <th>Siswa</th>
+                <th>Rombel</th>
+                <th>NIS</th>
+                <th>Status SKL</th>
+                <th>Nomor Saat Ini</th>
+                <th>Nomor Hasil</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card-footer text-muted small">
+          Nomor mengikuti posisi siswa pada urutan yang dipilih — termasuk siswa yang belum memiliki SKL. Siswa yang
+          belum punya SKL tidak diisi nomornya sekarang, tetapi posisinya dicadangkan: menjalankan halaman ini lagi
+          setelah SKL-nya dibuat akan memberinya nomor pada posisi yang sama.
+        </div>
+      </div>
     </div>
   </div>
 
