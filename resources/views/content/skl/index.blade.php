@@ -114,7 +114,7 @@
           </a>
           @hasanyrole('Operator Sekolah')
             <a href="{{ route('skl.pengaturan-nomor') }}" class="btn btn-label-secondary btn-sm">
-              <i class="icon-base ri ri-hashtag me-1"></i>Pengaturan Nomor
+              <i class="icon-base ri ri-hashtag me-1"></i>Tanggal &amp; Penomoran
             </a>
           @endhasanyrole
           <button class="btn btn-label-secondary btn-sm" id="btn-sync-skl" title="Sinkronisasi Data & Bobot">

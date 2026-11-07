@@ -1,6 +1,6 @@
 @extends('layouts/layoutMaster')
 
-@section('title', 'Pengaturan Angkatan SKHU')
+@section('title', 'Tanggal & Penomoran SKHU')
 
 @section('vendor-style')
   @vite(['resources/assets/vendor/libs/sweetalert2/sweetalert2.scss'])
@@ -16,7 +16,7 @@
       <i class="icon-base ri ri-arrow-left-line me-1"></i>Kembali
     </a>
     <div>
-      <h4 class="mb-0">Pengaturan Angkatan SKHU</h4>
+      <h4 class="mb-0">Tanggal &amp; Penomoran SKHU</h4>
       <small class="text-muted">
         {{ $sekolah->detailTerbaru->nama_sekolah ?? '' }} — Kelas {{ $tingkatAkhir }} ({{ $jenjang }}),
         Tahun Pelajaran {{ $semester->tahun_pelajaran }} {{ $semester->semester }}
@@ -37,7 +37,7 @@
       {{-- Tanggal angkatan --}}
       <div class="card mb-4">
         <div class="card-header">
-          <h5 class="card-title mb-0">Tanggal Angkatan</h5>
+          <h5 class="card-title mb-0">Tanggal &amp; Tempat Terbit</h5>
           <small class="text-muted">Satu tanggal untuk seluruh angkatan — diterapkan ke semua siswa kelas akhir.</small>
         </div>
         <div class="card-body">
@@ -69,7 +69,7 @@
       {{-- Penomoran --}}
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title mb-0">Generate Nomor</h5>
+          <h5 class="card-title mb-0">Penomoran</h5>
           <small class="text-muted">Kosongkan pola bila nomor tidak ingin dibuat dari sini.</small>
         </div>
         <div class="card-body">

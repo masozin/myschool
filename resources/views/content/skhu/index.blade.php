@@ -109,11 +109,11 @@
             <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
           </button>
         @endhasanyrole
-        {{-- Pengaturan Angkatan (tanggal & nomor massal) --}}
+        {{-- Tanggal & Penomoran (tanggal, tempat & nomor massal) --}}
         @hasanyrole('Operator Sekolah')
           <a href="{{ url('/skhu/pengaturan-angkatan') }}" class="btn btn-label-info btn-sm">
-            <i class="icon-base ri ri-calendar-settings-line me-1"></i><span class="d-none d-md-block">Pengaturan
-              Angkatan</span>
+            <i class="icon-base ri ri-calendar-settings-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
+              Penomoran</span>
           </a>
         @endhasanyrole
         {{-- Finalisasi Semua (controller menolak selain Operator) --}}

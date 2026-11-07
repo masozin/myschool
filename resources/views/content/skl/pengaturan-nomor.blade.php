@@ -1,6 +1,6 @@
 @extends('layouts/layoutMaster')
 
-@section('title', 'Pengaturan Nomor SKL')
+@section('title', 'Tanggal & Penomoran SKL')
 
 @section('content')
 
@@ -10,7 +10,7 @@
         <div class="card-body d-flex align-items-center">
           <i class="icon-base ri ri-hashtag icon-36px me-3"></i>
           <div>
-            <h5 class="text-white mb-0">Pengaturan Nomor SKL — {{ $semester->tahun_pelajaran }}
+            <h5 class="text-white mb-0">Tanggal &amp; Penomoran SKL — {{ $semester->tahun_pelajaran }}
               ({{ $semester->semester }})</h5>
             <small class="text-white-50">Terapkan tanggal terbit & generate nomor SKL untuk seluruh siswa kelas
               akhir sekaligus, dengan pola seperti pada SKHU. SKL yang sudah <strong>disetujui</strong> tidak pernah
@@ -24,6 +24,7 @@
   <div class="card mb-4">
     <div class="card-body">
       <form id="form-pengaturan-nomor">
+        <h6 class="mb-3"><i class="icon-base ri ri-calendar-line me-1"></i>Tanggal &amp; Tempat Terbit</h6>
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label fw-semibold">Tempat Terbit</label>
@@ -48,7 +49,7 @@
 
         <hr>
 
-        <h6 class="mb-3"><i class="icon-base ri ri-magic-line me-1"></i>Generate Nomor SKL</h6>
+        <h6 class="mb-3"><i class="icon-base ri ri-magic-line me-1"></i>Penomoran</h6>
         <div class="row g-3">
           <div class="col-md-5">
             <label class="form-label fw-semibold">Pola Nomor</label>
