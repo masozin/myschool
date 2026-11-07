@@ -97,7 +97,10 @@
       "url": "/presensi",
       "icon": "menu-icon icon-base ri ri-table-line",
       "name": "Presensi",
-      "slug": "Presensi"
+      "slug": "Presensi",
+      "roles": [
+        "Admin"
+      ]
     },
     {
       "url": "/kalender-pendidikan",

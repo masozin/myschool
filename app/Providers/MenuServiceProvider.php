@@ -134,12 +134,18 @@ class MenuServiceProvider extends ServiceProvider
 
   private function injectMenuRombel(array $menu, $rombels): array
   {
-    // Section Wali Kelas selalu di PALING ATAS menu: isinya jalur
-    // kerja harian Guru (kelas-kelas yang ia ampu semester ini).
+    // Section Wali Kelas tepat di BAWAH Home: item pertama menu
+    // (tautan Home) tetap paling atas, section kelas-kelas yang
+    // diampu Guru menyusul sesudahnya.
     $section = [(object) ['menuHeader' => 'Wali Kelas']];
 
     foreach ($rombels as $rombel) {
       $section[] = $this->buildMenuRombel($rombel);
+    }
+
+    if (!empty($menu) && !isset($menu[0]->menuHeader)) {
+      $pertama = array_shift($menu);
+      return array_merge([$pertama], $section, $menu);
     }
 
     return array_merge($section, $menu);
@@ -242,7 +248,7 @@ class MenuServiceProvider extends ServiceProvider
         ],
         (object) [
           'url'       => '/wali-kelas/' . $rombel->id . '/absensi',
-          'name'      => 'Absensi',
+          'name'      => 'Presensi',
           'slug'      => 'wali.kelas.absensi',
           'url_check' => '/wali-kelas/' . $rombel->id . '/absensi',
         ],
