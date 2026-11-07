@@ -15,41 +15,40 @@
   {{-- =========================================================== --}}
   {{-- INFO HEADER + FILTER TAHUN PELAJARAN                          --}}
   {{-- =========================================================== --}}
-  <div class="row mb-4 g-4">
-    <div class="col-12 col-md-8">
-      <div class="card h-100">
-        <div class="card-body d-flex align-items-center gap-4 py-4">
-          <div class="avatar avatar-xl flex-shrink-0">
-            <span class="avatar-initial rounded-circle bg-label-primary">
-              <i class="icon-base ri ri-calendar-event-line ri-28px"></i>
-            </span>
-          </div>
-          <div>
-            <h4 class="mb-1">Kalender Pendidikan</h4>
-            <div class="d-flex gap-4 flex-wrap">
-              <span class="text-muted"><i class="icon-base ri ri-list-check-2 me-1"></i><span
-                  id="info-jumlah-kegiatan">0</span> Kegiatan</span>
-              <span class="text-muted"><i class="icon-base ri ri-close-circle-line me-1 text-danger"></i><span
-                  id="info-jumlah-libur">0</span> Hari Libur</span>
+  <div class="card mb-4">
+    <div class="card-body py-4">
+      <div class="row align-items-center g-3">
+        <div class="col-12 col-md-7">
+          <div class="d-flex align-items-center gap-4">
+            <div class="avatar avatar-xl flex-shrink-0">
+              <span class="avatar-initial rounded-circle bg-label-primary">
+                <i class="icon-base ri ri-calendar-event-line ri-28px"></i>
+              </span>
+            </div>
+            <div>
+              <h4 class="mb-1">Kalender Pendidikan</h4>
+              <div class="d-flex gap-4 flex-wrap">
+                <span class="text-muted"><i class="icon-base ri ri-list-check-2 me-1"></i><span
+                    id="info-jumlah-kegiatan">0</span> Kegiatan</span>
+                <span class="text-muted"><i class="icon-base ri ri-close-circle-line me-1 text-danger"></i><span
+                    id="info-jumlah-libur">0</span> Hari Libur</span>
+                <span class="text-muted"><i class="icon-base ri ri-calendar-line me-1"></i>Tahun <span
+                    id="info-tahun-aktif">—</span></span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-md-4">
-      <div class="card h-100">
-        <div class="card-body d-flex flex-column justify-content-center py-4">
-          <label for="filter-tahun" class="form-label mb-1">Filter Tahun Pelajaran</label>
+        <div class="col-12 col-md-5">
+          <label for="filter-tahun" class="form-label mb-1">Tahun Pelajaran</label>
           <select id="filter-tahun" class="form-select">
             <option value="">Semua Tahun Pelajaran</option>
             @foreach ($daftarTahunPelajaran as $tp)
               <option value="{{ $tp }}" {{ $tp === ($tahunPelajaranSesi ?? null) ? 'selected' : '' }}>{{ $tp }}</option>
             @endforeach
           </select>
-          <small class="text-muted mt-1">
+          <small class="text-muted">
             <i class="ri ri-information-line me-1"></i>
-            Pilih tahun pelajaran untuk menambah kegiatan baru & melihat kalender ringkasan.
+            Tahun sesi login terpilih otomatis. Pilih tahun untuk menambah kegiatan & melihat ringkasannya.
           </small>
         </div>
       </div>
@@ -75,6 +74,7 @@
       </div>
       <div class="d-flex gap-3 align-items-center">
         <button id="btn-download-pdf" type="button" class="btn btn-outline-primary btn-sm">
+
           <i class="ri ri-file-pdf-2-line me-1"></i> <span class="d-none d-sm-inline-block">Download PDF</span>
         </button>
         @can('create', App\Models\KalenderPendidikan::class)
@@ -92,19 +92,23 @@
     </div>
   </div>
 
+  {{-- Legenda jenis: klik untuk menyaring tabel per jenis --}}
+  <div id="legend-jenis" class="d-flex flex-wrap gap-2 mb-4"></div>
+
   {{-- =========================================================== --}}
   {{-- VIEW TABEL (input langsung di dalam baris tabel)              --}}
   {{-- =========================================================== --}}
   <div id="view-tabel-kalender">
     <div class="card">
-      <div class="table-responsive">
-        <table class="table table-bordered table-hover mb-0 align-middle">
-          <thead class="table-light">
+      <div class="table-responsive" style="max-height: 72vh;">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
             <tr>
               <th width="40" class="text-center">#</th>
               <th width="150">Tanggal Mulai</th>
               <th width="150">Tanggal Selesai</th>
               <th width="190">Jenis</th>
+              <th width="100">Semester</th>
               <th class="text-center" width="90">Libur</th>
               <th>Kegiatan</th>
               <th class="text-center" width="110">Aksi</th>
@@ -112,7 +116,7 @@
           </thead>
           <tbody id="tbody-kalender">
             <tr>
-              <td colspan="7" class="text-center py-4 text-muted">
+              <td colspan="8" class="text-center py-4 text-muted">
                 <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...
               </td>
             </tr>
@@ -287,7 +291,7 @@
 
       // ── Load Tabel (plain AJAX) ───────────────────────────────────────────────
       async function loadTabelKalender() {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">
           <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...</td></tr>`;
 
         try {
@@ -300,19 +304,43 @@
           if (!res.ok) throw new Error(json.message || 'Gagal memuat data');
 
           allKalender = json.data || [];
-          updateHeaderStats(allKalender);
           renderTabel();
           if (currentView === 'kalender') renderRingkasanSemester();
         } catch (err) {
-          tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">
+          tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-danger">
             <i class="ri ri-error-warning-line me-1"></i> ${err.message}</td></tr>`;
         }
       }
 
-      function updateHeaderStats(data) {
-        document.getElementById('info-jumlah-kegiatan').textContent = data.length;
-        document.getElementById('info-jumlah-libur').textContent = data.filter(r => r.is_libur).length;
+      // Statistik header mengikuti data pada tahun terpilih (bukan
+      // seluruh tahun) + legenda jenis yang bisa diklik untuk menyaring
+      function perbaruiStatistikDanLegenda() {
+        const tp = filterTahun.value;
+        const dataTp = tp ? allKalender.filter(r => r.tahun_pelajaran === tp) : allKalender;
+
+        document.getElementById('info-jumlah-kegiatan').textContent = dataTp.length;
+        document.getElementById('info-jumlah-libur').textContent = dataTp.filter(r => r.is_libur).length;
+        document.getElementById('info-tahun-aktif').textContent = tp || 'Semua';
+
+        const q = searchInput.value.toLowerCase().trim();
+        document.getElementById('legend-jenis').innerHTML = DAFTAR_JENIS.map(jenis => {
+          const n = dataTp.filter(r => r.jenis === jenis).length;
+          const aktif = q === jenis.toLowerCase();
+          return `<button type="button" class="btn btn-sm ${aktif ? 'btn-primary' : 'btn-outline-secondary'} btn-legenda-jenis"
+            data-jenis="${jenis}">
+            <span class="badge bg-label-${warnaJenis(jenis)} me-1">&nbsp;</span>${jenis}
+            <span class="badge ${aktif ? 'bg-white text-primary' : 'bg-label-secondary'} ms-1">${n}</span>
+          </button>`;
+        }).join('');
       }
+
+      document.addEventListener('click', function(e) {
+        const chip = e.target.closest('.btn-legenda-jenis');
+        if (!chip) return;
+        const jenis = chip.dataset.jenis;
+        searchInput.value = searchInput.value.toLowerCase().trim() === jenis.toLowerCase() ? '' : jenis;
+        searchInput.dispatchEvent(new Event('input'));
+      });
 
       function formatTanggal(tgl) {
         if (!tgl) return '-';
@@ -380,12 +408,17 @@
         }
         aksi += '</div>';
 
+        const badgeSemester = row.jenis_semester === 'Ganjil' ?
+          '<span class="badge bg-label-primary">Ganjil</span>' :
+          '<span class="badge bg-label-info">Genap</span>';
+
         return `
           <tr data-id="${row.id}">
             <td class="text-center">${nomor}</td>
             <td>${formatTanggal(row.tanggal_mulai)}</td>
             <td>${formatTanggal(row.tanggal_selesai)}</td>
             <td>${badgeJenis}</td>
+            <td>${badgeSemester}</td>
             <td class="text-center">${badgeLibur}</td>
             <td>${row.kegiatan ?? '-'}</td>
             <td>${aksi}</td>
@@ -410,6 +443,7 @@
                 ${optionsJenis(row?.jenis)}
               </select>
             </td>
+            <td class="text-muted small">otomatis</td>
             <td class="text-center">
               <div class="form-check form-switch d-flex justify-content-center mb-0">
                 <input class="form-check-input inp-libur" type="checkbox" role="switch" ${row?.is_libur ? 'checked' : ''}>
@@ -426,6 +460,7 @@
       }
 
       function renderTabel() {
+        perbaruiStatistikDanLegenda();
         const data = dataTerfilter();
         let rows = '';
         let nomor = 1;
@@ -435,8 +470,11 @@
         }
 
         if (!data.length && editingRowId !== 'new') {
-          tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">
-            <i class="ri ri-inbox-line me-1"></i> Belum ada data kegiatan.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">
+            <i class="ri ri-calendar-line ri-36px d-block mb-2"></i>
+            Belum ada kegiatan pada pilihan ini.<br>
+            <small>Klik <strong>Tambah Kegiatan</strong> untuk input manual, atau <strong>Import Excel</strong> untuk memasukkan banyak kegiatan sekaligus.</small>
+            </td></tr>`;
           return;
         }
 
