@@ -381,6 +381,27 @@ class SklController extends Controller
       }
     }
 
+    // Saring mapping menurut kurikulum rombel siswa ini (aturan yang
+    // sama seperti Sinkronisasi): siswa hanya menerima mapel dari
+    // kurikulumnya sendiri, bukan gabungan semua kurikulum
+    $kurikulumSiswa = RombelAnggota::where('siswa_id', $request->siswa_id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', (int) $semesterId)
+      ->with('rombel')
+      ->first()?->rombel?->kurikulum_id;
+
+    if ($kurikulumSiswa !== null) {
+      $mappings = $mappings->filter(
+        fn($m) => $m->kurikulum_id === null || (int) $m->kurikulum_id === (int) $kurikulumSiswa
+      )->values();
+
+      if ($mappings->isEmpty()) {
+        $pesanError = "Tidak ada mata pelajaran yang berlaku untuk kurikulum siswa ini.";
+        if ($request->expectsJson()) return response()->json(['message' => $pesanError], 422);
+        return back()->with('error', $pesanError);
+      }
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // PROSES GENERATE DATA
     // ══════════════════════════════════════════════════════════════════════
@@ -956,8 +977,28 @@ class SklController extends Controller
 
     $tingkatAkhir = $this->tingkatAkhir[$jenjang] ?? 12;
 
-    // 2. Ambil Mapel menggunakan fungsi bawaan controller Anda
-    $mapels = $this->getMapels($jenjang, $tingkatAkhir, $semester->id, $sekolah->id);
+    // 2. Ambil Mapel menggunakan fungsi bawaan controller Anda,
+    //    disaring kurikulum rombel kelas akhir semester ini — satu
+    //    tingkat memakai satu kurikulum (aturan yang sama seperti
+    //    template SKHU)
+    $kurikulumIds = \App\Models\Rombel::where('sekolah_id', $sekolah->id)
+      ->where('semester_id', $semester->id)
+      ->where('tingkat', $tingkatAkhir)
+      ->whereNotNull('kurikulum_id')
+      ->distinct()
+      ->pluck('kurikulum_id');
+
+    if ($kurikulumIds->count() > 1) {
+      $namaKurikulum = \App\Models\Kurikulum::whereIn('id', $kurikulumIds)
+        ->pluck('nama_kurikulum')
+        ->implode(', ');
+
+      return response()->json([
+        'message' => "Rombel tingkat {$tingkatAkhir} memakai lebih dari satu kurikulum ({$namaKurikulum}). Samakan dulu kurikulum rombel setingkat, lalu unduh template lagi.",
+      ], 422);
+    }
+
+    $mapels = $this->getMapels($jenjang, $tingkatAkhir, $semester->id, $sekolah->id, $kurikulumIds->first());
 
     if ($mapels->isEmpty()) {
       return response()->json([

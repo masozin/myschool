@@ -27,6 +27,34 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
   // meski ada multiple sheet
   private $processedSiswaIds = [];
 
+  // Peta siswa_id => kurikulum_id dari rombelnya (dimuat sekali)
+  private $kurikulumPerSiswa = null;
+
+  /**
+   * Mapping mapel yang berlaku untuk siswa ini menurut kurikulum
+   * rombelnya — siswa tidak menerima mapel kurikulum lain.
+   */
+  protected function mappingsUntukSiswa(int $siswaId)
+  {
+    if ($this->kurikulumPerSiswa === null) {
+      $this->kurikulumPerSiswa = \App\Models\RombelAnggota::where('sekolah_id', $this->sekolahId)
+        ->where('semester_id', $this->semesterId)
+        ->with('rombel')
+        ->get()
+        ->mapWithKeys(fn($a) => [$a->siswa_id => $a->rombel?->kurikulum_id]);
+    }
+
+    $kurikulum = $this->kurikulumPerSiswa[$siswaId] ?? null;
+
+    if ($kurikulum === null) {
+      return collect($this->mappings);
+    }
+
+    return collect($this->mappings)->filter(
+      fn($m) => $m->kurikulum_id === null || (int) $m->kurikulum_id === (int) $kurikulum
+    )->values();
+  }
+
   public function __construct($sekolahId, $semesterId, $modeInput, $mappings, $komponens)
   {
     $this->sekolahId  = $sekolahId;
@@ -68,7 +96,7 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
 
       // 2. Jika SKL baru saja terbuat (Siswa belum punya), GENERATE STRUKTUR KOSONG
       if ($skl->wasRecentlyCreated) {
-        foreach ($this->mappings as $mapping) {
+        foreach ($this->mappingsUntukSiswa($siswaId) as $mapping) {
           $sklNilai = SklNilai::create([
             'skl_id'           => $skl->id,
             'mapel_mapping_id' => $mapping->id,
@@ -115,6 +143,10 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
       }
 
       // 3. Looping untuk Mengisi / Menimpa Nilai dari Excel
+      $mappingIdsSiswa = $this->mappingsUntukSiswa($siswaId)
+        ->pluck('id')
+        ->map(fn($i) => (int) $i)
+        ->all();
       $memilikiPerubahanNilai = false;
       foreach ($row as $colIndex => $nilaiExcel) {
         if ($colIndex < 5 || trim((string)$nilaiExcel) === '') continue;
@@ -129,6 +161,10 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
           $mapelId = $matches[1] ?? null;
           $kompId  = $matches[2] ?? null;
           $subId   = $matches[3] ?? null;
+
+          if ($mapelId && !in_array((int) $mapelId, $mappingIdsSiswa, true)) {
+            continue;
+          }
 
           if ($mapelId) {
             $sklNilai = SklNilai::firstOrCreate([
