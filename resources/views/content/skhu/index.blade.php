@@ -286,35 +286,10 @@
               </div>
             </div>
 
-            {{-- Tanggal --}}
-            <div class="mb-6">
-              <div class="fw-semibold mb-2">
-                <i class="icon-base ri ri-calendar-line me-2"></i>Step 2 — Isi Tanggal
-                <small class="text-muted fw-normal">(akan diset ke semua SKHU yang diimport)</small>
-              </div>
-              <div class="row g-3">
-                <div class="col-12 col-md-4">
-                  <label class="form-label form-label-sm">Tanggal Mulai Ujian</label>
-                  <input type="text" id="import-tgl-mulai" class="form-control form-control-sm"
-                    placeholder="YYYY-MM-DD" autocomplete="off">
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label form-label-sm">Tanggal Selesai Ujian</label>
-                  <input type="text" id="import-tgl-selesai" class="form-control form-control-sm"
-                    placeholder="YYYY-MM-DD" autocomplete="off">
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label form-label-sm">Tanggal Terbit SKHU</label>
-                  <input type="text" id="import-tgl-terbit" class="form-control form-control-sm"
-                    placeholder="YYYY-MM-DD" autocomplete="off">
-                </div>
-              </div>
-            </div>
-
             {{-- Upload --}}
             <div class="mb-3">
               <div class="fw-semibold mb-2">
-                <i class="icon-base ri ri-file-upload-line me-2"></i>Step 3 — Upload File Excel
+                <i class="icon-base ri ri-file-upload-line me-2"></i>Step 2 — Upload File Excel
               </div>
               <div class="upload-area-import" id="upload-area-import">
                 <input type="file" id="import-file-excel" accept=".xlsx,.xls" class="d-none">
@@ -629,20 +604,6 @@
       // IMPORT NILAI
       // ══════════════════════════════════════════════════════════════════════════
 
-      // Init flatpickr SETELAH modal ditampilkan agar appendTo bisa pakai body
-      document.getElementById('modal-import')?.addEventListener('shown.bs.modal', function() {
-        const opts = {
-          dateFormat: 'Y-m-d',
-          allowInput: true,
-          appendTo: document.body,
-          static: true,
-        };
-        ['import-tgl-mulai', 'import-tgl-selesai', 'import-tgl-terbit'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el && !el._flatpickr) flatpickr(el, opts);
-        });
-      });
-
       // Reset modal import saat ditutup
       document.getElementById('modal-import')?.addEventListener('hidden.bs.modal', () => {
         document.getElementById('import-file-excel').value = '';
@@ -652,10 +613,6 @@
         document.getElementById('import-sukses').classList.add('d-none');
         document.getElementById('import-error').classList.add('d-none');
         document.getElementById('btn-proses-import').disabled = true;
-        ['import-tgl-mulai', 'import-tgl-selesai', 'import-tgl-terbit'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el?._flatpickr) el._flatpickr.clear();
-        });
       });
 
       // Download Template
@@ -758,9 +715,6 @@
         this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memproses...';
 
         const formData = new FormData();
-        formData.append('tanggal_mulai_ujian', document.getElementById('import-tgl-mulai').value);
-        formData.append('tanggal_selesai_ujian', document.getElementById('import-tgl-selesai').value);
-        formData.append('tanggal_terbit', document.getElementById('import-tgl-terbit').value);
         formData.append('file_excel', fileInput.files[0]);
         formData.append('_token', csrf);
 

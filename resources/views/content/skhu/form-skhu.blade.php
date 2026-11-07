@@ -115,29 +115,19 @@
               value="{{ $skhu?->nomor_ujian }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
-          <div class="mb-4">
-            <label class="form-label">Tanggal Mulai Ujian</label>
-            <input type="text" id="tanggal_mulai_ujian" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_mulai_ujian?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
-          </div>
-
-          <div class="mb-4">
-            <label class="form-label">Tanggal Selesai Ujian</label>
-            <input type="text" id="tanggal_selesai_ujian" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_selesai_ujian?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
-          </div>
-
-          <div class="mb-4">
-            <label class="form-label">Tanggal Terbit</label>
-            <input type="text" id="tanggal_terbit" class="form-control form-control-sm flatpickr-date"
-              value="{{ $skhu?->tanggal_terbit?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
-          </div>
-
-          <div class="mb-4">
-            <label class="form-label">Tempat Terbit</label>
-            <input type="text" id="tempat_terbit" class="form-control form-control-sm"
-              placeholder="Kosongkan untuk memakai nama desa sekolah"
-              value="{{ $skhu?->tempat_terbit }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
+          <div class="alert alert-light border mb-4">
+            <div class="fw-semibold mb-1">
+              <i class="icon-base ri ri-calendar-settings-line me-1"></i>Tanggal &amp; Tempat Angkatan
+            </div>
+            <div class="small text-muted">
+              Ujian: {{ $konfigurasi?->tanggal_mulai_ujian?->translatedFormat('d F Y') ?? '—' }}
+              s.d. {{ $konfigurasi?->tanggal_selesai_ujian?->translatedFormat('d F Y') ?? '—' }}<br>
+              Terbit: {{ $konfigurasi?->tempat_terbit ? $konfigurasi->tempat_terbit . ', ' : '' }}{{ $konfigurasi?->tanggal_terbit?->translatedFormat('d F Y') ?? '—' }}
+            </div>
+            <div class="small text-muted mt-1">
+              Berlaku untuk seluruh angkatan — diatur di halaman
+              <a href="{{ url('/skhu/pengaturan-angkatan') }}">Tanggal &amp; Penomoran</a>.
+            </div>
           </div>
 
           @if ($skhu)
@@ -286,10 +276,6 @@
         return {
           nomor_surat: document.getElementById('nomor_surat').value,
           nomor_ujian: document.getElementById('nomor_ujian').value,
-          tanggal_mulai_ujian: document.getElementById('tanggal_mulai_ujian').value,
-          tanggal_selesai_ujian: document.getElementById('tanggal_selesai_ujian').value,
-          tanggal_terbit: document.getElementById('tanggal_terbit').value,
-          tempat_terbit: document.getElementById('tempat_terbit').value,
           nilai,
           finalisasi: finalisasi ? 1 : 0,
         };

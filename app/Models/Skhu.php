@@ -18,10 +18,6 @@ class Skhu extends Model
     'semester_id',
     'nomor_surat',
     'nomor_ujian',
-    'tanggal_mulai_ujian',
-    'tanggal_selesai_ujian',
-    'tanggal_terbit',
-    'tempat_terbit',
     'status',
     'generated_at',
     'snapshot_nama',
@@ -33,9 +29,6 @@ class Skhu extends Model
   ];
 
   protected $casts = [
-    'tanggal_mulai_ujian'   => 'date',
-    'tanggal_selesai_ujian' => 'date',
-    'tanggal_terbit'        => 'date',
     'generated_at'          => 'datetime',
     'snapshot_tgl_lahir'    => 'date',
   ];
@@ -163,6 +156,47 @@ class Skhu extends Model
   // Diisi saat SKHU difinalisasi, dikosongkan saat finalisasi
   // dibatalkan. Accessor *Cetak dipakai template cetak: membaca
   // snapshot bila ada, jatuh ke data induk bila belum ada.
+
+  // ── Konfigurasi angkatan ─────────────────────────────────────────
+  // Tanggal ujian, tanggal terbit, dan tempat terbit adalah data
+  // satu angkatan (tabel_skhu_konfigurasi), bukan data per siswa.
+  // Accessor di bawah mempertahankannya terbaca sebagai atribut
+  // SKHU ($skhu->tanggal_terbit dst.) untuk cetakan & validasi.
+
+  private ?SkhuKonfigurasi $konfigurasiCache = null;
+  private bool $konfigurasiDimuat = false;
+
+  public function konfigurasi(): ?SkhuKonfigurasi
+  {
+    if (!$this->konfigurasiDimuat) {
+      $this->konfigurasiCache = ($this->sekolah_id && $this->semester_id)
+        ? SkhuKonfigurasi::untukSekolah((int) $this->sekolah_id, (int) $this->semester_id)
+        : null;
+      $this->konfigurasiDimuat = true;
+    }
+
+    return $this->konfigurasiCache;
+  }
+
+  public function getTanggalMulaiUjianAttribute()
+  {
+    return $this->konfigurasi()?->tanggal_mulai_ujian;
+  }
+
+  public function getTanggalSelesaiUjianAttribute()
+  {
+    return $this->konfigurasi()?->tanggal_selesai_ujian;
+  }
+
+  public function getTanggalTerbitAttribute()
+  {
+    return $this->konfigurasi()?->tanggal_terbit;
+  }
+
+  public function getTempatTerbitAttribute()
+  {
+    return $this->konfigurasi()?->tempat_terbit;
+  }
 
   public function isiSnapshotIdentitas(): void
   {

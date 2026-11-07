@@ -20,7 +20,6 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
   protected int    $semesterId;
   protected string $jenjang;
   protected string $tahunPelajaran;
-  protected array  $dataHeader;
   protected array  $errors     = [];
   protected int    $berhasil   = 0;
   protected int    $diperbarui = 0;
@@ -29,14 +28,12 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     int    $sekolahId,
     int    $semesterId,
     string $jenjang,
-    string $tahunPelajaran,
-    array  $dataHeader
+    string $tahunPelajaran
   ) {
     $this->sekolahId      = $sekolahId;
     $this->semesterId     = $semesterId;
     $this->jenjang        = $jenjang;
     $this->tahunPelajaran = $tahunPelajaran;
-    $this->dataHeader     = $dataHeader;
   }
 
   public function sheets(): array
@@ -217,12 +214,11 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
       ->first();
     $isUpdate = (bool) $skhu;
 
+    // Tanggal ujian & terbit tidak lagi disimpan per SKHU — keduanya
+    // data angkatan di tabel_skhu_konfigurasi
     $headerData = [
-      'tanggal_mulai_ujian'   => $this->dataHeader['tanggal_mulai_ujian'] ?: null,
-      'tanggal_selesai_ujian' => $this->dataHeader['tanggal_selesai_ujian'] ?: null,
-      'tanggal_terbit'        => $this->dataHeader['tanggal_terbit'] ?: null,
-      'status'                => 'draft',
-      'generated_at'          => now(),
+      'status'       => 'draft',
+      'generated_at' => now(),
     ];
 
     // Nomor surat/ujian: update hanya jika kolom ada di file dan tidak kosong

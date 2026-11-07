@@ -10,6 +10,7 @@ use App\Models\RombelAnggota;
 use App\Models\Sekolah;
 use App\Models\Semester;
 use App\Models\Skhu;
+use App\Models\SkhuKonfigurasi;
 use App\Models\SkhuNilai;
 use App\Models\SkhuTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -268,7 +269,7 @@ class SkhuController extends Controller
       'nilaiExisting',
       'anggota',
       'canEdit'
-    ));
+    ))->with('konfigurasi', SkhuKonfigurasi::untukSekolah($sekolah->id, $semester->id));
   }
 
   // =========================================================================
@@ -279,10 +280,6 @@ class SkhuController extends Controller
     $request->validate([
       'nomor_surat'           => 'nullable|string|max:100',
       'nomor_ujian'           => 'nullable|string|max:100',
-      'tanggal_mulai_ujian'   => 'nullable|date',
-      'tanggal_selesai_ujian' => 'nullable|date',
-      'tanggal_terbit'        => 'nullable|date',
-      'tempat_terbit'         => 'nullable|string|max:100',
       'nilai'                 => 'required|array',
       'nilai.*'               => 'numeric|min:0|max:100',
       'finalisasi'            => 'nullable|boolean',
@@ -317,10 +314,6 @@ class SkhuController extends Controller
       'sekolah_id'            => $sekolahId,
       'nomor_surat'           => $request->nomor_surat,
       'nomor_ujian'           => $request->nomor_ujian,
-      'tanggal_mulai_ujian'   => $request->tanggal_mulai_ujian,
-      'tanggal_selesai_ujian' => $request->tanggal_selesai_ujian,
-      'tanggal_terbit'        => $request->tanggal_terbit,
-      'tempat_terbit'         => $request->tempat_terbit,
       'status'                => 'draft',
       'generated_at'          => now(),
     ]);
@@ -506,17 +499,19 @@ class SkhuController extends Controller
       ];
     })->values();
 
-    // Nilai tanggal yang sudah umum dipakai angkatan ini (untuk prefill form)
-    $skhus = Skhu::where('sekolah_id', $sekolah->id)
-      ->where('semester_id', $semester->id)
-      ->get();
+    // Tanggal & tempat adalah data angkatan di konfigurasi (sumber
+    // tunggal) — prefill form diambil dari sana
+    $konfigurasi = SkhuKonfigurasi::untukSekolah($sekolah->id, $semester->id);
     $prefill = [
-      'tanggal_mulai_ujian'   => $skhus->pluck('tanggal_mulai_ujian')->filter()->first(),
-      'tanggal_selesai_ujian' => $skhus->pluck('tanggal_selesai_ujian')->filter()->first(),
-      'tanggal_terbit'        => $skhus->pluck('tanggal_terbit')->filter()->first(),
-      'tempat_terbit'         => $skhus->pluck('tempat_terbit')->filter()->first(),
+      'tanggal_mulai_ujian'   => $konfigurasi?->tanggal_mulai_ujian,
+      'tanggal_selesai_ujian' => $konfigurasi?->tanggal_selesai_ujian,
+      'tanggal_terbit'        => $konfigurasi?->tanggal_terbit,
+      'tempat_terbit'         => $konfigurasi?->tempat_terbit,
     ];
-    $jumlahFinal = $skhus->where('status', 'final')->count();
+    $jumlahFinal = Skhu::where('sekolah_id', $sekolah->id)
+      ->where('semester_id', $semester->id)
+      ->where('status', 'final')
+      ->count();
 
     return view('content.skhu.pengaturan-angkatan', compact(
       'sekolah', 'semester', 'jenjang', 'tingkatAkhir',
@@ -646,15 +641,30 @@ class SkhuController extends Controller
       }
     }
 
-    $nTanggal = 0;
     $nSurat   = 0;
     $nUjian   = 0;
     $nFinal   = 0;
+    $konfigurasiTersimpan = false;
 
     DB::transaction(function () use (
       $anggota, $request, $adaTanggal, $penetapan,
-      $sekolahId, $semester, &$nTanggal, &$nSurat, &$nUjian, &$nFinal
+      $sekolahId, $semester, &$nSurat, &$nUjian, &$nFinal, &$konfigurasiTersimpan
     ) {
+      // Tanggal & tempat adalah data angkatan: simpan sekali ke
+      // konfigurasi, bukan berulang ke setiap baris SKHU
+      if ($adaTanggal) {
+        $konfigurasi = SkhuKonfigurasi::firstOrNew([
+          'sekolah_id'  => $sekolahId,
+          'semester_id' => $semester->id,
+        ]);
+        if ($request->filled('tanggal_mulai_ujian'))   $konfigurasi->tanggal_mulai_ujian   = $request->tanggal_mulai_ujian;
+        if ($request->filled('tanggal_selesai_ujian')) $konfigurasi->tanggal_selesai_ujian = $request->tanggal_selesai_ujian;
+        if ($request->filled('tanggal_terbit'))        $konfigurasi->tanggal_terbit        = $request->tanggal_terbit;
+        if ($request->filled('tempat_terbit'))         $konfigurasi->tempat_terbit         = $request->tempat_terbit;
+        $konfigurasi->save();
+        $konfigurasiTersimpan = true;
+      }
+
       foreach ($anggota as $a) {
         $skhu = $a->siswa->skhu->first();
 
@@ -664,13 +674,6 @@ class SkhuController extends Controller
         }
 
         $isi = $penetapan[$a->siswa->id] ?? [];
-
-        if ($adaTanggal) {
-          if ($request->filled('tanggal_mulai_ujian'))   $isi['tanggal_mulai_ujian']   = $request->tanggal_mulai_ujian;
-          if ($request->filled('tanggal_selesai_ujian')) $isi['tanggal_selesai_ujian'] = $request->tanggal_selesai_ujian;
-          if ($request->filled('tanggal_terbit'))        $isi['tanggal_terbit']        = $request->tanggal_terbit;
-          if ($request->filled('tempat_terbit'))         $isi['tempat_terbit']         = $request->tempat_terbit;
-        }
 
         if (!$isi) {
           continue;
@@ -685,14 +688,13 @@ class SkhuController extends Controller
         $skhu->fill($isi);
         $skhu->save();
 
-        if ($adaTanggal) $nTanggal++;
         if (isset($isi['nomor_surat'])) $nSurat++;
         if (isset($isi['nomor_ujian'])) $nUjian++;
       }
     });
 
     $ringkasan = [];
-    if ($nTanggal > 0) $ringkasan[] = "tanggal diterapkan ke {$nTanggal} siswa";
+    if ($konfigurasiTersimpan) $ringkasan[] = 'tanggal & tempat angkatan tersimpan';
     if ($nSurat > 0)   $ringkasan[] = "nomor SKHU dibuat untuk {$nSurat} siswa";
     if ($nUjian > 0)   $ringkasan[] = "nomor ujian dibuat untuk {$nUjian} siswa";
     if ($nFinal > 0)   $ringkasan[] = "{$nFinal} SKHU final dilewati (terkunci)";
@@ -1366,10 +1368,7 @@ class SkhuController extends Controller
     }
 
     $request->validate([
-      'tanggal_mulai_ujian'   => 'nullable|date',
-      'tanggal_selesai_ujian' => 'nullable|date',
-      'tanggal_terbit'        => 'nullable|date',
-      'file_excel'            => 'required|file|mimes:xlsx,xls|max:10240',
+      'file_excel' => 'required|file|mimes:xlsx,xls|max:10240',
     ]);
 
     $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
@@ -1385,12 +1384,7 @@ class SkhuController extends Controller
       return response()->json(['message' => 'Data sekolah operator tidak ditemukan.'], 422);
     }
 
-    $sekolah    = \App\Models\Sekolah::findOrFail($sekolahId);
-    $dataHeader = [
-      'tanggal_mulai_ujian'   => $request->tanggal_mulai_ujian,
-      'tanggal_selesai_ujian' => $request->tanggal_selesai_ujian,
-      'tanggal_terbit'        => $request->tanggal_terbit,
-    ];
+    $sekolah = \App\Models\Sekolah::findOrFail($sekolahId);
 
     try {
       $import = new SkhuImport(
@@ -1398,7 +1392,6 @@ class SkhuController extends Controller
         semesterId: $semester->id,
         jenjang: $sekolah->jenjang,
         tahunPelajaran: $semester->tahun_pelajaran,
-        dataHeader: $dataHeader,
       );
 
       Excel::import($import, $request->file('file_excel'));
