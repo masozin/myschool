@@ -832,7 +832,9 @@
           data: function(d) {
             if (!window.hasRole('Admin')) d.length = -1;
             d.sekolah_id = $('#filter_sekolah').val();
-            d.rombel_id = $('#filter_rombel').val();
+            // Halaman wali kelas membawa rombel konteks di tabel;
+            // itu yang dipakai, bukan saringan rombel umum
+            d.rombel_id = tabelSiswa.dataset.rombelId || $('#filter_rombel').val();
           },
           dataSrc: function(json) {
             json.recordsTotal = typeof json.recordsTotal === 'number' ? json.recordsTotal : 0;

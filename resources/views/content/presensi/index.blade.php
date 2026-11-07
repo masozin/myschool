@@ -58,7 +58,7 @@
           <select id="filter_rombel" name="rombel_id" class="form-select">
             <option value="">Pilih rombel</option>
             @foreach ($rombelList as $r)
-              <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
+              <option value="{{ $r->id }}" {{ (int) request('rombel_id') === $r->id ? 'selected' : '' }}>{{ $r->nama_rombel }}</option>
             @endforeach
           </select>
         </div>
