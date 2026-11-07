@@ -134,49 +134,15 @@ class MenuServiceProvider extends ServiceProvider
 
   private function injectMenuRombel(array $menu, $rombels): array
   {
-    $items = [];
+    // Section Wali Kelas selalu di PALING ATAS menu: isinya jalur
+    // kerja harian Guru (kelas-kelas yang ia ampu semester ini).
+    $section = [(object) ['menuHeader' => 'Wali Kelas']];
+
     foreach ($rombels as $rombel) {
-      $items[] = $this->buildMenuRombel($rombel);
+      $section[] = $this->buildMenuRombel($rombel);
     }
 
-    $menuBaru  = [];
-    $terpasang = false;
-
-    foreach ($menu as $item) {
-      $menuBaru[] = $item;
-
-      if (isset($item->menuHeader) && $item->menuHeader === 'Wali Kelas') {
-        $menuBaru  = array_merge($menuBaru, $items);
-        $terpasang = true;
-      }
-    }
-
-    if ($terpasang) {
-      return $menuBaru;
-    }
-
-    // Jangkar 'Wali Kelas' tidak ada di file menu (keadaan selama
-    // ini — akibatnya menu kelas Guru tidak pernah muncul).
-    // Sisipkan section-nya sendiri sebelum header 'Pengaturan',
-    // atau di ujung menu bila header itu pun tidak ada.
-    $hasil     = [];
-    $tersisip  = false;
-
-    foreach ($menuBaru as $item) {
-      if (!$tersisip && isset($item->menuHeader) && $item->menuHeader === 'Pengaturan') {
-        $hasil[]  = (object) ['menuHeader' => 'Wali Kelas'];
-        $hasil    = array_merge($hasil, $items);
-        $tersisip = true;
-      }
-      $hasil[] = $item;
-    }
-
-    if (!$tersisip) {
-      $hasil[] = (object) ['menuHeader' => 'Wali Kelas'];
-      $hasil   = array_merge($hasil, $items);
-    }
-
-    return $hasil;
+    return array_merge($section, $menu);
   }
 
   /** Apakah Guru ini wali kelas tingkat akhir pada semester kelulusan? */
@@ -202,8 +168,19 @@ class MenuServiceProvider extends ServiceProvider
       return false;
     }
 
+    // Kelas akhir dinilai pada DUA semester kerja guru: semester
+    // kelulusan (dokumen yang sedang difinalisasi — saat sesi
+    // Ganjil itu kelas akhir tahun lalu) dan semester sesi saat
+    // ini (kelas akhir yang sedang ia bina menuju kelulusan).
+    // Wali kelas salah satu di antaranya memang mengurus
+    // SKHU/SKL, jadi menunya tampil.
+    $semesterIds = array_unique(array_filter([
+      (int) \App\Models\Semester::smtIdKelulusan(),
+      (int) Session::get('semester_id'),
+    ]));
+
     return Rombel::where('ptk_id', $user->ptk->id)
-      ->where('semester_id', (int) \App\Models\Semester::smtIdKelulusan())
+      ->whereIn('semester_id', $semesterIds)
       ->where('tingkat', $tingkatAkhir)
       ->exists();
   }
