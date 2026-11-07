@@ -23,17 +23,23 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
   protected array  $errors     = [];
   protected int    $berhasil   = 0;
   protected int    $diperbarui = 0;
+  protected int    $dilewati   = 0;
+
+  /** Daftar siswa yang boleh diimpor (null = semua; diisi untuk Guru wali kelas). */
+  protected ?array $siswaIdsDiizinkan;
 
   public function __construct(
     int    $sekolahId,
     int    $semesterId,
     string $jenjang,
-    string $tahunPelajaran
+    string $tahunPelajaran,
+    ?array $siswaIdsDiizinkan = null
   ) {
     $this->sekolahId      = $sekolahId;
     $this->semesterId     = $semesterId;
     $this->jenjang        = $jenjang;
     $this->tahunPelajaran = $tahunPelajaran;
+    $this->siswaIdsDiizinkan = $siswaIdsDiizinkan;
   }
 
   public function sheets(): array
@@ -201,6 +207,16 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     $siswa = Siswa::where('nisn', $nisn)->first();
     if (!$siswa) return;
 
+    // Kurungan wali kelas: siswa di luar daftar yang diizinkan
+    // dilewati tanpa mengubah data apa pun
+    if (
+      $this->siswaIdsDiizinkan !== null
+      && !in_array((int) $siswa->id, $this->siswaIdsDiizinkan, true)
+    ) {
+      $this->dilewati++;
+      return;
+    }
+
     // Ambil nilai nomor surat & nomor ujian dari file jika kolomnya ada
     $nomorSurat = isset($nomorKolom['nomor_surat'])
       ? ($val($nomorKolom['nomor_surat']) ?: null)
@@ -265,6 +281,11 @@ class SkhuImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
   {
     return $this->berhasil;
   }
+  public function getDilewati(): int
+  {
+    return $this->dilewati;
+  }
+
   public function getDiperbarui(): int
   {
     return $this->diperbarui;

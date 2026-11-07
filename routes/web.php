@@ -429,17 +429,20 @@ Route::controller(SkhuController::class)
     Route::post('/finalisasi-semua', 'finalisasiSemua');
     Route::post('/siswa/{siswa_id}/simpan', 'simpan');
     Route::post('/siswa/{skhu_id}/updateStatus', 'updateStatus');
+    // Impor untuk wali kelas juga — baris di luar rombelnya
+    // dilewati di dalam import (daftar putih per Guru)
+    Route::get('/import/template', 'downloadTemplate');
+    Route::post('/import', 'importNilai');
   });
 
-// SKHU - Khusus Operator (impor & template memang sudah
-// dijaga Operator-only di controller; route kini selaras)
+// SKHU - Khusus Operator (halaman impor mandiri & pengaturan
+// angkatan; impor + template juga terbuka untuk Guru lewat grup
+// kelola di atas dengan kurungan rombel)
 Route::controller(SkhuController::class)
   ->prefix('skhu')
   ->middleware(['auth:sanctum', 'role:Operator Sekolah', 'fitur:skhu'])
   ->group(function () {
     Route::get('/import', 'halamanImport');
-    Route::get('/import/template', 'downloadTemplate');
-    Route::post('/import', 'importNilai');
     Route::get('/pengaturan-angkatan', 'pengaturanAngkatan');
     Route::post('/pengaturan-angkatan', 'simpanPengaturanAngkatan');
   });

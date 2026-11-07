@@ -1028,9 +1028,13 @@ class SkhuController extends Controller
   {
     $user = Auth::user();
 
-    if (!$user->hasRole('Operator Sekolah')) {
+    // Operator: template satu angkatan. Guru wali kelas: boleh,
+    // daftar siswanya dikurung ke rombelnya sendiri.
+    if (!$user->hasAnyRole(['Operator Sekolah', 'Guru'])) {
       abort(403);
     }
+
+    $hanyaRombelSendiri = $user->hasRole('Guru') && !$user->hasRole('Operator Sekolah');
 
     $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
       ?? Semester::where('is_active', 1)->first();
@@ -1087,10 +1091,15 @@ class SkhuController extends Controller
     $siswaList = RombelAnggota::with(['siswa', 'siswa.skhu', 'rombel'])
       ->whereHas(
         'rombel',
-        fn($q) => $q
-          ->where('sekolah_id', $sekolah->id)
-          ->where('semester_id', $semester->id)
-          ->where('tingkat', $tingkatAkhir)
+        function ($q) use ($sekolah, $semester, $tingkatAkhir, $hanyaRombelSendiri, $user) {
+          $q->where('sekolah_id', $sekolah->id)
+            ->where('semester_id', $semester->id)
+            ->where('tingkat', $tingkatAkhir);
+
+          if ($hanyaRombelSendiri) {
+            $q->where('ptk_id', $user->ptk?->id);
+          }
+        }
       )
       ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->get()
@@ -1363,7 +1372,7 @@ class SkhuController extends Controller
   {
     $user = Auth::user();
 
-    if (!$user->hasRole('Operator Sekolah')) {
+    if (!$user->hasAnyRole(['Operator Sekolah', 'Guru'])) {
       return response()->json(['message' => 'Akses ditolak.'], 403);
     }
 
@@ -1386,12 +1395,28 @@ class SkhuController extends Controller
 
     $sekolah = \App\Models\Sekolah::findOrFail($sekolahId);
 
+    // Guru wali kelas hanya boleh mengimpor nilai siswa rombel
+    // kelas akhirnya; baris siswa lain dilewati & dilaporkan
+    $siswaIdsDiizinkan = null;
+    if ($user->hasRole('Guru') && !$user->hasRole('Operator Sekolah')) {
+      $tingkatAkhir = $this->tingkatAkhir[strtoupper($sekolah->jenjang)] ?? 12;
+      $siswaIdsDiizinkan = RombelAnggota::where('sekolah_id', $sekolah->id)
+        ->where('semester_id', $semester->id)
+        ->whereHas('rombel', fn($q) => $q
+          ->where('ptk_id', $user->ptk?->id)
+          ->where('tingkat', $tingkatAkhir))
+        ->pluck('siswa_id')
+        ->map(fn($id) => (int) $id)
+        ->all();
+    }
+
     try {
       $import = new SkhuImport(
         sekolahId: $sekolah->id,
         semesterId: $semester->id,
         jenjang: $sekolah->jenjang,
         tahunPelajaran: $semester->tahun_pelajaran,
+        siswaIdsDiizinkan: $siswaIdsDiizinkan,
       );
 
       Excel::import($import, $request->file('file_excel'));
@@ -1407,15 +1432,18 @@ class SkhuController extends Controller
 
       $berhasil   = $import->getBerhasil();
       $diperbarui = $import->getDiperbarui();
+      $dilewati   = $import->getDilewati();
       $pesan      = [];
       if ($berhasil > 0)   $pesan[] = "{$berhasil} siswa baru diimport";
       if ($diperbarui > 0) $pesan[] = "{$diperbarui} data siswa diperbarui";
+      if ($dilewati > 0)   $pesan[] = "{$dilewati} siswa dilewati (di luar rombel Anda)";
 
       return response()->json([
         'status'     => 'success',
         'message'    => implode(', ', $pesan) . '.',
         'berhasil'   => $berhasil,
         'diperbarui' => $diperbarui,
+        'dilewati'   => $dilewati,
       ]);
     } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
       return response()->json([

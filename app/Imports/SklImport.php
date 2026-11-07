@@ -55,13 +55,17 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
     )->values();
   }
 
-  public function __construct($sekolahId, $semesterId, $modeInput, $mappings, $komponens)
+  /** Daftar siswa yang boleh diimpor (null = semua; diisi untuk Guru wali kelas). */
+  private ?array $siswaIdsDiizinkan;
+
+  public function __construct($sekolahId, $semesterId, $modeInput, $mappings, $komponens, ?array $siswaIdsDiizinkan = null)
   {
     $this->sekolahId  = $sekolahId;
     $this->semesterId = $semesterId;
     $this->modeInput  = $modeInput;
     $this->mappings   = $mappings;
     $this->komponens  = $komponens;
+    $this->siswaIdsDiizinkan = $siswaIdsDiizinkan;
   }
 
   // Eksekusi per Sheet
@@ -78,6 +82,19 @@ class SklImport implements ToCollection, WithMultipleSheets, SkipsUnknownSheets
       $siswaId = $row[0] ?? null;
 
       if (!$siswaId || !is_numeric($siswaId)) {
+        continue;
+      }
+
+      // Kurungan wali kelas: baris siswa di luar rombel Guru
+      // dilewati (dihitung sekali per siswa per file)
+      if (
+        $this->siswaIdsDiizinkan !== null
+        && !in_array((int) $siswaId, $this->siswaIdsDiizinkan, true)
+      ) {
+        if (!in_array($siswaId, $this->processedSiswaIds)) {
+          $this->dilewati++;
+          $this->processedSiswaIds[] = $siswaId;
+        }
         continue;
       }
 

@@ -897,8 +897,9 @@ class SklController extends Controller
 
   public function sync(Request $request)
   {
-    // Sinkronisasi menyelaraskan SKL seluruh sekolah — khusus Operator
-    abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
+    // Operator menyinkronkan seluruh sekolah; Guru wali kelas
+    // hanya SKL siswa rombelnya (disaring tepat setelah ini)
+    abort_unless(Auth::user()->hasAnyRole(['Operator Sekolah', 'Guru']), 403);
 
     $semesterId  = Semester::smtIdKelulusan();
     $sekolahId   = $this->getSekolahId();
@@ -918,6 +919,13 @@ class SklController extends Controller
       ->where('semester_id', $semesterId)
       ->where('status', '!=', 'disetujui')
       ->get();
+
+    if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
+      $skls = $skls->whereIn(
+        'siswa_id',
+        $this->siswaIdsWaliKelas($sekolahId, (int) $semesterId)
+      )->values();
+    }
 
     if ($skls->isEmpty()) {
       return response()->json(['message' => 'Tidak ada data SKL aktif yang perlu disinkronkan.']);
@@ -1157,9 +1165,14 @@ class SklController extends Controller
   {
     $user = Auth::user();
 
-    if (!$user->hasRole('Operator Sekolah')) {
+    // Operator: template satu angkatan. Guru wali kelas: boleh,
+    // tetapi daftar siswanya dikurung ke rombelnya sendiri
+    // (penjaga di daftar siswa di bawah).
+    if (!$user->hasAnyRole(['Operator Sekolah', 'Guru'])) {
       abort(403);
     }
+
+    $hanyaRombelSendiri = $user->hasRole('Guru') && !$user->hasRole('Operator Sekolah');
 
     // 1. Ambil Semester & Data Sekolah PERSIS seperti menu SKHU Anda
     $semester = Semester::where('id', Semester::smtIdKelulusan())->first()
@@ -1209,10 +1222,15 @@ class SklController extends Controller
     $siswaList = RombelAnggota::with(['siswa', 'rombel'])
       ->whereHas(
         'rombel',
-        fn($q) => $q
-          ->where('sekolah_id', $sekolah->id)
-          ->where('semester_id', $semester->id)
-          ->where('tingkat', $tingkatAkhir)
+        function ($q) use ($sekolah, $semester, $tingkatAkhir, $hanyaRombelSendiri, $user) {
+          $q->where('sekolah_id', $sekolah->id)
+            ->where('semester_id', $semester->id)
+            ->where('tingkat', $tingkatAkhir);
+
+          if ($hanyaRombelSendiri) {
+            $q->where('ptk_id', $user->ptk?->id);
+          }
+        }
       )
       ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->get()
@@ -1551,12 +1569,19 @@ class SklController extends Controller
     }
 
     try {
-      $import = new SklImport($sekolahId, $semesterId, $konfigurasi->mode_input, $mappings, $komponens);
+      // Guru wali kelas hanya boleh mengimpor nilai siswa
+      // rombelnya; baris siswa lain dilewati & dihitung import
+      $siswaIdsDiizinkan = null;
+      if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
+        $siswaIdsDiizinkan = $this->siswaIdsWaliKelas($sekolahId, (int) $semesterId);
+      }
+
+      $import = new SklImport($sekolahId, $semesterId, $konfigurasi->mode_input, $mappings, $komponens, $siswaIdsDiizinkan);
       Excel::import($import, $request->file('file_excel'));
 
       return response()->json([
         'status'     => 'success',
-        'message'    => "Import selesai. {$import->berhasil} siswa diperbarui/dibuat. {$import->dilewati} siswa dilewati (sudah disetujui).",
+        'message'    => "Import selesai. {$import->berhasil} siswa diperbarui/dibuat. {$import->dilewati} siswa dilewati (sudah disetujui atau di luar rombel Anda).",
         'berhasil'   => $import->berhasil,
         'dilewati'   => $import->dilewati,
       ]);

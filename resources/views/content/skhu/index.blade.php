@@ -103,8 +103,8 @@
         </a>
       </div>
       <div class="d-flex gap-2">
-        {{-- Import Nilai (route khusus Operator — jangan tampilkan ke peran lain) --}}
-        @hasanyrole('Operator Sekolah')
+        {{-- Import Nilai (Operator & Guru wali kelas; untuk Guru baris di luar rombelnya dilewati) --}}
+        @hasanyrole('Operator Sekolah|Guru')
           <button class="btn btn-label-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-import">
             <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
           </button>
@@ -247,7 +247,7 @@
   {{-- ════════════════════════════════════════════════════════════════════════
        MODAL: Import Nilai SKHU
   ═══════════════════════════════════════════════════════════════════════════ --}}
-  @hasanyrole('Admin|Operator Sekolah')
+  @hasanyrole('Operator Sekolah|Guru')
     <div class="modal fade" id="modal-import" tabindex="-1" data-bs-backdrop="static">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
