@@ -445,8 +445,11 @@ Route::controller(SkhuController::class)
   ->middleware(['auth:sanctum', 'role:Operator Sekolah', 'fitur:skhu'])
   ->group(function () {
     Route::get('/import', 'halamanImport');
-    Route::get('/pengaturan-angkatan', 'pengaturanAngkatan');
-    Route::post('/pengaturan-angkatan', 'simpanPengaturanAngkatan');
+    // Nama route berawalan 'skhu' WAJIB ada: penanda menu aktif
+    // di sidebar mencocokkan awalan nama route dengan slug menu —
+    // tanpa nama, highlight SKHU hilang di halaman ini
+    Route::get('/pengaturan-angkatan', 'pengaturanAngkatan')->name('skhu.pengaturan-angkatan');
+    Route::post('/pengaturan-angkatan', 'simpanPengaturanAngkatan')->name('skhu.simpan-pengaturan-angkatan');
   });
 
 // SKHU - Kelola Template Cetak (Admin; template berlaku lintas sekolah

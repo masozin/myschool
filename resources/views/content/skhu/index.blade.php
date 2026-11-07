@@ -112,7 +112,7 @@
         {{-- Tanggal & Penomoran (tanggal, tempat & nomor massal) --}}
         @hasanyrole('Operator Sekolah')
           <a href="{{ url('/skhu/pengaturan-angkatan') }}" class="btn btn-label-info btn-sm">
-            <i class="icon-base ri ri-calendar-settings-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
+            <i class="icon-base ri ri-calendar-2-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
               Penomoran</span>
           </a>
         @endhasanyrole
@@ -218,12 +218,16 @@
               <td>{{ $skhu?->nomor_surat ?? '-' }}</td>
               <td>
                 <div class="d-flex gap-2">
-                  <a href="{{ url('/skhu/siswa/' . $siswa->id) }}"
-                    class="btn btn-sm btn-icon btn-text-primary rounded-pill"
-                    @hasanyrole('Operator Sekolah|Guru') title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}"
-                    @else title="Lihat SKHU" @endhasanyrole>
-                    <i class="icon-base ri ri-edit-line icon-18px"></i>
-                  </a>
+                  {{-- SKHU final terkunci: tombol edit disembunyikan untuk peran pengisi
+                       (server pun menolak simpan); peran lihat tetap mendapat tautannya --}}
+                  @if (!($skhu && $skhu->status === 'final' && auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru'])))
+                    <a href="{{ url('/skhu/siswa/' . $siswa->id) }}"
+                      class="btn btn-sm btn-icon btn-text-primary rounded-pill"
+                      @hasanyrole('Operator Sekolah|Guru') title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}"
+                      @else title="Lihat SKHU" @endhasanyrole>
+                      <i class="icon-base ri ri-edit-line icon-18px"></i>
+                    </a>
+                  @endif
                   @if ($skhu)
                     <button class="btn btn-sm btn-icon btn-text-success rounded-pill btn-download-pdf"
                       data-skhu-id="{{ $skhu->id }}" data-nama="{{ $siswa->nama_siswa }}" title="Download PDF">
