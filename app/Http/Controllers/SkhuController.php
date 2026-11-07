@@ -282,6 +282,7 @@ class SkhuController extends Controller
       'tanggal_mulai_ujian'   => 'nullable|date',
       'tanggal_selesai_ujian' => 'nullable|date',
       'tanggal_terbit'        => 'nullable|date',
+      'tempat_terbit'         => 'nullable|string|max:100',
       'nilai'                 => 'required|array',
       'nilai.*'               => 'numeric|min:0|max:100',
       'finalisasi'            => 'nullable|boolean',
@@ -319,6 +320,7 @@ class SkhuController extends Controller
       'tanggal_mulai_ujian'   => $request->tanggal_mulai_ujian,
       'tanggal_selesai_ujian' => $request->tanggal_selesai_ujian,
       'tanggal_terbit'        => $request->tanggal_terbit,
+      'tempat_terbit'         => $request->tempat_terbit,
       'status'                => 'draft',
       'generated_at'          => now(),
     ]);
@@ -512,6 +514,7 @@ class SkhuController extends Controller
       'tanggal_mulai_ujian'   => $skhus->pluck('tanggal_mulai_ujian')->filter()->first(),
       'tanggal_selesai_ujian' => $skhus->pluck('tanggal_selesai_ujian')->filter()->first(),
       'tanggal_terbit'        => $skhus->pluck('tanggal_terbit')->filter()->first(),
+      'tempat_terbit'         => $skhus->pluck('tempat_terbit')->filter()->first(),
     ];
     $jumlahFinal = $skhus->where('status', 'final')->count();
 
@@ -527,6 +530,7 @@ class SkhuController extends Controller
       'tanggal_mulai_ujian'   => 'nullable|date',
       'tanggal_selesai_ujian' => 'nullable|date|after_or_equal:tanggal_mulai_ujian',
       'tanggal_terbit'        => 'nullable|date',
+      'tempat_terbit'         => 'nullable|string|max:100',
       'pola_nomor_surat'      => 'nullable|string|max:100',
       'pola_nomor_ujian'      => 'nullable|string|max:100',
       'nomor_awal'            => 'nullable|integer|min:0|max:99999',
@@ -545,12 +549,13 @@ class SkhuController extends Controller
 
     $adaTanggal = $request->filled('tanggal_mulai_ujian')
       || $request->filled('tanggal_selesai_ujian')
-      || $request->filled('tanggal_terbit');
+      || $request->filled('tanggal_terbit')
+      || $request->filled('tempat_terbit');
     $adaNomor = $request->filled('pola_nomor_surat') || $request->filled('pola_nomor_ujian');
 
     if (!$adaTanggal && !$adaNomor) {
       return response()->json([
-        'message' => 'Tidak ada yang diterapkan. Isi minimal satu tanggal atau satu pola nomor.',
+        'message' => 'Tidak ada yang diterapkan. Isi minimal satu tanggal/tempat atau satu pola nomor.',
       ], 422);
     }
 
@@ -652,6 +657,7 @@ class SkhuController extends Controller
           if ($request->filled('tanggal_mulai_ujian'))   $isi['tanggal_mulai_ujian']   = $request->tanggal_mulai_ujian;
           if ($request->filled('tanggal_selesai_ujian')) $isi['tanggal_selesai_ujian'] = $request->tanggal_selesai_ujian;
           if ($request->filled('tanggal_terbit'))        $isi['tanggal_terbit']        = $request->tanggal_terbit;
+          if ($request->filled('tempat_terbit'))         $isi['tempat_terbit']         = $request->tempat_terbit;
         }
 
         if (!$isi) {

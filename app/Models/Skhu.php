@@ -21,6 +21,7 @@ class Skhu extends Model
     'tanggal_mulai_ujian',
     'tanggal_selesai_ujian',
     'tanggal_terbit',
+    'tempat_terbit',
     'status',
     'generated_at',
     'snapshot_nama',

@@ -51,10 +51,17 @@
             <input type="date" class="form-control" id="tanggal_selesai_ujian"
               value="{{ $prefill['tanggal_selesai_ujian']?->format('Y-m-d') }}">
           </div>
-          <div>
+          <div class="mb-3">
             <label class="form-label" for="tanggal_terbit">Tanggal Terbit SKHU</label>
             <input type="date" class="form-control" id="tanggal_terbit"
               value="{{ $prefill['tanggal_terbit']?->format('Y-m-d') }}">
+          </div>
+          <div>
+            <label class="form-label" for="tempat_terbit">Tempat Terbit</label>
+            <input type="text" class="form-control" id="tempat_terbit"
+              placeholder="Kosongkan untuk memakai nama desa sekolah"
+              value="{{ $prefill['tempat_terbit'] }}">
+            <small class="text-muted">Tercetak sebelum tanggal terbit pada baris tanda tangan.</small>
           </div>
         </div>
       </div>
@@ -217,6 +224,7 @@
           tanggal_mulai_ujian: el('tanggal_mulai_ujian').value || null,
           tanggal_selesai_ujian: el('tanggal_selesai_ujian').value || null,
           tanggal_terbit: tglTerbit.value || null,
+          tempat_terbit: el('tempat_terbit').value.trim() || null,
           pola_nomor_surat: polaSurat.value.trim() || null,
           pola_nomor_ujian: polaUjian.value.trim() || null,
           nomor_awal: parseInt(nomorAwal.value || '1', 10),

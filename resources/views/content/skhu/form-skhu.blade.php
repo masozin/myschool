@@ -133,6 +133,13 @@
               value="{{ $skhu?->tanggal_terbit?->format('Y-m-d') }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
           </div>
 
+          <div class="mb-4">
+            <label class="form-label">Tempat Terbit</label>
+            <input type="text" id="tempat_terbit" class="form-control form-control-sm"
+              placeholder="Kosongkan untuk memakai nama desa sekolah"
+              value="{{ $skhu?->tempat_terbit }}" {{ ($isFinal || !$canEdit) ? 'disabled' : '' }}>
+          </div>
+
           @if ($skhu)
             <div class="alert alert-{{ $isFinal ? 'success' : 'warning' }} py-2 mb-0">
               <i class="ri-information-line me-1"></i>
@@ -282,6 +289,7 @@
           tanggal_mulai_ujian: document.getElementById('tanggal_mulai_ujian').value,
           tanggal_selesai_ujian: document.getElementById('tanggal_selesai_ujian').value,
           tanggal_terbit: document.getElementById('tanggal_terbit').value,
+          tempat_terbit: document.getElementById('tempat_terbit').value,
           nilai,
           finalisasi: finalisasi ? 1 : 0,
         };

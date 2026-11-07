@@ -268,7 +268,7 @@
       <!-- Tanda Tangan -->
       <td width="40%">
         <div class="ttd-container">
-          {{ $desa }}, {{ $skhu->tanggal_terbit ? $skhu->tanggal_terbit->translatedFormat('d F Y') : '' }}<br>
+          {{ $skhu->tempat_terbit ?: $desa }}, {{ $skhu->tanggal_terbit ? $skhu->tanggal_terbit->translatedFormat('d F Y') : '' }}<br>
           Kepala Sekolah,<br><br>
 
           <div class="nama-pejabat">{{ $kepalaSekolah }}</div>
