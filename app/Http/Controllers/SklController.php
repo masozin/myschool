@@ -726,6 +726,190 @@ class SklController extends Controller
     return response()->json(['nomor' => $nomor]);
   }
 
+  // ── Pengaturan Nomor SKL Massal ─────────────────────────────────────
+  // Penomoran massal berpola seperti Pengaturan Angkatan SKHU: nomor
+  // mengikuti POSISI siswa dalam urutan yang dipilih (nama/NIS,
+  // dapat dikelompokkan per rombel). SKL berstatus disetujui tidak
+  // pernah diubah; siswa yang belum punya SKL dilewati tetapi tetap
+  // memakan posisi urutnya, jadi menjalankan ulang halaman ini
+  // setelah SKL mereka dibuat memberi nomor pada posisi yang sama.
+
+  public function pengaturanNomor()
+  {
+    abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
+
+    $data        = $this->dataPengaturanNomor();
+    $konfigurasi = SklKonfigurasi::untukSekolah($data['sekolahId'], (int) $data['semester']->id);
+
+    return view('content.skl.pengaturan-nomor', [
+      'semester'    => $data['semester'],
+      'baris'       => $data['baris'],
+      'konfigurasi' => $konfigurasi,
+      'prefix'      => $konfigurasi->prefix_nomor ?? 'SKL',
+    ]);
+  }
+
+  public function simpanPengaturanNomor(Request $request)
+  {
+    abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
+
+    $data = $request->validate([
+      'pola_nomor'      => ['required', 'string', 'max:100', 'regex:/\{no(?::\d+|;\d+)?\}/'],
+      'nomor_awal'      => 'required|integer|min:0',
+      'urutan'          => 'required|in:nama,nis',
+      'kelompok_rombel' => 'nullable|boolean',
+      'timpa'           => 'nullable|boolean',
+      'tanggal_terbit'  => 'nullable|date',
+    ]);
+
+    ['sekolahId' => $sekolahId, 'semester' => $semester, 'baris' => $baris]
+      = $this->dataPengaturanNomor();
+
+    $konfigurasi = SklKonfigurasi::untukSekolah($sekolahId, (int) $semester->id);
+    $prefix      = $konfigurasi->prefix_nomor ?? 'SKL';
+    $timpa       = !empty($data['timpa']);
+
+    $terurut = $this->urutkanBarisNomor($baris, $data['urutan'], !empty($data['kelompok_rombel']));
+
+    $tahun = !empty($data['tanggal_terbit'])
+      ? (int) \Carbon\Carbon::parse($data['tanggal_terbit'])->format('Y')
+      : (int) ($konfigurasi?->tanggal_terbit?->format('Y') ?? now()->format('Y'));
+
+    // Nomor hasil generate per SKL, mengikuti posisi pada urutan penuh
+    $hasil = [];
+    foreach ($terurut as $i => $b) {
+      if ($b['skl']) {
+        $hasil[$b['skl']->id] = $this->formatNomorSkl(
+          $data['pola_nomor'],
+          $data['nomor_awal'] + $i,
+          $tahun,
+          $prefix
+        );
+      }
+    }
+
+    // Nomor SKL yang sudah disetujui tidak boleh tertabrak
+    $nomorDisetujui = Skl::where('sekolah_id', $sekolahId)
+      ->where('status', 'disetujui')
+      ->whereNotNull('nomor_skl')
+      ->pluck('nomor_skl')
+      ->flip();
+
+    $tabrakan = collect($hasil)->filter(fn($n) => $nomorDisetujui->has($n))->values();
+
+    if ($tabrakan->isNotEmpty()) {
+      return response()->json([
+        'message' => 'Nomor hasil generate (' . $tabrakan->implode(', ') . ') sudah dipakai SKL yang telah disetujui. Ubah pola atau nomor awal.',
+      ], 422);
+    }
+
+    $terisi = 0;
+    $dilewati = 0;
+    $tanpaSkl = 0;
+
+    DB::transaction(function () use ($terurut, $hasil, $data, $timpa, &$terisi, &$dilewati, &$tanpaSkl) {
+      foreach ($terurut as $b) {
+        if (!$b['skl']) {
+          $tanpaSkl++;
+          continue;
+        }
+
+        $skl = $b['skl'];
+
+        if ($skl->status === 'disetujui' || (!$timpa && filled($skl->nomor_skl))) {
+          $dilewati++;
+          continue;
+        }
+
+        $update = ['nomor_skl' => $hasil[$skl->id]];
+
+        if (!empty($data['tanggal_terbit'])) {
+          $update['tanggal_terbit'] = $data['tanggal_terbit'];
+        }
+
+        $skl->update($update);
+        $terisi++;
+      }
+    });
+
+    return response()->json([
+      'message' => "Pengaturan nomor SKL tersimpan: {$terisi} nomor terisi, {$dilewati} dilewati"
+        . ($tanpaSkl > 0 ? ", {$tanpaSkl} siswa belum memiliki SKL" : '') . '.',
+    ]);
+  }
+
+  private function dataPengaturanNomor(): array
+  {
+    $sekolahId    = $this->getSekolahId();
+    $semester     = Semester::findOrFail(Semester::smtIdKelulusan());
+    $tingkatAkhir = $this->getTingkatAkhir($sekolahId);
+
+    $anggota = RombelAnggota::with(['siswa.registrasiTerbaru', 'rombel'])
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semester->id)
+      ->whereHas('rombel', fn($q) => $q->where('tingkat', $tingkatAkhir))
+      ->get();
+
+    $sklPerSiswa = Skl::where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semester->id)
+      ->whereIn('siswa_id', $anggota->pluck('siswa_id'))
+      ->get()
+      ->keyBy('siswa_id');
+
+    $baris = $anggota
+      ->filter(fn($a) => $a->siswa && in_array($a->siswa->registrasiTerbaru?->status, ['aktif', 'lulus'], true))
+      ->map(fn($a) => [
+        'siswa'  => $a->siswa,
+        'rombel' => $a->rombel?->nama_rombel,
+        'nis'    => $a->siswa->registrasiTerbaru?->nis,
+        'skl'    => $sklPerSiswa->get($a->siswa_id),
+      ])
+      ->values();
+
+    return ['sekolahId' => $sekolahId, 'semester' => $semester, 'baris' => $baris];
+  }
+
+  private function urutkanBarisNomor($baris, string $urutan, bool $kelompokRombel)
+  {
+    return $baris->sort(function ($a, $b) use ($urutan, $kelompokRombel) {
+      if ($kelompokRombel) {
+        $perRombel = strcmp((string) $a['rombel'], (string) $b['rombel']);
+        if ($perRombel !== 0) {
+          return $perRombel;
+        }
+      }
+
+      if ($urutan === 'nis') {
+        return strnatcmp((string) $a['nis'], (string) $b['nis']);
+      }
+
+      return strcmp(
+        mb_strtolower($a['siswa']->nama_siswa ?? ''),
+        mb_strtolower($b['siswa']->nama_siswa ?? '')
+      );
+    })->values();
+  }
+
+  private function formatNomorSkl(string $pola, int $nomorUrut, int $tahun, string $prefix): string
+  {
+    $hasil = preg_replace_callback(
+      '/\{no(?::(\d+)|;(\d+))?\}/',
+      fn($m) => str_pad(
+        (string) $nomorUrut,
+        (int) ($m[1] ?? $m[2] ?? 0),
+        '0',
+        STR_PAD_LEFT
+      ),
+      $pola
+    );
+
+    return str_replace(
+      ['{tahun}', '{prefix}'],
+      [(string) $tahun, $prefix],
+      $hasil
+    );
+  }
+
   // ── Sinkronisasi Struktur & Perhitungan Ulang Nilai SKL ─────────────────
 
   public function sync(Request $request)

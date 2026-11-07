@@ -112,6 +112,11 @@
           <a href="{{ route('skl.konfigurasi.edit') }}" class="btn btn-label-secondary btn-sm">
             <i class="icon-base ri ri-equalizer-line me-1"></i>Konfigurasi SKL
           </a>
+          @hasanyrole('Operator Sekolah')
+            <a href="{{ route('skl.pengaturan-nomor') }}" class="btn btn-label-secondary btn-sm">
+              <i class="icon-base ri ri-hashtag me-1"></i>Pengaturan Nomor
+            </a>
+          @endhasanyrole
           <button class="btn btn-label-secondary btn-sm" id="btn-sync-skl" title="Sinkronisasi Data & Bobot">
             <i class="ri ri-refresh-line "></i>
           </button>

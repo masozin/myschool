@@ -371,6 +371,8 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::put('/{skl}/nilai', 'updateNilai')->name('nilai.update');
       Route::post('/{skl}/ajukan', 'ajukan')->name('ajukan');
       Route::post('/sync', 'sync')->name('sync');
+      Route::get('/pengaturan-nomor', 'pengaturanNomor')->name('pengaturan-nomor');
+      Route::post('/pengaturan-nomor', 'simpanPengaturanNomor')->name('pengaturan-nomor.simpan');
       Route::get('/template/download', 'downloadTemplate')->name('template.download');
       Route::post('/import', 'importNilai')->name('import');
     });
