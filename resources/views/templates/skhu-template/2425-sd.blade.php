@@ -219,7 +219,7 @@
     <thead>
       <tr>
         <th width="10%">No</th>
-        <th width="65%">Mata Pelajaran<br>(Kurikulum 2013)</th>
+        <th width="65%">Mata Pelajaran<br>({{ $skhu->nama_kurikulum ?? 'Kurikulum 2013' }})</th>
         <th width="25%">Nilai Murni<br>Ujian Sekolah</th>
       </tr>
     </thead>

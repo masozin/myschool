@@ -211,6 +211,21 @@ class Skhu extends Model
   }
 
   /**
+   * Nama kurikulum siswa ini, dari rombelnya pada semester dokumen
+   * ini — dipakai kop tabel nilai di template cetak. null bila
+   * rombel/kurikulum tidak ditemukan (template jatuh ke teks lama).
+   */
+  public function getNamaKurikulumAttribute(): ?string
+  {
+    $rombelAnggota = RombelAnggota::where('siswa_id', $this->siswa_id)
+      ->where('semester_id', $this->semester_id)
+      ->with('rombel.kurikulum')
+      ->first();
+
+    return $rombelAnggota?->rombel?->kurikulum?->nama;
+  }
+
+  /**
    * Validasi kelengkapan data sebelum SKHU boleh difinalisasi.
    * Return array pesan error. Kosong = valid, siap difinalisasi.
    */
