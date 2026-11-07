@@ -346,6 +346,14 @@
                       <i class="icon-base ri ri-eye-line icon-18px"></i>
                     </a>
 
+                    {{-- Tombol titik tiga hanya tampil bila menunya benar-benar berisi
+                         untuk peran + status baris ini (mis. Admin tidak punya isi sama
+                         sekali; SKL disetujui tidak menyisakan aksi bagi Operator/Guru) --}}
+                    @php
+                      $adaIsiMenu = (auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && $skl->status !== 'disetujui')
+                        || (auth()->user()->hasRole('Kepala Sekolah') && $skl->status === 'pengajuan');
+                    @endphp
+                    @if ($adaIsiMenu)
                     <div class="dropdown">
                       <button class="btn btn-sm btn-icon btn-text-secondary rounded-pill" type="button"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -406,6 +414,7 @@
                         @endhasanyrole
                       </ul>
                     </div>
+                    @endif
                   @endif
                 </div>
               </td>
