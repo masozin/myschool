@@ -1174,7 +1174,7 @@ class SklController extends Controller
 
     if ($kurikulumIds->count() > 1) {
       $namaKurikulum = \App\Models\Kurikulum::whereIn('id', $kurikulumIds)
-        ->pluck('nama_kurikulum')
+        ->pluck('nama')
         ->implode(', ');
 
       return response()->json([
