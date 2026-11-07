@@ -279,7 +279,7 @@
   </table>
 
   @if (!empty($watermark))
-    <div style="position: fixed; top: 40%; left: -10%; width: 120%; text-align: center; transform: rotate(-30deg); font-size: 120px; font-weight: bold; letter-spacing: 12px; color: rgba(200, 0, 0, 0.15); z-index: 9999;">{{ $watermark }}</div>
+    <div style="position: fixed; top: 40%; left: -10%; width: 120%; text-align: center; transform: rotate(-30deg); font-size: 200px; font-weight: bold; letter-spacing: 24px; color: rgba(200, 0, 0, 0.18); z-index: 9999;">{{ $watermark }}</div>
   @endif
 </body>
 

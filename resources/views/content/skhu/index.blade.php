@@ -177,19 +177,31 @@
               <td>{{ $anggota->rombel->nama_rombel ?? '-' }}</td>
               <td>
                 @if ($skhu)
-                  <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                    <input type="checkbox" class="form-check-input btn-toggle-status" role="switch"
-                      id="statusToggle{{ $skhu->id }}" data-skhu-id="{{ $skhu->id }}"
-                      data-status="{{ $skhu->status }}" {{ $skhu->status === 'final' ? 'checked' : '' }}
-                      style="cursor:pointer;">
-                    <label class="form-check-label status-label" for="statusToggle{{ $skhu->id }}"
-                      style="cursor:pointer;">
-                      <span
-                        class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
-                        {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
-                      </span>
-                    </label>
-                  </div>
+                  {{-- Saklar finalisasi hanya untuk yang boleh mengubah:
+                       Operator dan Guru (daftar Guru sudah tersaring ke
+                       rombelnya sendiri). Admin/Kepala Sekolah hanya
+                       melihat lencana status — route updateStatus memang
+                       menolak mereka, jadi saklarnya tidak ditampilkan. --}}
+                  @hasanyrole('Operator Sekolah|Guru')
+                    <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                      <input type="checkbox" class="form-check-input btn-toggle-status" role="switch"
+                        id="statusToggle{{ $skhu->id }}" data-skhu-id="{{ $skhu->id }}"
+                        data-status="{{ $skhu->status }}" {{ $skhu->status === 'final' ? 'checked' : '' }}
+                        style="cursor:pointer;">
+                      <label class="form-check-label status-label" for="statusToggle{{ $skhu->id }}"
+                        style="cursor:pointer;">
+                        <span
+                          class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
+                          {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
+                        </span>
+                      </label>
+                    </div>
+                  @else
+                    <span
+                      class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
+                      {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
+                    </span>
+                  @endhasanyrole
                 @else
                   <span class="badge bg-label-secondary">Belum diisi</span>
                 @endif
@@ -199,7 +211,8 @@
                 <div class="d-flex gap-2">
                   <a href="{{ url('/skhu/siswa/' . $siswa->id) }}"
                     class="btn btn-sm btn-icon btn-text-primary rounded-pill"
-                    title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}">
+                    @hasanyrole('Operator Sekolah|Guru') title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}"
+                    @else title="Lihat SKHU" @endhasanyrole>
                     <i class="icon-base ri ri-edit-line icon-18px"></i>
                   </a>
                   @if ($skhu)

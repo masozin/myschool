@@ -252,6 +252,12 @@ class SkhuController extends Controller
       ? $skhu->nilais->pluck('nilai', 'mapel_mapping_id')->toArray()
       : [];
 
+    // Yang boleh menyimpan: Operator, atau Guru yang memang wali
+    // kelas siswa ini (Guru bukan wali sudah ditolak di atas).
+    // Admin dan Kepala Sekolah hanya melihat — tombol simpan di
+    // form disembunyikan berdasarkan flag ini.
+    $canEdit = $user->hasRole('Operator Sekolah') || $user->hasRole('Guru');
+
     return view('content.skhu.form-skhu', compact(
       'siswa',
       'skhu',
@@ -260,7 +266,8 @@ class SkhuController extends Controller
       'template',
       'mapels',
       'nilaiExisting',
-      'anggota'
+      'anggota',
+      'canEdit'
     ));
   }
 
@@ -358,8 +365,11 @@ class SkhuController extends Controller
     $user = Auth::user();
 
     // Batasi ke sekolah konteks — sebelumnya SKHU milik sekolah
-    // lain pun bisa diubah statusnya hanya dengan id-nya
-    $skhu = Skhu::where('sekolah_id', $user->ptk->sekolah_id)->findOrFail($skhuId);
+    // lain pun bisa diubah statusnya hanya dengan id-nya.
+    // Pakai helper konteks (bukan $user->ptk langsung) supaya akun
+    // Operator/Guru yang belum terhubung ke PTK mendapat 403 yang
+    // ramah, bukan fatal 500.
+    $skhu = Skhu::where('sekolah_id', $this->sekolahKonteksId())->findOrFail($skhuId);
 
     // Guru hanya boleh mengubah SKHU siswa rombelnya sendiri
     if ($user->hasRole('Guru')) {
