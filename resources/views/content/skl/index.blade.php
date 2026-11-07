@@ -100,6 +100,9 @@
             @endforeach
           </select>
         </form>
+        <a href="{{ url('/skl/template') }}" class="btn btn-label-secondary btn-sm ms-auto">
+          <i class="icon-base ri ri-layout-line me-1"></i>Kelola Template Cetak
+        </a>
       </div>
     </div>
   @endhasanyrole

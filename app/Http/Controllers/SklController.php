@@ -14,6 +14,7 @@ use App\Models\SklKonfigurasi;
 use App\Models\SklNilai;
 use App\Models\SklNilaiKomponen;
 use App\Models\SklNilaiSubKomponen;
+use App\Models\SklTemplate;
 use Barryvdh\DomPDF\Facade\Pdf;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
@@ -1549,6 +1550,137 @@ class SklController extends Controller
   }
 
   // 1. Preview PDF langsung di Browser (Termasuk QR Code)
+  // ── Template Cetak ──────────────────────────────────────────────────
+  // SKL kini punya tabel template seperti SKHU (tabel_skl_template).
+  // Selama belum ada pendaftaran aktif untuk jenjang + semester
+  // dokumen, cetakan memakai file bawaan 'skl-2425-sd'.
+
+  private function viewTemplateSkl(Skl $skl): string
+  {
+    $jenjang  = strtoupper($skl->sekolah->jenjang ?? '');
+    $template = SklTemplate::aktifUntuk($jenjang, (string) $skl->semester_id);
+
+    return $template?->view_name ?? 'templates.skl-template.skl-2425-sd';
+  }
+
+  private function daftarFileTemplateSkl(): array
+  {
+    $base = resource_path('views/templates/skl-template');
+    if (!is_dir($base)) {
+      return [];
+    }
+
+    $files = [];
+    $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($base));
+    foreach ($it as $file) {
+      if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+        $rel = str_replace('\\', '/', substr($file->getPathname(), strlen($base) + 1));
+        $files[] = substr($rel, 0, -strlen('.blade.php'));
+      }
+    }
+    sort($files);
+
+    return $files;
+  }
+
+  public function templateIndex()
+  {
+    $templates = SklTemplate::with(['semester', 'kurikulum'])
+      ->orderBy('jenjang')
+      ->orderByDesc('semester_id')
+      ->get();
+
+    $semesters  = Semester::orderByDesc('kode_semester')->get();
+    $kurikulums = \App\Models\Kurikulum::orderBy('nama')->get();
+    $fileList   = $this->daftarFileTemplateSkl();
+
+    return view('content.skl.template', compact(
+      'templates', 'semesters', 'kurikulums', 'fileList'
+    ));
+  }
+
+  public function templateStore(Request $request)
+  {
+    $data = $request->validate([
+      'jenjang'      => 'required|in:SD,SMP,SMA,SMK',
+      'semester_id'  => 'required|exists:tabel_semester,id',
+      'kurikulum_id' => 'required|exists:tabel_kurikulum,id',
+      'nama_file'    => 'required|string|max:255',
+      'keterangan'   => 'nullable|string|max:255',
+      'is_active'    => 'nullable|boolean',
+    ]);
+
+    if (!in_array($data['nama_file'], $this->daftarFileTemplateSkl(), true)) {
+      return back()->withInput()
+        ->with('error', 'File template tidak ditemukan di folder templates/skl-template.');
+    }
+
+    $duplikat = SklTemplate::where('jenjang', $data['jenjang'])
+      ->where('semester_id', $data['semester_id'])
+      ->exists();
+    if ($duplikat) {
+      return back()->withInput()
+        ->with('error', "Template untuk jenjang {$data['jenjang']} pada semester itu sudah terdaftar. Edit entri yang ada.");
+    }
+
+    SklTemplate::create([
+      'jenjang'      => $data['jenjang'],
+      'semester_id'  => $data['semester_id'],
+      'kurikulum_id' => $data['kurikulum_id'],
+      'nama_file'    => $data['nama_file'],
+      'keterangan'   => $data['keterangan'] ?? null,
+      'is_active'    => $request->boolean('is_active'),
+    ]);
+
+    return back()->with('success', 'Template SKL berhasil didaftarkan.');
+  }
+
+  public function templateUpdate(Request $request, int $id)
+  {
+    $template = SklTemplate::findOrFail($id);
+
+    $data = $request->validate([
+      'jenjang'      => 'required|in:SD,SMP,SMA,SMK',
+      'semester_id'  => 'required|exists:tabel_semester,id',
+      'kurikulum_id' => 'required|exists:tabel_kurikulum,id',
+      'nama_file'    => 'required|string|max:255',
+      'keterangan'   => 'nullable|string|max:255',
+      'is_active'    => 'nullable|boolean',
+    ]);
+
+    if (!in_array($data['nama_file'], $this->daftarFileTemplateSkl(), true)) {
+      return back()->withInput()
+        ->with('error', 'File template tidak ditemukan di folder templates/skl-template.');
+    }
+
+    $duplikat = SklTemplate::where('jenjang', $data['jenjang'])
+      ->where('semester_id', $data['semester_id'])
+      ->where('id', '!=', $id)
+      ->exists();
+    if ($duplikat) {
+      return back()->withInput()
+        ->with('error', "Template untuk jenjang {$data['jenjang']} pada semester itu sudah terdaftar.");
+    }
+
+    $template->update([
+      'jenjang'      => $data['jenjang'],
+      'semester_id'  => $data['semester_id'],
+      'kurikulum_id' => $data['kurikulum_id'],
+      'nama_file'    => $data['nama_file'],
+      'keterangan'   => $data['keterangan'] ?? null,
+      'is_active'    => $request->boolean('is_active'),
+    ]);
+
+    return back()->with('success', 'Template SKL berhasil diperbarui.');
+  }
+
+  public function templateDestroy(int $id)
+  {
+    SklTemplate::findOrFail($id)->delete();
+
+    return back()->with('success', 'Pendaftaran template dihapus. File Blade-nya tidak ikut terhapus.');
+  }
+
   public function previewPdf(int $sklId)
   {
     $user    = Auth::user();
@@ -1576,7 +1708,7 @@ class SklController extends Controller
 
     $qrCodeBase64 = (new QRCode($options))->render($urlCekSkl);
 
-    $html = view('templates.skl-template.skl-2425-sd', [
+    $html = view($this->viewTemplateSkl($skl), [
       'skl'   => $skl,
       'qrCode' => $qrCodeBase64,
       'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,
@@ -1615,7 +1747,7 @@ class SklController extends Controller
     $options   = new QROptions(['version' => 5, 'outputType' => 'svg', 'eccLevel' => 1, 'scale' => 10, 'imageBase64' => true]);
     $qrCodeBase64 = (new QRCode($options))->render($urlCekSkl);
 
-    $html = view('templates.skl-template.skl-2425-sd', [
+    $html = view($this->viewTemplateSkl($skl), [
       'skl'    => $skl,
       'qrCode' => $qrCodeBase64,
       'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,
@@ -1677,7 +1809,7 @@ class SklController extends Controller
       $options   = new QROptions(['version' => 5, 'outputType' => 'svg', 'eccLevel' => 1, 'scale' => 10, 'imageBase64' => true]);
       $qrCodeBase64 = (new QRCode($options))->render($urlCekSkl);
 
-      $html = view('templates.skl-template.skl-2425-sd', [
+      $html = view($this->viewTemplateSkl($skl), [
         'skl'    => $skl,
         'qrCode' => $qrCodeBase64,
         'watermark' => $skl->status !== 'disetujui' ? 'DRAFT' : null,

@@ -377,6 +377,18 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::post('/import', 'importNilai')->name('import');
     });
 
+  // SKL - Kelola Template Cetak (Admin; didaftarkan sebelum grup
+  // baca supaya /template tidak tertangkap pola /{skl})
+  Route::controller(SklController::class)
+    ->prefix('skl')
+    ->middleware(['auth:sanctum', 'role:Admin', 'fitur:skl'])
+    ->group(function () {
+      Route::get('/template', 'templateIndex');
+      Route::post('/template', 'templateStore');
+      Route::put('/template/{id}', 'templateUpdate');
+      Route::delete('/template/{id}', 'templateDestroy');
+    });
+
   // SKL - Baca (Admin dan Kepala Sekolah boleh melihat;
   // Kepala Sekolah bertindak lewat grup persetujuan)
   Route::controller(SklController::class)
@@ -443,6 +455,7 @@ Route::controller(SkhuController::class)
     Route::put('/template/{id}', 'templateUpdate');
     Route::delete('/template/{id}', 'templateDestroy');
   });
+
 
 
 /*
