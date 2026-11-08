@@ -78,6 +78,14 @@
           </button>
         </div>
       </form>
+      @hasanyrole('Operator Sekolah')
+        <div class="d-flex justify-content-end mt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+            data-bs-target="#modal-pengaturan-presensi">
+            <i class="ri ri-settings-3-line me-1"></i> Pengaturan Presensi
+          </button>
+        </div>
+      @endhasanyrole
     </div>
   </div>
 
@@ -115,6 +123,11 @@
             </span>
           </div>
         @endif
+        <div class="mt-1 d-none" id="grid_info_akses">
+          <span class="badge bg-label-info">
+            <i class="ri ri-eye-line me-1"></i> Mode pantau — Anda hanya dapat melihat presensi ini.
+          </span>
+        </div>
       </div>
       <div class="d-flex gap-2 align-items-center">
         <button type="button" class="btn btn-outline-secondary btn-sm btn-tambah" id="btn_tandai_semua_hadir">
@@ -150,6 +163,36 @@
       -
     </div>
   </div>
+
+  {{-- =========================================================== --}}
+  {{-- MODAL: PENGATURAN PRESENSI (Operator Sekolah)                --}}
+  {{-- =========================================================== --}}
+  @hasanyrole('Operator Sekolah')
+    <div class="modal fade" id="modal-pengaturan-presensi" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Pengaturan Presensi</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+          </div>
+          <div class="modal-body">
+            <label for="batas_koreksi_hari" class="form-label">Batas koreksi presensi untuk Guru (hari)</label>
+            <input type="number" id="batas_koreksi_hari" class="form-control" min="0" max="365"
+              value="{{ $batasKoreksi ?? 7 }}">
+            <div class="form-text">
+              Guru wali kelas hanya dapat mengisi/mengubah presensi sampai sejumlah hari ke belakang
+              dari hari ini. Operator Sekolah tidak dibatasi. Isi 0 bila Guru hanya boleh mengisi
+              pada hari yang sama.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="button" class="btn btn-primary" id="btn_simpan_pengaturan">Simpan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  @endhasanyrole
 
 @endsection
 
@@ -205,7 +248,7 @@
 
           tr.innerHTML = `
             <td class="text-center">${idx + 1}</td>
-            <td>${s.nama_siswa}</td>
+            <td>${s.nama_siswa}${s.terisi && s.diisi_oleh ? `<br><small class="text-muted">Terakhir diisi ${s.diisi_oleh} • ${s.diubah_pada}</small>` : ''}</td>
             <td>${s.nisn ?? '-'}</td>
             <td>${radios}</td>
             <td>
@@ -269,6 +312,17 @@
             });
 
           renderGrid(data.siswa);
+
+          // Mode pantau (Kepala Sekolah/Admin) atau di luar jendela
+          // koreksi Guru: kunci semua isian pada grid ini
+          const bolehIsi = data.boleh_isi !== false;
+          document.getElementById('grid_info_akses').classList.toggle('d-none', bolehIsi);
+          btnSimpan.disabled = !bolehIsi;
+          btnHadirSemua.disabled = !bolehIsi;
+          if (!bolehIsi) {
+            tbody.querySelectorAll('input').forEach(el => el.disabled = true);
+          }
+
           showState(stateGrid);
 
         } catch (err) {
@@ -344,6 +398,49 @@
           btnSimpan.innerHTML = '<i class="ri ri-save-line me-1"></i> Simpan Presensi';
         }
       });
+
+      // ── Simpan pengaturan presensi (Operator Sekolah) ─────────────
+      const btnPengaturan = document.getElementById('btn_simpan_pengaturan');
+      if (btnPengaturan) {
+        btnPengaturan.addEventListener('click', async function() {
+          const nilai = document.getElementById('batas_koreksi_hari').value;
+          btnPengaturan.disabled = true;
+
+          try {
+            const res = await fetch(`{{ route('presensi.pengaturan') }}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+              },
+              body: JSON.stringify({
+                batas_koreksi_hari: nilai
+              }),
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+              Swal.fire('Gagal', data.message ?? 'Terjadi kesalahan.', 'error');
+              return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('modal-pengaturan-presensi'))?.hide();
+            Swal.fire({
+              icon: 'success',
+              title: 'Tersimpan',
+              text: data.message,
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          } catch (err) {
+            console.error(err);
+            Swal.fire('Gagal', 'Terjadi kesalahan jaringan.', 'error');
+          } finally {
+            btnPengaturan.disabled = false;
+          }
+        });
+      }
 
     });
   </script>

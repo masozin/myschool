@@ -100,7 +100,8 @@
       "slug": "Presensi",
       "roles": [
         "Admin",
-        "Operator Sekolah"
+        "Operator Sekolah",
+        "Kepala Sekolah"
       ]
     },
     {

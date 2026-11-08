@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Presensi;
+use App\Models\PresensiPengaturan;
 use App\Models\Rombel;
 use App\Models\RombelAnggota;
 use App\Models\Semester;
@@ -20,16 +21,86 @@ class PresensiController extends Controller
    */
   public function index()
   {
+    $user = Auth::user();
+
     // Hanya rombel semester sesi: tanggal presensi divalidasi
     // terhadap semester sesi, jadi rombel semester lain tidak
-    // boleh bisa dipilih (snapshot rombel/semester akan bertentangan)
+    // boleh bisa dipilih (snapshot rombel/semester akan bertentangan).
+    // Daftar rombel mengikuti peran: Guru hanya rombel wali
+    // kelasnya, Operator & Kepala Sekolah rombel sekolahnya,
+    // Admin semua rombel semester sesi (memantau lintas sekolah)
     $rombelList = Rombel::where('semester_id', session('semester_id'))
+      ->when(
+        $user->hasRole('Guru') && !$user->hasAnyRole(['Operator Sekolah', 'Admin']),
+        fn($q) => $q->where('ptk_id', $user->ptk?->id)
+      )
+      ->when(
+        $user->hasAnyRole(['Operator Sekolah', 'Kepala Sekolah']),
+        fn($q) => $q->where('sekolah_id', $user->ptk?->sekolah_id)
+      )
       ->orderBy('tingkat')
       ->orderBy('nama_rombel')
       ->get();
-    $semester   = Semester::find(session('semester_id'));
+    $semester     = Semester::find(session('semester_id'));
+    $batasKoreksi = PresensiPengaturan::batasUntuk($user->ptk?->sekolah_id);
 
-    return view('content.presensi.index', compact('rombelList', 'semester'));
+    return view('content.presensi.index', compact('rombelList', 'semester', 'batasKoreksi'));
+  }
+
+  /**
+   * Hak melihat presensi satu rombel: Admin semua rombel;
+   * Operator & Kepala Sekolah rombel sekolahnya; Guru hanya
+   * rombel wali kelasnya. Peran lain tidak berhak.
+   */
+  private function bolehLihat(Rombel $rombel): bool
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      return true;
+    }
+
+    if ($user->hasAnyRole(['Operator Sekolah', 'Kepala Sekolah'])) {
+      return (int) $rombel->sekolah_id === (int) $user->ptk?->sekolah_id;
+    }
+
+    if ($user->hasRole('Guru')) {
+      return (int) $rombel->ptk_id === (int) $user->ptk?->id;
+    }
+
+    return false;
+  }
+
+  /**
+   * Hak mengisi/mengubah presensi satu rombel: hanya wali kelas
+   * rombel itu (Guru) dan Operator Sekolah sekolah itu. Admin
+   * dan Kepala Sekolah hanya memantau — tidak pernah mengisi.
+   */
+  private function bolehIsi(Rombel $rombel): bool
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Operator Sekolah')) {
+      return (int) $rombel->sekolah_id === (int) $user->ptk?->sekolah_id;
+    }
+
+    if ($user->hasRole('Guru')) {
+      return (int) $rombel->ptk_id === (int) $user->ptk?->id;
+    }
+
+    return false;
+  }
+
+  /**
+   * Jendela koreksi untuk Guru: tanggal lampau hanya boleh
+   * diisi/diubah dalam batas hari yang diatur Operator sekolah
+   * (bawaan 7 hari). Operator sendiri tidak dibatasi jendela.
+   */
+  private function dalamJendelaKoreksi(Rombel $rombel, Carbon $tanggal): bool
+  {
+    $batas = PresensiPengaturan::batasUntuk((int) $rombel->sekolah_id);
+
+    return $tanggal->gte(now()->startOfDay()->subDays($batas));
   }
 
   /**
@@ -87,6 +158,13 @@ class PresensiController extends Controller
       ], 422);
     }
 
+    if (!$this->bolehLihat($rombel)) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Anda tidak berhak melihat presensi rombel ini.',
+      ], 403);
+    }
+
     // Roster = anggota rombel itu pada semesternya, dibatasi hari
     // efektif siswa dari tanggal registrasinya di sekolah rombel
     // ini: belum bisa dipresensi sebelum tanggal_diterima dan tidak
@@ -100,7 +178,8 @@ class PresensiController extends Controller
     // tersimpan dicari tanpa memandang rombel asalnya, supaya
     // membuka tanggal yang sama dari rombel lain (mis. setelah
     // siswa pindah rombel) tetap menampilkan status yang tersimpan
-    $presensiExisting = Presensi::whereIn('siswa_id', $anggota->pluck('siswa_id'))
+    $presensiExisting = Presensi::with('inputOleh')
+      ->whereIn('siswa_id', $anggota->pluck('siswa_id'))
       ->whereDate('tanggal', $tanggal)
       ->get()
       ->keyBy('siswa_id');
@@ -114,17 +193,29 @@ class PresensiController extends Controller
         'nisn'       => $a->siswa->nisn,
         'status'     => $existing->status ?? Presensi::STATUS_HADIR,
         'keterangan' => $existing->keterangan ?? null,
+        // Jejak pengubah: input_by selama ini sudah mencatat
+        // pengisi/pengubah terakhir, kini ikut ditampilkan
+        'terisi'      => $existing !== null,
+        'diisi_oleh'  => $existing?->inputOleh?->name,
+        'diubah_pada' => $existing?->updated_at?->format('d M Y H:i'),
       ];
     });
 
+    // Apakah pengguna ini boleh menyimpan untuk rombel + tanggal
+    // ini (peran pengisi dan, untuk Guru, jendela koreksi)
+    $user = Auth::user();
+    $bolehIsi = $this->bolehIsi($rombel)
+      && (!$user->hasRole('Guru') || $user->hasRole('Operator Sekolah') || $this->dalamJendelaKoreksi($rombel, $tanggal));
+
     return response()->json([
-      'success' => true,
-      'rombel'  => [
+      'success'   => true,
+      'rombel'    => [
         'id'          => $rombel->id,
         'nama_rombel' => $rombel->nama_rombel,
       ],
-      'tanggal' => $tanggal->format('Y-m-d'),
-      'siswa'   => $data,
+      'tanggal'   => $tanggal->format('Y-m-d'),
+      'boleh_isi' => $bolehIsi,
+      'siswa'     => $data,
     ]);
   }
 
@@ -182,11 +273,11 @@ class PresensiController extends Controller
       ], 422);
     }
 
-    // Sama seperti modul lain: kalau semester di session bukan semester aktif,
-    // hanya admin yang boleh melakukan perubahan (termasuk presensi).
-    $isEditable = Auth::user()->hasRole('Admin') || $semester->is_active == 1;
-
-    if (!$isEditable) {
+    // Kunci semester selaras aturan global: semester sesi harus
+    // aktif atau dibuka Admin (kunci_dibuka). Pengecualian lokal
+    // lama untuk Admin dihapus — Admin kini hanya memantau dan
+    // tidak pernah menyimpan presensi (lihat bolehIsi di bawah).
+    if (!$semester->is_active && !$semester->kunci_dibuka) {
       return response()->json([
         'success' => false,
         'message' => 'Semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester
@@ -221,6 +312,31 @@ class PresensiController extends Controller
         'success' => false,
         'message' => 'Rombel ini bukan rombel semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester . '.',
       ], 422);
+    }
+
+    // Hak mengisi: hanya wali kelas rombel ini dan Operator
+    // Sekolah sekolah ini. Kepala Sekolah & Admin hanya memantau.
+    if (!$this->bolehIsi($rombel)) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Anda tidak berhak mengisi presensi rombel ini. Hanya wali kelas rombel ini dan Operator Sekolah yang dapat mengisi.',
+      ], 403);
+    }
+
+    // Jendela koreksi khusus Guru (Operator tidak dibatasi):
+    // tanggal lampau di luar batas hari yang diatur sekolah
+    // tidak dapat lagi diisi/diubah oleh wali kelas
+    if (
+      Auth::user()->hasRole('Guru')
+      && !Auth::user()->hasRole('Operator Sekolah')
+      && !$this->dalamJendelaKoreksi($rombel, $tanggal)
+    ) {
+      $batas = PresensiPengaturan::batasUntuk((int) $rombel->sekolah_id);
+
+      return response()->json([
+        'success' => false,
+        'message' => 'Tanggal ini sudah melewati batas koreksi presensi untuk Guru (' . $batas . ' hari). Silakan hubungi Operator Sekolah bila perlu perubahan.',
+      ], 403);
     }
 
     // Tegakkan aturan roster yang sama dengan yang ditampilkan
@@ -269,6 +385,36 @@ class PresensiController extends Controller
     return response()->json([
       'success' => true,
       'message' => 'Presensi berhasil disimpan.',
+    ]);
+  }
+
+  /**
+   * Simpan pengaturan presensi sekolah (khusus Operator Sekolah):
+   * batas koreksi presensi (hari) untuk Guru wali kelas.
+   */
+  public function simpanPengaturan(Request $request)
+  {
+    $request->validate([
+      'batas_koreksi_hari' => 'required|integer|min:0|max:365',
+    ]);
+
+    $sekolahId = Auth::user()->ptk?->sekolah_id;
+
+    if (!$sekolahId) {
+      return response()->json([
+        'success' => false,
+        'message' => 'Akun Anda tidak terhubung ke sekolah mana pun.',
+      ], 422);
+    }
+
+    PresensiPengaturan::updateOrCreate(
+      ['sekolah_id' => $sekolahId],
+      ['batas_koreksi_hari' => $request->integer('batas_koreksi_hari')]
+    );
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Pengaturan presensi berhasil disimpan.',
     ]);
   }
 }

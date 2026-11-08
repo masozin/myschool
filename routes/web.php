@@ -571,10 +571,24 @@ Route::controller(DhSiswaController::class)
   });
 
 // routes/web.php
-Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru', 'fitur:presensi'])->group(function () {
+// Presensi - Baca (pengisi sesuai cakupannya + pemantau:
+// Kepala Sekolah & Admin; kurungan per rombel ditegakkan
+// di controller lewat bolehLihat)
+Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru|Kepala Sekolah', 'fitur:presensi'])->group(function () {
   Route::get('/', [PresensiController::class, 'index'])->name('index');
   Route::get('/ajax-siswa', [PresensiController::class, 'ajaxSiswa'])->name('ajaxSiswa');
+});
+
+// Presensi - Simpan (hanya peran pengisi: Operator Sekolah &
+// Guru wali kelas; kurungan rombel + jendela koreksi Guru
+// ditegakkan di controller lewat bolehIsi)
+Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Operator Sekolah|Guru', 'fitur:presensi'])->group(function () {
   Route::post('/store', [PresensiController::class, 'store'])->name('store');
+});
+
+// Presensi - Pengaturan sekolah (khusus Operator Sekolah)
+Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Operator Sekolah', 'fitur:presensi'])->group(function () {
+  Route::post('/pengaturan', [PresensiController::class, 'simpanPengaturan'])->name('pengaturan');
 });
 
 Route::middleware(['auth:sanctum', 'role:Operator Sekolah'])->group(function () {
