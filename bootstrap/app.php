@@ -18,7 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
     $middleware->web(append: [
       LocaleMiddleware::class,
       SemesterSessionMiddleware::class,
-      \App\Http\Middleware\CekDataPeriodik::class
+      \App\Http\Middleware\CekDataPeriodik::class,
+      \App\Http\Middleware\CheckSemesterLock::class
     ]);
     $middleware->alias([
       'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,

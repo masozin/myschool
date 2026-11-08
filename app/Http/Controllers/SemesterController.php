@@ -21,6 +21,24 @@ class SemesterController extends Controller
     return response()->json($semester);
   }
 
+  /**
+   * Buka / terapkan kembali kunci semester (grup route ini
+   * khusus Admin). Semester non-aktif terkunci untuk perubahan
+   * data di seluruh aplikasi (CheckSemesterLock); tombol ini
+   * membukanya bila memang diperlukan.
+   */
+  public function kunci(Request $request, $id)
+  {
+    $semester = Semester::findOrFail($id);
+    $semester->update(['kunci_dibuka' => $request->input('aksi') === 'buka']);
+
+    return response()->json([
+      'message' => $semester->kunci_dibuka
+        ? 'Kunci semester dibuka. Perubahan data kembali diizinkan.'
+        : 'Kunci semester diterapkan kembali.',
+    ]);
+  }
+
   public function store(Request $request)
   {
     $validator = Validator::make($request->all(), [

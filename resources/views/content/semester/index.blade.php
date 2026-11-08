@@ -150,8 +150,17 @@
               <span class="badge ${row.is_active == 1 ? 'bg-label-success' : 'bg-label-secondary'}">
                 ${row.is_active == 1 ? 'Aktif' : 'Tidak Aktif'}
               </span>
+              ${row.is_active == 1 ? '' : (row.kunci_dibuka == 1
+                ? '<span class="badge bg-label-warning">Kunci Dibuka</span>'
+                : '<span class="badge bg-label-danger">Terkunci</span>')}
             </td>
             <td>
+              ${row.is_active == 1 ? '' : `
+                <button class="btn btn-icon btn-text-warning btn-sm rounded-pill toggle-kunci"
+                  data-id="${row.id}" data-dibuka="${row.kunci_dibuka == 1 ? '1' : '0'}"
+                  title="${row.kunci_dibuka == 1 ? 'Terapkan kunci lagi' : 'Buka kunci semester ini'}">
+                  <i class="icon-base ri ${row.kunci_dibuka == 1 ? 'ri-lock-line' : 'ri-lock-unlock-line'} icon-22px"></i>
+                </button>`}
               <button class="btn btn-icon btn-text-secondary btn-sm rounded-pill edit-data"
                 data-id="${row.id}"
                 data-bs-toggle="offcanvas"
@@ -355,7 +364,7 @@
       semesterInput.addEventListener('change', generateSemesterData);
 
       // ─── 5. EVENT DELEGATION ─────────────────────────────────────────
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', async function(e) {
         const judulForm = document.getElementById('offcanvas_label');
 
         // Tombol Tambah
@@ -369,6 +378,43 @@
           judulForm.innerHTML = 'Tambah Semester Baru';
           document.getElementById('preview_tanggal_mulai').value = '';
           document.getElementById('preview_tanggal_selesai').value = '';
+        }
+
+        // Tombol Buka / Terapkan Kunci Semester
+        if (e.target.closest('.toggle-kunci')) {
+          const btn = e.target.closest('.toggle-kunci');
+          const buka = btn.dataset.dibuka !== '1';
+          try {
+            const res = await fetch(`/semester/${btn.dataset.id}/kunci`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json'
+              },
+              body: JSON.stringify({
+                aksi: buka ? 'buka' : 'tutup'
+              })
+            });
+            const hasil = await res.json();
+            if (!res.ok) throw new Error(hasil.message || 'Gagal mengubah kunci semester.');
+            Swal.fire({
+              icon: 'success',
+              title: 'Berhasil',
+              text: hasil.message,
+              timer: 1800,
+              showConfirmButton: false
+            });
+            loadData();
+          } catch (err) {
+            Swal.fire({
+              icon: 'error',
+              title: 'Gagal',
+              text: err.message
+            });
+          }
+          return;
         }
 
         // Tombol Edit

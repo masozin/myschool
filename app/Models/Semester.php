@@ -13,10 +13,11 @@ class Semester extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_semester';
-  protected $fillable = ['kode_semester', 'semester', 'tahun_pelajaran', 'is_active', 'tanggal_mulai', 'tanggal_selesai'];
+  protected $fillable = ['kode_semester', 'semester', 'tahun_pelajaran', 'is_active', 'tanggal_mulai', 'tanggal_selesai', 'kunci_dibuka'];
 
   protected $casts = [
     'is_active' => 'boolean',
+    'kunci_dibuka' => 'boolean',
     // tanggal_mulai & tanggal_selesai TIDAK di-cast di sini:
     // keduanya sudah ditangani accessor khusus dengan fallback hitung.
   ];

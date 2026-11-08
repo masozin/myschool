@@ -132,6 +132,7 @@ Route::controller(SemesterController::class)
   ->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/table', 'table')->name('table');
+    Route::post('/{id}/kunci', 'kunci')->name('kunci');
     Route::post('/', 'store')->name('store');
     Route::put('/{id}', 'update')->name('update');
     Route::delete('/{id}', 'destroy')->name('destroy');
