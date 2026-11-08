@@ -21,6 +21,33 @@
     </div>
   @endif
 
+  @if ($terkunci ?? false)
+    <div class="alert alert-danger d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="icon-base ri ri-lock-line me-1"></i>
+        <strong>Angkatan terkunci.</strong> Musim kelulusan berikutnya telah dimulai — angkatan ini hanya dapat
+        dilihat dan dicetak, tidak dapat diubah atau dihapus.</span>
+      @if (auth()->user()->hasRole('Admin'))
+        <form method="POST" action="{{ route('skhu.kunci') }}" class="m-0">
+          @csrf
+          <input type="hidden" name="aksi" value="buka">
+          <button type="submit" class="btn btn-sm btn-danger">Buka Kunci</button>
+        </form>
+      @endif
+    </div>
+  @elseif (($terkunciOtomatis ?? false) && ($kunciDibuka ?? false))
+    <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="icon-base ri ri-lock-unlock-line me-1"></i>
+        Kunci otomatis angkatan ini sedang <strong>dibuka manual oleh Admin</strong> — perubahan kembali diizinkan.</span>
+      @if (auth()->user()->hasRole('Admin'))
+        <form method="POST" action="{{ route('skhu.kunci') }}" class="m-0">
+          @csrf
+          <input type="hidden" name="aksi" value="tutup">
+          <button type="submit" class="btn btn-sm btn-warning">Terapkan Kunci Lagi</button>
+        </form>
+      @endif
+    </div>
+  @endif
+
   {{-- Info header --}}
   <div class="row mb-4 g-4">
     <div class="col-12 col-md-8">

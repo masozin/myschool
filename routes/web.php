@@ -390,6 +390,7 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::post('/template', 'templateStore');
       Route::put('/template/{id}', 'templateUpdate');
       Route::delete('/template/{id}', 'templateDestroy');
+      Route::post('/kunci', 'kunci')->name('skl.kunci');
     });
 
   // SKL - Baca (Admin dan Kepala Sekolah boleh melihat;

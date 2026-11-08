@@ -308,6 +308,10 @@ class SklController extends Controller
       ? Sekolah::with('detailTerbaru')->orderBy('id')->get()
       : collect();
 
+    $terkunci         = KunciKelulusan::terkunci('skl', $sekolahId, (int) $semesterId);
+    $terkunciOtomatis = KunciKelulusan::terkunciOtomatis((int) $semesterId);
+    $kunciDibuka      = KunciKelulusan::dibukaManual('skl', $sekolahId, (int) $semesterId);
+
     return view('content.skl.index', compact(
       'daftarSiswa',
       'semester',
@@ -320,6 +324,9 @@ class SklController extends Controller
       'tingkatAkhir',
       'daftarSekolah',
       'sekolahId',
+      'terkunci',
+      'terkunciOtomatis',
+      'kunciDibuka',
     ));
   }
 

@@ -91,6 +91,10 @@ class SkhuController extends Controller
       ? Sekolah::with('detailTerbaru')->orderBy('id')->get()
       : collect();
 
+    $terkunci         = KunciKelulusan::terkunci('skhu', $sekolah->id, $semester->id);
+    $terkunciOtomatis = KunciKelulusan::terkunciOtomatis($semester->id);
+    $kunciDibuka      = KunciKelulusan::dibukaManual('skhu', $sekolah->id, $semester->id);
+
     return view('content.skhu.index', compact(
       'sekolah',
       'semester',
@@ -99,7 +103,10 @@ class SkhuController extends Controller
       'mapels',
       'jenjang',
       'tingkatAkhir',
-      'daftarSekolah'
+      'daftarSekolah',
+      'terkunci',
+      'terkunciOtomatis',
+      'kunciDibuka'
     ));
   }
 
