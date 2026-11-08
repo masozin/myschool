@@ -313,7 +313,8 @@
             <tr>
               <td>
                 @if ($skl)
-                  <input type="checkbox" class="form-check-input check-item" value="{{ $skl->id }}">
+                  <input type="checkbox" class="form-check-input check-item" value="{{ $skl->id }}"
+                    data-status="{{ $skl->status }}">
                 @else
                   <input type="checkbox" class="form-check-input" disabled title="SKL belum dibuat">
                 @endif
@@ -409,6 +410,29 @@
                       title="Lihat Detail">
                       <i class="icon-base ri ri-eye-line icon-18px"></i>
                     </a>
+
+                    {{-- Aksi langsung Kepala Sekolah per baris, tampil
+                         mengikuti status baris ini (persetujuan memakai
+                         penangan kelas yang sama dengan menu titik tiga) --}}
+                    @unless ($terkunci ?? false)
+                      @hasanyrole('Kepala Sekolah')
+                        @if ($skl->status === 'pengajuan')
+                          <button class="btn btn-sm btn-icon btn-text-success rounded-pill btn-setujui"
+                            data-id="{{ $skl->id }}" title="Setujui SKL">
+                            <i class="icon-base ri ri-check-line icon-18px"></i>
+                          </button>
+                          <button class="btn btn-sm btn-icon btn-text-danger rounded-pill btn-tolak"
+                            data-id="{{ $skl->id }}" title="Tolak SKL">
+                            <i class="icon-base ri ri-close-line icon-18px"></i>
+                          </button>
+                        @elseif ($skl->status === 'disetujui')
+                          <button class="btn btn-sm btn-icon btn-text-secondary rounded-pill btn-batal-setujui"
+                            data-id="{{ $skl->id }}" title="Batalkan Persetujuan">
+                            <i class="icon-base ri ri-arrow-go-back-line icon-18px"></i>
+                          </button>
+                        @endif
+                      @endhasanyrole
+                    @endunless
 
                     {{-- Tombol titik tiga hanya tampil bila menunya benar-benar berisi
                          untuk peran + status baris ini (mis. Admin tidak punya isi sama
@@ -701,6 +725,18 @@
         } else {
           bulkContainer.classList.add('d-none');
         }
+
+        // Tombol Kepala Sekolah mengikuti status pilihan: hanya
+        // yang relevan yang tampil — Setujui/Tolak untuk baris
+        // berstatus pengajuan, Batal Setujui untuk yang disetujui
+        const statusTerpilih = Array.from(document.querySelectorAll('.check-item:checked'))
+          .map(cb => cb.dataset.status);
+        const adaPengajuan = statusTerpilih.includes('pengajuan');
+        const adaDisetujui = statusTerpilih.includes('disetujui');
+        document.querySelectorAll('.btn-bulk[data-action="setujui"], .btn-bulk[data-action="tolak"]')
+          .forEach(b => b.style.display = adaPengajuan ? '' : 'none');
+        document.querySelectorAll('.btn-bulk[data-action="batal-setujui"]')
+          .forEach(b => b.style.display = adaDisetujui ? '' : 'none');
       }
 
       if (checkAll) {
@@ -999,6 +1035,49 @@
         if (!konfirm.isConfirmed) return;
 
         const res = await apiFetch(`/skl/${btn.dataset.id}/setujui`);
+        const data = await res.json();
+        if (res.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: data.message,
+            timer: 2000,
+            showConfirmButton: false
+          });
+          setTimeout(() => location.reload(), 2100);
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal',
+            text: data.message
+          });
+        }
+      });
+
+      // ── Batal Setujui (per baris, Kepala Sekolah) ──────────────────────────
+      // Memakai endpoint masal yang sama dengan satu id
+      document.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.btn-batal-setujui');
+        if (!btn) return;
+
+        const konfirm = await Swal.fire({
+          icon: 'question',
+          title: 'Batalkan Persetujuan?',
+          text: 'SKL akan kembali ke status pengajuan.',
+          showCancelButton: true,
+          confirmButtonText: 'Ya, Batalkan',
+          cancelButtonText: 'Batal',
+          customClass: {
+            confirmButton: 'btn btn-secondary me-3',
+            cancelButton: 'btn btn-outline-secondary'
+          },
+          buttonsStyling: false
+        });
+        if (!konfirm.isConfirmed) return;
+
+        const res = await apiFetch('/skl/bulk/batal-setujui', {
+          ids: [btn.dataset.id]
+        });
         const data = await res.json();
         if (res.ok) {
           Swal.fire({
