@@ -8,6 +8,7 @@ use App\Models\SekolahDetail;
 use App\Models\SekolahLogo;
 use App\Models\Semester;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Shared\Date as TanggalExcel;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Conditional;
@@ -212,7 +213,14 @@ class KalenderPendidikanController extends Controller
     ];
     foreach ($contoh as $r => $baris) {
       foreach ($baris as $c => $nilai) {
-        $sheet->setCellValue([$c + 1, $r + 2], $nilai);
+        // Kolom tanggal ditulis sebagai tanggal Excel SUNGGUHAN
+        // (angka serial), bukan teks 'Y-m-d' yang berkedok format
+        // tanggal — teks seperti itu mudah berubah rupa saat file
+        // disimpan ulang di aplikasi lain dan gagal terbaca impor
+        $sheet->setCellValue(
+          [$c + 1, $r + 2],
+          $c < 2 ? TanggalExcel::PHPToExcel(new \DateTimeImmutable($nilai)) : $nilai
+        );
       }
       $sheet->getComment('A' . ($r + 2))->getText()
         ->createTextRun('Baris contoh — boleh dihapus sebelum mengimpor.');

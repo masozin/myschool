@@ -136,9 +136,22 @@ class KalenderPendidikanImport implements ToCollection
     }
   }
 
-  /** Baca tanggal dari sel Excel: angka serial, string Y-m-d, atau d/m/Y. */
+  /**
+   * Baca tanggal dari sel Excel dalam rupa apa pun yang lazim
+   * muncul dari file yang dibuat / disimpan ulang di aplikasi
+   * berbeda: objek tanggal, angka serial Excel (juga sebagai
+   * teks), string ISO ('2025-07-14', boleh dengan jam), string
+   * hari/bulan/tahun ('14/07/2025', '14-07-2025', '14.07.2025',
+   * satu digit boleh), dan nama bulan Indonesia/Inggris
+   * ('14 Juli 2025'). Urutan selalu hari-bulan-tahun; format
+   * Amerika bulan/hari sengaja TIDAK ditebak.
+   */
   private function bacaTanggal($nilai): ?string
   {
+    if ($nilai instanceof \DateTimeInterface) {
+      return $nilai->format('Y-m-d');
+    }
+
     if (is_numeric($nilai)) {
       try {
         return ExcelDate::excelToDateTimeObject((float) $nilai)->format('Y-m-d');
@@ -147,13 +160,48 @@ class KalenderPendidikanImport implements ToCollection
       }
     }
 
-    $teks = trim((string) $nilai);
-    foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y'] as $format) {
+    $teks = trim(str_replace("\u{00A0}", ' ', (string) $nilai));
+    if ($teks === '') {
+      return null;
+    }
+
+    // Angka serial Excel yang tersimpan sebagai teks
+    if (is_numeric($teks)) {
+      try {
+        return ExcelDate::excelToDateTimeObject((float) $teks)->format('Y-m-d');
+      } catch (\Throwable) {
+        return null;
+      }
+    }
+
+    foreach (['Y-m-d H:i:s', 'Y-m-d', 'Y/m/d', 'd/m/Y', 'd-m-Y', 'd.m.Y', 'j/n/Y', 'j-n-Y'] as $format) {
       try {
         return Carbon::createFromFormat($format, $teks)->format('Y-m-d');
       } catch (\Throwable) {
         // coba format berikutnya
       }
+    }
+
+    // Nama bulan: '14 Juli 2025' atau 'Juli 14, 2025'
+    $bulan = [
+      'januari' => 1, 'january' => 1, 'jan' => 1,
+      'februari' => 2, 'february' => 2, 'feb' => 2,
+      'maret' => 3, 'march' => 3, 'mar' => 3,
+      'april' => 4, 'apr' => 4,
+      'mei' => 5, 'may' => 5,
+      'juni' => 6, 'june' => 6, 'jun' => 6,
+      'juli' => 7, 'july' => 7, 'jul' => 7,
+      'agustus' => 8, 'august' => 8, 'agu' => 8, 'aug' => 8,
+      'september' => 9, 'sept' => 9, 'sep' => 9,
+      'oktober' => 10, 'october' => 10, 'okt' => 10, 'oct' => 10,
+      'november' => 11, 'nov' => 11,
+      'desember' => 12, 'december' => 12, 'des' => 12, 'dec' => 12,
+    ];
+    if (preg_match('/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/', $teks, $m) && isset($bulan[strtolower($m[2])])) {
+      return sprintf('%04d-%02d-%02d', (int) $m[3], $bulan[strtolower($m[2])], (int) $m[1]);
+    }
+    if (preg_match('/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/', $teks, $m) && isset($bulan[strtolower($m[1])])) {
+      return sprintf('%04d-%02d-%02d', (int) $m[3], $bulan[strtolower($m[1])], (int) $m[2]);
     }
 
     return null;
