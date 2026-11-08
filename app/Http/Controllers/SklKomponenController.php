@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SklKomponen;
 use App\Models\Semester;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -37,12 +38,94 @@ class SklKomponenController extends Controller
     $komponens  = SklKomponen::untuk($semester->id, $jenjang)->with('komponenSub')->get();
     $totalBobot = SklKomponen::totalBobot($semester->id, $jenjang);
 
+    // Pilihan semester sumber untuk tombol Salin: semester lain
+    // yang sudah memiliki komponen pada jenjang yang sedang dibuka
+    $idSumber = SklKomponen::where('jenjang', $jenjang)
+      ->where('semester_id', '!=', $semester->id)
+      ->distinct()
+      ->pluck('semester_id');
+
+    $semesterSumber = Semester::whereIn('id', $idSumber)
+      ->orderByDesc('kode_semester')
+      ->get();
+
+    $jumlahPerSumber = SklKomponen::where('jenjang', $jenjang)
+      ->whereIn('semester_id', $idSumber)
+      ->selectRaw('semester_id, COUNT(*) as jumlah')
+      ->groupBy('semester_id')
+      ->pluck('jumlah', 'semester_id');
+
     return view('content.skl.komponen.index', compact(
       'komponens',
       'jenjang',
       'semester',
-      'totalBobot'
+      'totalBobot',
+      'semesterSumber',
+      'jumlahPerSumber'
     ));
+  }
+
+  // ── Salin dari Semester Lain ────────────────────────────────────────
+
+  /**
+   * Salin seluruh komponen + sub-komponen satu jenjang dari
+   * semester sumber ke semester kerja kelulusan. Tujuan harus
+   * masih kosong untuk jenjang itu agar tidak terjadi duplikasi
+   * dan total bobot sumber (maksimal 100) terbawa apa adanya.
+   */
+  public function salin(Request $request)
+  {
+    $target = $this->getSemester();
+
+    $data = $request->validate([
+      'semester_sumber' => 'required|integer|exists:tabel_semester,id',
+      'jenjang'          => 'required|in:SD,SMP,SMA,SMK',
+    ]);
+
+    if ((int) $data['semester_sumber'] === (int) $target->id) {
+      return back()->with('error', 'Semester sumber sama dengan semester tujuan.');
+    }
+
+    $sumber = SklKomponen::untuk((int) $data['semester_sumber'], $data['jenjang'])
+      ->with(['komponenSub' => fn($q) => $q->orderBy('urutan')])
+      ->get();
+
+    if ($sumber->isEmpty()) {
+      return back()->with('error', 'Semester sumber tidak memiliki komponen untuk jenjang ' . $data['jenjang'] . '.');
+    }
+
+    $sudahAda = SklKomponen::untuk($target->id, $data['jenjang'])->count();
+    if ($sudahAda > 0) {
+      return back()->with('error', 'Semester ini sudah memiliki ' . $sudahAda . ' komponen untuk jenjang ' . $data['jenjang'] . '. Hapus terlebih dahulu bila ingin menyalin ulang.');
+    }
+
+    $jumlahSub = 0;
+    DB::transaction(function () use ($sumber, $target, $data, &$jumlahSub) {
+      foreach ($sumber as $komp) {
+        $baru = SklKomponen::create([
+          'semester_id' => $target->id,
+          'jenjang'     => $data['jenjang'],
+          'kode'        => $komp->kode,
+          'label'       => $komp->label,
+          'bobot'       => $komp->bobot,
+          'keterangan'  => $komp->keterangan,
+          'urutan'      => $komp->urutan,
+        ]);
+
+        foreach ($komp->komponenSub as $sub) {
+          $baru->komponenSub()->create([
+            'label'      => $sub->label,
+            'keterangan' => $sub->keterangan,
+            'urutan'     => $sub->urutan,
+          ]);
+          $jumlahSub++;
+        }
+      }
+    });
+
+    return redirect()
+      ->route('skl.komponen.index', ['jenjang' => $data['jenjang']])
+      ->with('success', 'Berhasil menyalin ' . $sumber->count() . ' komponen dan ' . $jumlahSub . ' sub-komponen ke semester ini.');
   }
 
   // ── Create ────────────────────────────────────────────────────────────

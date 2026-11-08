@@ -321,6 +321,7 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::get('/', 'index')->name('index');
       Route::get('/create', 'create')->name('create');
       Route::post('/', 'store')->name('store');
+      Route::post('/salin', 'salin')->name('salin');
       Route::get('/{komponen}/edit', 'edit')->name('edit');
       Route::put('/{komponen}', 'update')->name('update');
       Route::delete('/{komponen}', 'destroy')->name('destroy');

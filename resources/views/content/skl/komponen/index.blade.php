@@ -12,6 +12,20 @@
 
 @section('content')
 
+  {{-- Pesan kilat (sebelumnya tidak dirender di halaman ini, sehingga
+       pesan sukses/gagal dari store, update dan salin tidak terlihat) --}}
+  @if (session('success'))
+    <div class="alert alert-success py-2 mb-4">
+      <i class="icon-base ri ri-checkbox-circle-line me-1"></i>{{ session('success') }}
+    </div>
+  @endif
+
+  @if (session('error'))
+    <div class="alert alert-danger py-2 mb-4">
+      <i class="icon-base ri ri-error-warning-line me-1"></i>{{ session('error') }}
+    </div>
+  @endif
+
   {{-- ── Header ─────────────────────────────────────────────────────────── --}}
   <div class="mb-4 d-flex align-items-center gap-2">
     <a href="{{ route('skl.index') }}" class="btn btn-sm btn-outline-secondary">
@@ -52,9 +66,17 @@
         @endforeach
       </div>
 
-      <a href="{{ route('skl.komponen.create', ['jenjang' => $jenjang]) }}" class="btn btn-primary btn-sm">
-        <i class="icon-base ri ri-add-line me-1"></i>Tambah Komponen
-      </a>
+      <div class="d-flex gap-2">
+        @if ($semesterSumber->isNotEmpty())
+          <button type="button" class="btn btn-label-secondary btn-sm" data-bs-toggle="modal"
+            data-bs-target="#modal-salin-komponen">
+            <i class="icon-base ri ri-file-copy-line me-1"></i>Salin dari Semester Lain
+          </button>
+        @endif
+        <a href="{{ route('skl.komponen.create', ['jenjang' => $jenjang]) }}" class="btn btn-primary btn-sm">
+          <i class="icon-base ri ri-add-line me-1"></i>Tambah Komponen
+        </a>
+      </div>
 
     </div>
   </div>
@@ -199,6 +221,45 @@
       @endif
 
     @endif
+  </div>
+
+  {{-- ── Modal Salin Komponen dari Semester Lain ─────────────────────── --}}
+  <div class="modal fade" id="modal-salin-komponen" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <form method="POST" action="{{ route('skl.komponen.salin') }}" class="modal-content">
+        @csrf
+        <input type="hidden" name="jenjang" value="{{ $jenjang }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Salin Komponen dari Semester Lain</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">
+            Seluruh komponen nilai beserta sub-komponennya untuk jenjang
+            <strong>{{ $jenjang }}</strong> akan disalin ke semester kelulusan
+            <strong>{{ $semester->tahun_pelajaran }} ({{ $semester->semester }})</strong>.
+            Penyalinan hanya dapat dilakukan bila semester ini belum memiliki
+            komponen untuk jenjang {{ $jenjang }}.
+          </p>
+          <label class="form-label" for="semester_sumber">Semester Sumber</label>
+          <select class="form-select" id="semester_sumber" name="semester_sumber" required>
+            <option value="">— Pilih semester sumber —</option>
+            @foreach ($semesterSumber as $semSumber)
+              <option value="{{ $semSumber->id }}">
+                {{ $semSumber->tahun_pelajaran }} — {{ $semSumber->semester }}
+                ({{ $jumlahPerSumber[$semSumber->id] ?? 0 }} komponen)
+              </option>
+            @endforeach
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="icon-base ri ri-file-copy-line me-1"></i>Salin Komponen
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
 @endsection
