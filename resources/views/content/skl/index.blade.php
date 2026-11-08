@@ -48,6 +48,14 @@
     </div>
   @endif
 
+  @if (!$konfigurasi && auth()->user()->hasAnyRole(['Admin', 'Kepala Sekolah']))
+    <div class="alert alert-info d-flex gap-2 py-2 mb-4">
+      <i class="icon-base ri ri-information-line"></i>
+      <span>Konfigurasi SKL sekolah ini (mode input nilai) <strong>belum diatur oleh Operator Sekolah</strong>.
+        Daftar di bawah ditampilkan untuk pemantauan — dokumen SKL baru dapat dibuat setelah konfigurasi diatur.</span>
+    </div>
+  @endif
+
   {{-- ── Info Header ──────────────────────────────────────────────────────── --}}
   <div class="row mb-4 g-4">
     <div class="col-12 col-md-7">
@@ -68,6 +76,19 @@
               <span class="text-muted">
                 <i class="icon-base ri ri-group-line me-1"></i>
                 {{ $daftarSiswa->count() }} Siswa Kelas Akhir (Tingkat {{ $tingkatAkhir }})
+              </span>
+              <span class="text-muted">
+                <i class="icon-base ri ri-school-line me-1"></i>
+                {{ $sekolah->detailTerbaru->nama_sekolah ?? 'Sekolah #' . $sekolahId }}
+              </span>
+              <span class="text-muted">
+                <i class="icon-base ri ri-equalizer-line me-1"></i>
+                Mode input:
+                {{ $konfigurasi
+                  ? ($konfigurasi->mode_input === 'manual'
+                      ? 'Manual (per komponen)'
+                      : 'Jadi (nilai akhir langsung)')
+                  : 'belum diatur Operator' }}
               </span>
               @if ($konfigurasi?->tempat_terbit ?? 'Tempat terbit belum diatur')
                 <span class="text-muted">
