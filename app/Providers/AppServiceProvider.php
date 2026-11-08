@@ -54,8 +54,12 @@ class AppServiceProvider extends ServiceProvider
         $semesterId = session('semester_id');
         $semester   = Semester::find($semesterId);
 
-        $isEditable = $user->hasRole('Admin')
-          || ($semester && $semester->is_active == 1);
+        // Selaras dengan CheckSemesterLock (penjaga di server):
+        // dapat diubah hanya bila semester sesi adalah semester
+        // aktif ATAU kuncinya sedang dibuka Admin — Admin tidak
+        // lagi bebas otomatis agar tampilan sama dengan kenyataan
+        $isEditable = $semester
+          && ($semester->is_active == 1 || $semester->kunci_dibuka == 1);
 
         $view->with([
           'namaSemester' => isset($semester)

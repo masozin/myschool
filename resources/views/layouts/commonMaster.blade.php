@@ -88,25 +88,37 @@
   @include('layouts/sections/scriptsIncludes' . $isFront)
 
   <!-- untuk menampilkan dan menyembunyikan tombol crud pada semester yang dipilih -->
-  <style>
-    /* Sembunyikan tombol aksi utama jika semester terkunci */
-    .semester-locked .btn-tambah,
-    .semester-locked .btn-edit,
-    .semester-locked .btn-hapus,
-    .semester-locked .btn-simpan,
-    .semester-locked .smt-lock {
-      display: none !important;
-    }
+  {{-- Halaman SKHU/SKL diatur kunci angkatannya sendiri dan halaman
+       Semester adalah tempat Admin mengelola kunci — keduanya
+       dikecualikan dari gaya sembunyi menyeluruh ini --}}
+  @if (!str_starts_with(request()->path(), 'skhu') && !str_starts_with(request()->path(), 'skl') && !str_starts_with(request()->path(), 'semester'))
+    <style>
+      /* Sembunyikan tombol aksi utama jika semester terkunci */
+      .semester-locked .btn-tambah,
+      .semester-locked .tambah-data,
+      .semester-locked .btn-edit,
+      .semester-locked .edit-data,
+      .semester-locked .btn-hapus,
+      .semester-locked .hapus-data,
+      .semester-locked .btn-delete,
+      .semester-locked .delete-data,
+      .semester-locked .btn-simpan,
+      .semester-locked .smt-lock,
+      .semester-locked form[method="post" i] button[type="submit"],
+      .semester-locked form[method="post" i] input[type="submit"] {
+        display: none !important;
+      }
 
-    /* Opsional: Jika ingin tombolnya tetap ada tapi tidak bisa diklik */
-    /*
+      /* Opsional: Jika ingin tombolnya tetap ada tapi tidak bisa diklik */
+      /*
     .semester-locked .aksi-edit {
       pointer-events: none;
       opacity: 0.5;
       cursor: not-allowed;
     }
     */
-  </style>
+    </style>
+  @endif
 </head>
 
 <body class="{{ isset($isEditable) && !$isEditable ? 'semester-locked' : '' }}">
