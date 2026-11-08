@@ -111,6 +111,29 @@ class SkhuController extends Controller
   }
 
   // ── Ambil data siswa kelas akhir ──────────────────────────────────────
+  /**
+   * Kunci urutan tampilan berdasarkan nomor dokumen: yang sudah
+   * memiliki nomor tampil lebih dulu mengikuti nomornya — setiap
+   * kelompok angka pada nomor dibandingkan sebagai bilangan
+   * (bukan teks), supaya "2" mendahului "10" walau pola nomor
+   * tidak memakai nol di depan — lalu nama sebagai penentu akhir.
+   * Yang belum memiliki nomor tampil sesudahnya menurut nama.
+   */
+  private function kunciUrutNomor(?string $nomor, string $nama): array
+  {
+    if (!$nomor) {
+      return [1, '', $nama];
+    }
+
+    $normal = preg_replace_callback(
+      '/\d+/',
+      fn($m) => str_pad($m[0], 10, '0', STR_PAD_LEFT),
+      $nomor
+    );
+
+    return [0, $normal, $nama];
+  }
+
   private function getSiswaKelasAkhir(int $sekolahId, int $semesterId, int $tingkatAkhir)
   {
     return RombelAnggota::with([
@@ -127,7 +150,14 @@ class SkhuController extends Controller
           ->where('tingkat', $tingkatAkhir);
       })
       ->get()
-      ->sortBy('siswa.nama_siswa');
+      ->sort(fn($a, $b) => $this->kunciUrutNomor(
+        $a->siswa->skhu->first()?->nomor_surat,
+        $a->siswa->nama_siswa
+      ) <=> $this->kunciUrutNomor(
+        $b->siswa->skhu->first()?->nomor_surat,
+        $b->siswa->nama_siswa
+      ))
+      ->values();
   }
 
   /**
@@ -1174,7 +1204,14 @@ class SkhuController extends Controller
       )
       ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
       ->get()
-      ->sortBy('siswa.nama_siswa');
+      ->sort(fn($a, $b) => $this->kunciUrutNomor(
+        $a->siswa->skhu->where('semester_id', $semester->id)->first()?->nomor_surat,
+        $a->siswa->nama_siswa
+      ) <=> $this->kunciUrutNomor(
+        $b->siswa->skhu->where('semester_id', $semester->id)->first()?->nomor_surat,
+        $b->siswa->nama_siswa
+      ))
+      ->values();
 
     // ── Buat Excel ─────────────────────────────────────────────────────────
     $spreadsheet = new Spreadsheet();

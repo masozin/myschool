@@ -88,6 +88,29 @@ class SklController extends Controller
   }
 
   /**
+   * Kunci urutan tampilan berdasarkan nomor dokumen: yang sudah
+   * memiliki nomor tampil lebih dulu mengikuti nomornya — setiap
+   * kelompok angka pada nomor dibandingkan sebagai bilangan
+   * (bukan teks), supaya "2" mendahului "10" walau pola nomor
+   * tidak memakai nol di depan — lalu nama sebagai penentu akhir.
+   * Yang belum memiliki nomor tampil sesudahnya menurut nama.
+   */
+  private function kunciUrutNomor(?string $nomor, string $nama): array
+  {
+    if (!$nomor) {
+      return [1, '', $nama];
+    }
+
+    $normal = preg_replace_callback(
+      '/\d+/',
+      fn($m) => str_pad($m[0], 10, '0', STR_PAD_LEFT),
+      $nomor
+    );
+
+    return [0, $normal, $nama];
+  }
+
+  /**
    * Tolak perubahan pada angkatan yang sudah terkunci otomatis
    * (musim kelulusan berikutnya telah dimulai dan Admin belum
    * membuka kuncinya). Melihat dan mencetak tidak dibatasi.
@@ -293,6 +316,17 @@ class SklController extends Controller
       'siswa' => $siswa,
       'skl'   => $sklExisting->get($siswa->id),
     ]);
+
+    // Yang sudah memiliki nomor SKL tampil mengikuti nomornya
+    $daftarSiswa = $daftarSiswa
+      ->sort(fn($a, $b) => $this->kunciUrutNomor(
+        $a['skl']?->nomor_skl,
+        $a['siswa']->nama_siswa
+      ) <=> $this->kunciUrutNomor(
+        $b['skl']?->nomor_skl,
+        $b['siswa']->nama_siswa
+      ))
+      ->values();
 
     // Filter status jika diminta
     if ($request->filled('status')) {
@@ -1340,8 +1374,7 @@ class SklController extends Controller
         }
       )
       ->whereHas('siswa', fn($q) => $q->whereHas('registrasiTerbaru', fn($qr) => $qr->whereIn('status', ['aktif', 'lulus'])))
-      ->get()
-      ->sortBy('siswa.nama_siswa');
+      ->get();
 
     // 4. Cek Konfigurasi SKL Sekolah Anda
     $konfigurasi = SklKonfigurasi::where('sekolah_id', $sekolah->id)
@@ -1357,6 +1390,17 @@ class SklController extends Controller
       ->where('semester_id', $semester->id)
       ->get()
       ->keyBy('siswa_id');
+
+    // Yang sudah memiliki nomor SKL tampil mengikuti nomornya
+    $siswaList = $siswaList
+      ->sort(fn($a, $b) => $this->kunciUrutNomor(
+        $skls->get($a->siswa_id)?->nomor_skl,
+        $a->siswa->nama_siswa
+      ) <=> $this->kunciUrutNomor(
+        $skls->get($b->siswa_id)?->nomor_skl,
+        $b->siswa->nama_siswa
+      ))
+      ->values();
 
     $spreadsheet = new Spreadsheet();
 
