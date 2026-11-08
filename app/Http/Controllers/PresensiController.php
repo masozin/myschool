@@ -188,10 +188,12 @@ class PresensiController extends Controller
       $existing = $presensiExisting->get($a->siswa_id);
 
       return [
-        'siswa_id'   => $a->siswa->id,
-        'nama_siswa' => $a->siswa->nama_siswa,
-        'nisn'       => $a->siswa->nisn,
-        'status'     => $existing->status ?? Presensi::STATUS_HADIR,
+        'siswa_id'      => $a->siswa->id,
+        'nama_siswa'    => $a->siswa->nama_siswa,
+        'nisn'          => $a->siswa->nisn,
+        'photo'         => $a->siswa->photo,
+        'jenis_kelamin' => $a->siswa->jenis_kelamin,
+        'status'        => $existing->status ?? Presensi::STATUS_HADIR,
         'keterangan' => $existing->keterangan ?? null,
         // Jejak pengubah: input_by selama ini sudah mencatat
         // pengisi/pengubah terakhir, kini ikut ditampilkan
