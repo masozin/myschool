@@ -444,9 +444,10 @@
       // ── DataTable ───────────────────────────────────────────────────────────
       new DataTable('#tabel-skhu', {
         scrollX: true, // Menambahkan scroll horizontal bawaan DataTables
-        order: [
-          [1, 'asc']
-        ],
+        // Tanpa urutan bawaan: tabel mengikuti urutan dari server
+        // (menurut nomor SKHU bagi yang sudah bernomor, lalu nama).
+        // Pengurutan manual lewat klik kepala kolom tetap tersedia.
+        order: [],
         columnDefs: [{
           targets: 0,
           orderable: false,

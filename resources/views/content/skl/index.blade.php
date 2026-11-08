@@ -712,9 +712,10 @@
       // ── DataTable ─────────────────────────────────────────────────────────────
       new DataTable('#tabel-skl', {
         scrollX: true,
-        order: [
-          [2, 'asc']
-        ],
+        // Tanpa urutan bawaan: tabel mengikuti urutan dari server
+        // (menurut nomor SKL bagi yang sudah bernomor, lalu nama).
+        // Pengurutan manual lewat klik kepala kolom tetap tersedia.
+        order: [],
         columnDefs: [{
           targets: [0, 1],
           orderable: false,
