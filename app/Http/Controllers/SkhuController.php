@@ -1127,6 +1127,22 @@ class SkhuController extends Controller
 
   public function downloadTemplate(Request $request)
   {
+    return $this->buatBukuNilai($request, false);
+  }
+
+  /**
+   * Leger SKHU: bentuk sama persis dengan template impor
+   * (termasuk kunci baris pertama), tetapi sel nilainya terisi
+   * nilai yang sudah tersimpan — untuk dibaca/dicetak sebagai
+   * rekap, bukan untuk diimpor ulang.
+   */
+  public function downloadLeger(Request $request)
+  {
+    return $this->buatBukuNilai($request, true);
+  }
+
+  private function buatBukuNilai(Request $request, bool $leger)
+  {
     $user = Auth::user();
 
     // Operator: template satu angkatan. Guru wali kelas: boleh,
@@ -1189,7 +1205,7 @@ class SkhuController extends Controller
       ], 422);
     }
 
-    $siswaList = RombelAnggota::with(['siswa', 'siswa.skhu', 'rombel'])
+    $siswaList = RombelAnggota::with(['siswa', 'siswa.skhu.nilais', 'rombel'])
       ->whereHas(
         'rombel',
         function ($q) use ($sekolah, $semester, $tingkatAkhir, $hanyaRombelSendiri, $user) {
@@ -1375,8 +1391,18 @@ class SkhuController extends Controller
         $skhuExisting?->nomor_ujian ?? '',
       ];
 
-      foreach ($mapels as $_) {
-        $rowData[] = '';
+      // Leger: isi sel mapel dengan nilai tersimpan milik SKHU
+      // semester ini; template impor membiarkannya kosong
+      $nilaiPerMapel = null;
+      if ($leger) {
+        $skhuSemesterIni = $siswa->skhu->where('semester_id', $semester->id)->first();
+        $nilaiPerMapel = $skhuSemesterIni
+          ? $skhuSemesterIni->nilais->keyBy('mapel_mapping_id')
+          : collect();
+      }
+
+      foreach ($mapels as $mapel) {
+        $rowData[] = $nilaiPerMapel?->get($mapel->id)?->nilai ?? '';
       }
 
       $dataSiswa[] = $rowData;
@@ -1460,10 +1486,10 @@ class SkhuController extends Controller
     $prot->setSelectUnlockedCells(false);
 
     $spreadsheet->getProperties()
-      ->setTitle("Template Nilai SKHU — {$jenjang} {$semester->tahun_pelajaran}")
+      ->setTitle(($leger ? 'Leger Nilai SKHU' : 'Template Nilai SKHU') . " — {$jenjang} {$semester->tahun_pelajaran}")
       ->setDescription("Generate: " . now()->toDateTimeString());
 
-    $namaFile = "template-skhu-{$jenjang}-" . str_replace('/', '-', $semester->tahun_pelajaran) . ".xlsx";
+    $namaFile = ($leger ? 'leger-skhu-' : 'template-skhu-') . "{$jenjang}-" . str_replace('/', '-', $semester->tahun_pelajaran) . ".xlsx";
     $writer   = new XlsxWriter($spreadsheet);
 
     return response()->streamDownload(function () use ($writer) {

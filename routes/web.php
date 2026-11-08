@@ -439,6 +439,7 @@ Route::controller(SkhuController::class)
     // Impor untuk wali kelas juga — baris di luar rombelnya
     // dilewati di dalam import (daftar putih per Guru)
     Route::get('/import/template', 'downloadTemplate');
+    Route::get('/leger', 'downloadLeger');
     Route::post('/import', 'importNilai');
   });
 

@@ -153,6 +153,13 @@
             </button>
           @endhasanyrole
         @endunless
+        {{-- Leger: unduhan bersifat bacaan (bentuk template impor
+             berisi nilai), tetap tersedia saat angkatan terkunci --}}
+        @hasanyrole('Operator Sekolah|Guru')
+          <a href="{{ url('/skhu/leger') }}" class="btn btn-label-success btn-sm">
+            <i class="icon-base ri ri-file-excel-2-line me-1"></i><span class="d-none d-md-block">Leger</span>
+          </a>
+        @endhasanyrole
         {{-- Download Bulk --}}
         <button class="btn btn-success btn-sm" id="btn-download-bulk">
           <i class="ri ri-download-2-line me-1"></i><span class="d-none d-md-block">Download Semua PDF</span>
