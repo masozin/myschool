@@ -211,7 +211,7 @@
     2022 tentang Standar Kompetensi Lulusan, Permendikbudristek Nomor 21 Tahun 2022 tentang Standar Penilaian
     Pendidikan, dan Keputusan Kepala Badan Standar, Kurikulum, dan Asesmen Pendidikan Kementerian Pendidikan,
     Kebudayaan, Riset, dan Teknologi Nomor 012.A Tahun 2024 tentang Pedoman Pengelolaan Blangko Ijazah Pendidikan Dasar
-    dan Pendidikan Menengah Tahun Pelajaran 2025/2026, dengan ini siswa tersebut di atas ditetapkan:
+    dan Pendidikan Menengah Tahun Pelajaran 2024/2025, dengan ini siswa tersebut di atas ditetapkan:
   </p>
 
   {{-- Putusan kelulusan. Dokumen lama yang keterangannya belum
