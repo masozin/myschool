@@ -194,7 +194,10 @@
             @endphp
             <tr>
               <td></td>
-              <td>
+              {{-- data-order: kunci urut nama asli — tanpa ini
+                   DataTables mengurutkan dari teks sel yang
+                   diawali inisial avatar --}}
+              <td data-order="{{ $siswa->nama_siswa }}">
                 <div class="d-flex align-items-center">
                   <!-- Kontainer Foto -->
                   <div class="avatar avatar-sm me-3">

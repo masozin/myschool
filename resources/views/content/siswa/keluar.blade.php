@@ -75,7 +75,10 @@
           @endphp
           <tr>
             <td>{{ $loop->iteration }}</td>
-            <td>
+            {{-- data-order: kunci urut nama asli — tanpa ini
+                 DataTables mengurutkan dari teks sel yang
+                 diawali inisial avatar --}}
+            <td data-order="{{ $siswa->nama_siswa }}">
               <div class="d-flex justify-content-start align-items-center gap-3 user-name">
                 <a href="{{ route('siswa.show', $siswa->id) }}" class="text-decoration-none" title="Detail {{ $siswa->nama_siswa }}">
                   <div class="avatar avatar-sm">

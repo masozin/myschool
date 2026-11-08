@@ -320,7 +320,10 @@
                 @endif
               </td>
               <td></td>
-              <td>
+              {{-- data-order: kunci urut nama asli — tanpa ini
+                   DataTables mengurutkan dari teks sel yang
+                   diawali inisial avatar --}}
+              <td data-order="{{ $siswa->nama_siswa }}">
                 <a href="{{ route('siswa.show', $siswa->id) }}" class="text-decoration-none text-reset">
                   <div class="d-flex align-items-center gap-2">
                     <div class="avatar avatar-sm">

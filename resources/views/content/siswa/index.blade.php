@@ -864,6 +864,13 @@
           {
             data: 'nama_siswa',
             render: function(data, type, full) {
+              // Urut & cari memakai nama asli — tanpa penjaga ini
+              // DataTables mengurutkan dari teks hasil render,
+              // yang diawali inisial avatar
+              if (type === 'sort' || type === 'filter') {
+                return data;
+              }
+
               const nama = esc(full.nama_siswa);
               const detailUrl = `/siswa/${full.id}/show`;
               const photo = full.photo;

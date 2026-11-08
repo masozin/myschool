@@ -631,7 +631,10 @@
               // Data kolom berupa string nama — bukan objek siswa —
               // supaya pengurutan dan pencarian bekerja pada namanya
               data: 'siswa.nama_siswa',
-              render: (nama, t, row) => renderSiswaCell(nama, row.siswa.id)
+              // Urut & cari memakai nama asli, bukan teks sel yang
+              // diawali inisial avatar
+              render: (nama, t, row) => (t === 'sort' || t === 'filter') ?
+                nama : renderSiswaCell(nama, row.siswa.id)
             },
             {
               // NIS / NISN
