@@ -58,6 +58,14 @@
       line-height: 1.2;
     }
 
+    /* ── Putusan Kelulusan ── */
+    .putusan {
+      text-align: center;
+      margin: 4px 0 6px;
+      font-size: 14pt;
+      letter-spacing: 1px;
+    }
+
     /* ── Identitas Siswa ── */
     table.identitas {
       margin: 0 0 15px 30px;
@@ -216,7 +224,7 @@
 
   {{-- Putusan kelulusan. Dokumen lama yang keterangannya belum
        terisi tetapi sudah disetujui tercetak LULUS. --}}
-  <h3>{{ $skl->keterangan ?? ($skl->status === 'disetujui' ? 'LULUS' : '') }}</h3>
+  <h3 class="putusan">{{ $skl->keterangan ?? ($skl->status === 'disetujui' ? 'LULUS' : '') }}</h3>
 
   <P>dari {{ $namaSekolah }} dengan nilai sebagai berikut:</P>
 
