@@ -364,6 +364,7 @@
                           @if ($skl->status !== 'disetujui')
                           <li>
                             <button class="dropdown-item btn-nomor-skl" data-id="{{ $skl->id }}"
+                              data-keterangan="{{ $skl->keterangan ?? 'LULUS' }}"
                               data-nomor="{{ $skl->nomor_skl ?? '' }}"
                               data-tanggal="{{ $skl->tanggal_terbit?->format('Y-m-d') ?? '' }}"
                               data-nama="{{ $siswa->nama_siswa }}">
@@ -454,7 +455,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">
-            <i class="icon-base ri ri-hashtag me-1"></i>Input Nomor SKL
+            <i class="icon-base ri ri-hashtag me-1"></i>Input Nomor &amp; Keterangan SKL
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
@@ -467,6 +468,15 @@
             <div class="form-text">Isi nomor secara manual. Penomoran massal berpola tersedia di halaman
               Tanggal &amp; Penomoran.
             </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Keterangan Kelulusan</label>
+            <select id="input-keterangan-skl" class="form-select">
+              <option value="LULUS">LULUS</option>
+              <option value="TIDAK LULUS">TIDAK LULUS</option>
+            </select>
+            <div class="form-text">Putusan rapat kelulusan siswa ini — tercetak sebagai putusan di tengah SKL.</div>
           </div>
 
           <div class="form-text">
@@ -830,6 +840,7 @@
         if (!btn) return;
         nomorSklId = btn.dataset.id;
         inputNomor.value = btn.dataset.nomor || '';
+        document.getElementById('input-keterangan-skl').value = btn.dataset.keterangan || 'LULUS';
         document.getElementById('nomor-skl-nama-siswa').textContent = 'Siswa: ' + btn.dataset.nama;
         modalNomor.show();
       });
@@ -840,6 +851,7 @@
         this.disabled = true;
         const res = await apiFetch(`/skl/${nomorSklId}/nomor`, {
           nomor_skl: inputNomor.value,
+          keterangan: document.getElementById('input-keterangan-skl').value,
         }, 'PUT');
         const data = await res.json();
         this.disabled = false;

@@ -522,7 +522,8 @@ class SklController extends Controller
     // Tanggal terbit tidak lagi per siswa — ia milik konfigurasi
     // angkatan dan diatur di halaman Tanggal & Penomoran
     $data = $request->validate([
-      'nomor_skl' => 'nullable|string|max:100',
+      'nomor_skl'  => 'nullable|string|max:100',
+      'keterangan' => 'nullable|in:LULUS,TIDAK LULUS',
     ]);
 
     $skl->update($data);
