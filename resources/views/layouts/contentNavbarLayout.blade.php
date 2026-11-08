@@ -66,6 +66,35 @@ isset($configData['contentLayout']) && $configData['contentLayout'] === 'compact
                     <div class="{{ $container }} flex-grow-1 container-p-y">
                         @endif
 
+                        {{-- Spanduk kunci semester: tampil di semua halaman bila semester
+                             sesi bukan semester aktif (SKHU/SKL punya spanduk angkatannya
+                             sendiri, jadi dikecualikan di sini) --}}
+                        @auth
+                            @if (!str_starts_with(request()->path(), 'skhu') && !str_starts_with(request()->path(), 'skl'))
+                                @php
+                                    $semSesiBanner = session('semester_id')
+                                        ? \App\Models\Semester::find(session('semester_id'))
+                                        : null;
+                                @endphp
+                                @if ($semSesiBanner && !$semSesiBanner->is_active && !$semSesiBanner->kunci_dibuka)
+                                    <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" role="alert">
+                                        <i class="icon-base ri ri-lock-line"></i>
+                                        <span><strong>Mode lihat saja.</strong> Anda sedang membuka semester
+                                            {{ $semSesiBanner->tahun_pelajaran }} {{ $semSesiBanner->semester }} yang bukan
+                                            semester aktif — data tidak dapat diubah atau dihapus. Admin dapat membuka
+                                            kunci semester ini dari halaman Semester.</span>
+                                    </div>
+                                @elseif($semSesiBanner && !$semSesiBanner->is_active && $semSesiBanner->kunci_dibuka)
+                                    <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
+                                        <i class="icon-base ri ri-lock-unlock-line"></i>
+                                        <span>Semester {{ $semSesiBanner->tahun_pelajaran }} {{ $semSesiBanner->semester }}
+                                            bukan semester aktif, tetapi kuncinya sedang <strong>dibuka oleh Admin</strong>
+                                            — perubahan data diizinkan.</span>
+                                    </div>
+                                @endif
+                            @endif
+                        @endauth
+
                         @yield('content')
 
                     </div>
