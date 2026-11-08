@@ -257,10 +257,14 @@
               <td>
                 <div class="d-flex gap-2">
                   {{-- SKHU final terkunci: tombol edit disembunyikan untuk peran pengisi
-                       (server pun menolak simpan); peran lihat tetap mendapat tautannya --}}
-                  @if (!(auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && (($skhu && $skhu->status === 'final') || ($terkunci ?? false))))
+                       (server pun menolak simpan); peran lihat tetap mendapat tautannya.
+                       Untuk peran pengisi tombol tetap dirender (tersembunyi) saat
+                       final agar saklar status dapat menampilkannya lagi seketika
+                       tanpa memuat ulang halaman --}}
+                  @if (!(auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && ($terkunci ?? false)))
                     <a href="{{ url('/skhu/siswa/' . $siswa->id) }}"
-                      class="btn btn-sm btn-icon btn-text-primary rounded-pill"
+                      class="btn btn-sm btn-icon btn-text-primary rounded-pill btn-aksi-skhu"
+                      @if (auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && $skhu && $skhu->status === 'final') style="display:none" @endif
                       @hasanyrole('Operator Sekolah|Guru') title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}"
                       @else title="Lihat SKHU" @endhasanyrole>
                       <i class="icon-base ri ri-edit-line icon-18px"></i>
