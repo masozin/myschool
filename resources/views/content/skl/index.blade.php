@@ -169,24 +169,33 @@
         @hasanyrole('Operator Sekolah|Guru')
           {{-- Konfigurasi adalah wewenang Operator; Guru cukup menerima pemberitahuan bila belum diatur --}}
           @hasanyrole('Operator Sekolah')
-            <a href="{{ route('skl.konfigurasi.edit') }}" class="btn btn-label-secondary btn-sm">
-              <i class="icon-base ri ri-equalizer-line me-1"></i>Konfigurasi SKL
+            <a href="{{ route('skl.konfigurasi.edit') }}" class="btn btn-label-secondary btn-sm" title="Konfigurasi SKL">
+              <i class="icon-base ri ri-equalizer-line"></i>
             </a>
           @endhasanyrole
           @hasanyrole('Operator Sekolah')
-            <a href="{{ route('skl.pengaturan-nomor') }}" class="btn btn-label-secondary btn-sm">
-              <i class="icon-base ri ri-hashtag me-1"></i>Tanggal &amp; Penomoran
+            <a href="{{ route('skl.pengaturan-nomor') }}" class="btn btn-label-info btn-sm">
+              <i class="icon-base ri ri-calendar-2-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
+                Penomoran</span>
             </a>
           @endhasanyrole
           <button class="btn btn-label-secondary btn-sm" id="btn-sync-skl" title="Sinkronisasi Data & Bobot">
             <i class="ri ri-refresh-line "></i>
           </button>
-          {{-- Tombol Trigger Modal Import --}}
-          <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modal-import">
-            <i class="ri ri-upload-cloud-2-line me-1"></i> Import Nilai
+          {{-- Tombol Trigger Modal Import (gaya disamakan dengan SKHU) --}}
+          <button type="button" class="btn btn-label-secondary btn-sm" data-bs-toggle="modal"
+            data-bs-target="#modal-import">
+            <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
           </button>
         @endhasanyrole
         @endunless
+        {{-- Leger: unduhan bersifat bacaan (bentuk template impor
+             berisi nilai), tetap tersedia saat angkatan terkunci --}}
+        @hasanyrole('Operator Sekolah|Guru')
+          <a href="{{ route('skl.leger.download') }}" class="btn btn-label-success btn-sm">
+            <i class="icon-base ri ri-file-excel-2-line me-1"></i><span class="d-none d-md-block">Leger</span>
+          </a>
+        @endhasanyrole
       </div>
       <div class="d-flex gap-2 flex-wrap align-items-center">
         {{-- PANEL AKSI MASAL (Disembunyikan secara default) --}}
