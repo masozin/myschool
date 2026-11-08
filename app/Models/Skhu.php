@@ -81,7 +81,19 @@ class Skhu extends Model
   {
     $result = [];
 
-    foreach ($this->nilais as $nilai) {
+    // Urutan tampil selalu mengikuti urutan mapping (kelompok,
+    // lalu urutan mapel) seperti pada formulir isian — BUKAN
+    // urutan pembuatan baris nilai, yang dapat berbeda-beda
+    // tergantung jalur simpan/impor yang lebih dulu berjalan
+    $nilais = $this->nilais->sort(fn($a, $b) => [
+      $a->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+      $a->mapelMapping?->urutan ?? 999,
+    ] <=> [
+      $b->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+      $b->mapelMapping?->urutan ?? 999,
+    ]);
+
+    foreach ($nilais as $nilai) {
       if ($tampilKelompok) {
         $namaKelompok = $nilai->mapelMapping?->kelompok?->nama
           ?? $nilai->mapelMapping?->masterMapel?->kelompok?->nama

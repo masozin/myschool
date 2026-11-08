@@ -79,9 +79,19 @@ class Skl extends Model
 
   public function nilaisLengkap()
   {
+    // Urutan tampil selalu mengikuti urutan mapping (kelompok,
+    // lalu urutan mapel) — bukan urutan pembuatan baris nilai
     return $this->nilais()
       ->with('mapelMapping.masterMapel.kelompok', 'mapelMapping.kelompok', 'komponens.komponen.komponenSub', 'komponens.nilaiKomponenSub')
-      ->get();
+      ->get()
+      ->sort(fn($a, $b) => [
+        $a->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+        $a->mapelMapping?->urutan ?? 999,
+      ] <=> [
+        $b->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+        $b->mapelMapping?->urutan ?? 999,
+      ])
+      ->values();
   }
 
   // ── Helper ────────────────────────────────────────────────────────────
@@ -89,7 +99,18 @@ class Skl extends Model
   public function nilaiPerKelompok(): array
   {
     $result = [];
-    foreach ($this->nilais as $nilai) {
+
+    // Sama seperti nilaisLengkap(): urutan mengikuti mapping,
+    // bukan urutan pembuatan baris nilai
+    $nilais = $this->nilais->sort(fn($a, $b) => [
+      $a->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+      $a->mapelMapping?->urutan ?? 999,
+    ] <=> [
+      $b->mapelMapping?->kelompokTampil()?->urutan ?? 999,
+      $b->mapelMapping?->urutan ?? 999,
+    ]);
+
+    foreach ($nilais as $nilai) {
       $namaKelompok = $nilai->mapelMapping->kelompok->nama
         ?? $nilai->mapelMapping->masterMapel->kelompok->nama
         ?? 'Lainnya';

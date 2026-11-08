@@ -513,6 +513,13 @@
           label.textContent = 'Draft';
           el.closest('.form-check').querySelector('label').title = 'Klik untuk finalisasi';
         }
+
+        // Tombol edit pada baris yang sama ikut tampil/hilang saat itu
+        // juga mengikuti status baru (final = sembunyi, draft = tampil)
+        const tombolEdit = el.closest('tr')?.querySelector('.btn-aksi-skhu');
+        if (tombolEdit) {
+          tombolEdit.style.display = status === 'final' ? 'none' : '';
+        }
       }
 
       // Render semua badge saat load
