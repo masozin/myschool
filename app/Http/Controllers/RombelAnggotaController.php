@@ -92,13 +92,17 @@ class RombelAnggotaController extends Controller
         ->where('sekolah_id', $rombel->sekolah_id);
     });
 
-    // [C] Kelayakan tingkat — dinilai dari bukti terakhir siswa:
-    // - tingkat pada registrasinya sama dengan tingkat rombel ini, atau
-    // - keanggotaan terakhirnya SEBELUM semester ini menunjukkan ia
-    //   memang berada di tingkat ini: tingkatnya sama (pindah rombel
-    //   di tengah jalan, atau tinggal kelas), atau tingkatnya
-    //   ditambah selisih tahun pelajaran sejak keanggotaan itu sama
-    //   dengan tingkat ini (naik kelas).
+    // [C] Kelayakan tingkat — sumber buktinya dibedakan:
+    // - siswa yang BELUM PERNAH memiliki rombel dinilai dari
+    //   tingkat pada registrasinya;
+    // - siswa yang SUDAH PERNAH memiliki rombel dinilai dari
+    //   keanggotaan terakhirnya SEBELUM semester ini: tingkatnya
+    //   ditambah selisih tahun pelajaran sama dengan tingkat ini
+    //   (naik kelas), atau tingkatnya sama (tinggal kelas).
+    //   Tingkat registrasi TIDAK lagi dipakai untuk mereka —
+    //   tingkat itu membeku pada saat siswa pertama diterima,
+    //   sehingga pindahan yang masuk kelas 3 bertahun-tahun lalu
+    //   akan selamanya lolos untuk kelas 3.
     // Penilaiannya di PHP karena "keanggotaan terakhir" mengikuti
     // urutan kronologis semester. Mengeluarkan siswa dari rombel
     // kini menghapus barisnya, jadi bukti yang dipakai adalah baris
@@ -114,10 +118,7 @@ class RombelAnggotaController extends Controller
 
     $siswa = $query->with(['registrasiTerbaru', 'rombelAnggota.rombel.semester'])->get()
       ->filter(function ($s) use ($rombel, $semuaSemester, $kunciSemester, $kunciTarget, $tahunTarget) {
-        // Tingkat yang dinyatakan pada registrasi siswa
-        if ((int) ($s->registrasiTerbaru?->tingkat ?? 0) === (int) $rombel->tingkat) {
-          return true;
-        }
+        $tingkatTarget = (int) $rombel->tingkat;
 
         // Keanggotaan terakhir sebelum semester target
         $terakhir = $s->rombelAnggota
@@ -129,16 +130,32 @@ class RombelAnggotaController extends Controller
           ->sortByDesc('semester_urut')
           ->first();
 
-        if (!$terakhir || !$terakhir->rombel) {
-          return false;
+        // Sudah pernah memiliki rombel → nilai dari keanggotaan
+        // terakhir SAJA (tingkat registrasi tidak dipakai lagi)
+        if ($terakhir && $terakhir->rombel) {
+          $semTerakhir = $terakhir->rombel->semester ?? $semuaSemester->get($terakhir->semester_id);
+          $selisihTp   = $tahunTarget - (int) substr($semTerakhir->tahun_pelajaran, 0, 4);
+          $tingkatLalu = (int) $terakhir->rombel->tingkat;
+
+          // Tingkat acuan: perkiraan tingkat siswa saat ini.
+          // Dipakai untuk kelayakan DAN ditampilkan di daftar,
+          // agar operator tidak terkecoh tingkat lama registrasi
+          $s->tingkat_acuan = $tingkatLalu + $selisihTp;
+
+          // Layak bila perkiraan tingkatnya cocok (naik kelas),
+          // atau tingkat terakhirnya sama (tinggal kelas)
+          return $s->tingkat_acuan === $tingkatTarget
+            || $tingkatLalu === $tingkatTarget;
         }
 
-        $semTerakhir = $terakhir->rombel->semester ?? $semuaSemester->get($terakhir->semester_id);
-        $selisihTp   = $tahunTarget - (int) substr($semTerakhir->tahun_pelajaran, 0, 4);
-        $tingkatLalu = (int) $terakhir->rombel->tingkat;
+        // Belum pernah memiliki rombel sama sekali → gunakan
+        // tingkat pada registrasi apa adanya (siswa baru /
+        // pindahan yang baru diterima)
+        $s->tingkat_acuan = $s->registrasiTerbaru?->tingkat !== null
+          ? (int) $s->registrasiTerbaru->tingkat
+          : null;
 
-        return $tingkatLalu === (int) $rombel->tingkat
-          || $tingkatLalu + $selisihTp === (int) $rombel->tingkat;
+        return $s->tingkat_acuan !== null && $s->tingkat_acuan === $tingkatTarget;
       })
       ->values();
 

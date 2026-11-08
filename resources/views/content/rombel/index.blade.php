@@ -836,7 +836,7 @@
               <td>${renderSiswaCell(siswa.nama_siswa, siswa.id)}</td>
               <td><small class="text-muted">${nisn} / ${nis}</small></td>
               <td class="text-center">
-                <span class="badge bg-label-secondary">Tingkat ${reg?.tingkat ?? '-'}</span>
+                <span class="badge bg-label-secondary">Tingkat ${siswa.tingkat_acuan ?? reg?.tingkat ?? '-'}</span>
               </td>
             </tr>`;
         }).join('');
