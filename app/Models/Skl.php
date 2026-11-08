@@ -31,6 +31,7 @@ class Skl extends Model
     'semester_id',
     'nomor_skl',
     'status',
+    'keterangan',
     'catatan',
     'generated_at',
     'snapshot_nama',

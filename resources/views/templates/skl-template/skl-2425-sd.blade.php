@@ -214,8 +214,9 @@
     dan Pendidikan Menengah Tahun Pelajaran 2025/2026, dengan ini siswa tersebut di atas ditetapkan:
   </p>
 
-  {{-- lulus dan tidak lulu --}}
-  <h3>{{ $skl->keterangan }}</h3>
+  {{-- Putusan kelulusan. Dokumen lama yang keterangannya belum
+       terisi tetapi sudah disetujui tercetak LULUS. --}}
+  <h3>{{ $skl->keterangan ?? ($skl->status === 'disetujui' ? 'LULUS' : '') }}</h3>
 
   <P>dari {{ $namaSekolah }} dengan nilai sebagai berikut:</P>
 
