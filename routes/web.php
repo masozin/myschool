@@ -371,6 +371,7 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::delete('/{skl}', 'destroy')->name('destroy');
       Route::get('/{skl}/nilai', 'editNilai')->name('nilai.edit');
       Route::put('/{skl}/nilai', 'updateNilai')->name('nilai.update');
+      Route::put('/{skl}/nomor', 'updateNomor')->name('nomor.update');
       Route::post('/{skl}/ajukan', 'ajukan')->name('ajukan');
       Route::post('/sync', 'sync')->name('sync');
       Route::get('/pengaturan-nomor', 'pengaturanNomor')->name('pengaturan-nomor');
