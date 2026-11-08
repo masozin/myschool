@@ -315,9 +315,21 @@ class RombelAnggotaController extends Controller
 
     $riwayat = RombelAnggota::with(['rombel.semester'])
       ->where('siswa_id', $siswa_id)
-      ->orderBy('semester_id', 'asc')
-      ->orderBy('id', 'asc')
       ->get()
+      // Urutan KRONOLOGIS semester (tahun pelajaran, lalu
+      // Ganjil sebelum Genap) — BUKAN semester_id: id semester
+      // mengikuti urutan pembuatannya di basis data, sehingga
+      // semester lama yang dibuat belakangan (mis. saat mengimpor
+      // riwayat) akan tampak acak bila diurutkan berdasar id
+      ->sortBy(function ($item) {
+        $sem = $item->rombel?->semester;
+        if (!$sem) {
+          return PHP_INT_MAX;
+        }
+        $k = Semester::kunciKronologis($sem);
+        return $k[0] * 10 + $k[1];
+      })
+      ->values()
       ->map(function ($item) use ($semesterAktifId) {
         return [
           'id'         => $item->id,
