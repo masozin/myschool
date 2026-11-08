@@ -209,7 +209,7 @@
                 if (full.user_id) {
                   if (canResetPassword) {
                     akunBtn = `
-                      <a href="javascript:;" class="dropdown-item btn-reset-password" data-id="${full.id}">
+                      <a href="javascript:;" class="dropdown-item reset-password" data-id="${full.id}" data-name="${full.nama_ptk}">
                         <i class="icon-base ri ri-lock-password-line me-2"></i> Reset Password
                       </a>
                     `;
