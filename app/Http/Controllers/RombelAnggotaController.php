@@ -157,6 +157,8 @@ class RombelAnggotaController extends Controller
 
         return $s->tingkat_acuan !== null && $s->tingkat_acuan === $tingkatTarget;
       })
+      // Daftar disajikan urut nama A–Z agar mudah dicari
+      ->sortBy(fn($s) => mb_strtolower($s->nama_siswa))
       ->values();
 
     return response()->json([

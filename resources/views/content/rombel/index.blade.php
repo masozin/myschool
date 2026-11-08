@@ -277,9 +277,11 @@
                     <th width="40" class="text-center">
                       <input type="checkbox" class="form-check-input" id="check-all">
                     </th>
-                    <th>Siswa</th>
+                    <th class="kepala-urut" data-urut="nama" style="cursor:pointer" title="Klik untuk mengurutkan">
+                      Siswa <span class="panah-urut small"></span></th>
                     <th>NIS / NISN</th>
-                    <th class="text-center">Tingkat</th>
+                    <th class="text-center kepala-urut" data-urut="tingkat" style="cursor:pointer" title="Klik untuk mengurutkan">
+                      Tingkat <span class="panah-urut small"></span></th>
                   </tr>
                 </thead>
                 <tbody id="tbody-siswa-tersedia"></tbody>
@@ -820,9 +822,44 @@
         }
       }
 
+      // Keadaan urutan daftar tersedia: bawaan nama A–Z (sama
+      // seperti dari server); klik tajuk kolom membalik arah
+      let urutanTersedia = {
+        kunci: 'nama',
+        arah: 1
+      };
+
+      function urutkanTersedia(data) {
+        const salinan = [...data];
+        salinan.sort((a, b) => {
+          let hasil = 0;
+          if (urutanTersedia.kunci === 'tingkat') {
+            hasil = (a.tingkat_acuan ?? 999) - (b.tingkat_acuan ?? 999);
+            if (hasil === 0) hasil = a.nama_siswa.localeCompare(b.nama_siswa);
+          } else {
+            hasil = a.nama_siswa.localeCompare(b.nama_siswa);
+          }
+          return hasil * urutanTersedia.arah;
+        });
+        return salinan;
+      }
+
+      function segarkanPanahUrut() {
+        document.querySelectorAll('.kepala-urut').forEach(th => {
+          const panah = th.querySelector('.panah-urut');
+          if (!panah) return;
+          panah.textContent = th.dataset.urut === urutanTersedia.kunci ?
+            (urutanTersedia.arah === 1 ? '↑' : '↓') :
+            '';
+        });
+      }
+
       function renderTabelTersedia(data) {
         const tbody = document.getElementById('tbody-siswa-tersedia');
         const info = document.getElementById('info-tersedia');
+
+        data = urutkanTersedia(data);
+        segarkanPanahUrut();
 
         tbody.innerHTML = data.map(siswa => {
           const reg = siswa.registrasi_terbaru;
@@ -849,6 +886,25 @@
         const q = this.value.toLowerCase().trim();
         renderTabelTersedia(q ? allTersedia.filter(s => s.nama_siswa.toLowerCase().includes(q)) :
           allTersedia);
+      });
+
+      // Klik tajuk kolom Siswa / Tingkat untuk mengurutkan;
+      // klik yang sama kedua kalinya membalik arahnya
+      document.querySelectorAll('.kepala-urut').forEach(th => {
+        th.addEventListener('click', function() {
+          const kunci = this.dataset.urut;
+          if (urutanTersedia.kunci === kunci) {
+            urutanTersedia.arah *= -1;
+          } else {
+            urutanTersedia = {
+              kunci,
+              arah: 1
+            };
+          }
+          const q = document.getElementById('search-tersedia').value.toLowerCase().trim();
+          renderTabelTersedia(q ? allTersedia.filter(s => s.nama_siswa.toLowerCase().includes(q)) :
+            allTersedia);
+        });
       });
 
       document.getElementById('check-all').addEventListener('change', function() {
