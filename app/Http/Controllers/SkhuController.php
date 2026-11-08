@@ -302,7 +302,8 @@ class SkhuController extends Controller
     // kelas siswa ini (Guru bukan wali sudah ditolak di atas).
     // Admin dan Kepala Sekolah hanya melihat — tombol simpan di
     // form disembunyikan berdasarkan flag ini.
-    $canEdit = $user->hasRole('Operator Sekolah') || $user->hasRole('Guru');
+    $canEdit = ($user->hasRole('Operator Sekolah') || $user->hasRole('Guru'))
+      && !KunciKelulusan::terkunci('skhu', $sekolah->id, $semester->id);
 
     return view('content.skhu.form-skhu', compact(
       'siswa',

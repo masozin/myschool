@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SklKonfigurasi;
 use App\Models\Semester;
+use App\Support\KunciKelulusan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -40,6 +41,12 @@ class SklKonfigurasiController extends Controller
   public function update(Request $request)
   {
     [$sekolahId, $semesterId] = $this->getContext();
+
+    abort_if(
+      KunciKelulusan::terkunci('skl', $sekolahId, $semesterId),
+      403,
+      'Angkatan ini sudah terkunci karena musim kelulusan berikutnya telah dimulai. Admin dapat membuka kunci bila memang diperlukan.'
+    );
 
     $request->validate([
       'mode_input'      => 'required|in:jadi,manual',

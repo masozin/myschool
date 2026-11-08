@@ -143,6 +143,8 @@
   <div class="card mb-4">
     <div class="card-body py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div class="d-flex gap-2 flex-wrap">
+        {{-- Angkatan terkunci: tombol pengubah data disembunyikan --}}
+        @unless ($terkunci ?? false)
         @hasanyrole('Operator Sekolah|Guru')
           {{-- Konfigurasi adalah wewenang Operator; Guru cukup menerima pemberitahuan bila belum diatur --}}
           @hasanyrole('Operator Sekolah')
@@ -163,6 +165,7 @@
             <i class="ri ri-upload-cloud-2-line me-1"></i> Import Nilai
           </button>
         @endhasanyrole
+        @endunless
       </div>
       <div class="d-flex gap-2 flex-wrap align-items-center">
         {{-- PANEL AKSI MASAL (Disembunyikan secara default) --}}
@@ -171,25 +174,27 @@
           <span class="text-primary small fw-semibold"><span id="selected-count">0</span> terpilih</span>
           <div class="vr mx-1"></div>
 
-          @hasanyrole('Operator Sekolah|Guru')
-            <button class="btn btn-sm btn-warning btn-bulk" data-action="ajukan" title="Ajukan Masal"><i
-                class="ri ri-send-plane-line"></i></button>
-            <button class="btn btn-sm btn-danger btn-bulk" data-action="hapus" title="Hapus Masal"><i
-                class="ri ri-delete-bin-line"></i></button>
-            <button class="btn btn-sm btn-info" id="btn-bulk-print" title="Cetak ZIP Masal">
-              <i class="ri ri-printer-line"></i>
-            </button>
-          @endhasanyrole
+          @unless ($terkunci ?? false)
+            @hasanyrole('Operator Sekolah|Guru')
+              <button class="btn btn-sm btn-warning btn-bulk" data-action="ajukan" title="Ajukan Masal"><i
+                  class="ri ri-send-plane-line"></i></button>
+              <button class="btn btn-sm btn-danger btn-bulk" data-action="hapus" title="Hapus Masal"><i
+                  class="ri ri-delete-bin-line"></i></button>
+            @endhasanyrole
 
-          @hasanyrole('Kepala Sekolah')
-            <button class="btn btn-sm btn-success btn-bulk" data-action="setujui" title="Setujui Masal"><i
-                class="ri ri-checkbox-circle-line"></i></button>
-            <button class="btn btn-sm btn-danger btn-bulk" data-action="tolak" title="Tolak Masal"><i
-                class="ri ri-close-circle-line"></i></button>
-            <button class="btn btn-sm btn-secondary btn-bulk" data-action="batal-setujui" title="Batal Setujui Masal">
-              <i class="ri ri-arrow-go-back-line"></i>
-            </button>
-          @endhasanyrole
+            @hasanyrole('Kepala Sekolah')
+              <button class="btn btn-sm btn-success btn-bulk" data-action="setujui" title="Setujui Masal"><i
+                  class="ri ri-checkbox-circle-line"></i></button>
+              <button class="btn btn-sm btn-danger btn-bulk" data-action="tolak" title="Tolak Masal"><i
+                  class="ri ri-close-circle-line"></i></button>
+              <button class="btn btn-sm btn-secondary btn-bulk" data-action="batal-setujui" title="Batal Setujui Masal">
+                <i class="ri ri-arrow-go-back-line"></i>
+              </button>
+            @endhasanyrole
+          @endunless
+          <button class="btn btn-sm btn-info" id="btn-bulk-print" title="Cetak ZIP Masal">
+            <i class="ri ri-printer-line"></i>
+          </button>
         </div>
         {{-- Filter Status --}}
         <select class="form-select form-select-sm" id="filter-status" style="width:auto">
@@ -338,16 +343,18 @@
               <td>
                 <div class="d-flex gap-1">
                   @if (!$skl)
-                    @hasanyrole('Operator Sekolah|Guru')
-                      <button class="btn btn-sm btn-icon btn-text-primary rounded-pill btn-buat-skl"
-                        data-siswa-id="{{ $siswa->id }}" data-nama="{{ $siswa->nama_siswa }}"
-                        title="Input Nilai (SKL dibuat otomatis)">
-                        <i class="icon-base ri ri-pencil-line icon-18px"></i>
-                      </button>
-                    @endhasanyrole
+                    @unless ($terkunci ?? false)
+                      @hasanyrole('Operator Sekolah|Guru')
+                        <button class="btn btn-sm btn-icon btn-text-primary rounded-pill btn-buat-skl"
+                          data-siswa-id="{{ $siswa->id }}" data-nama="{{ $siswa->nama_siswa }}"
+                          title="Input Nilai (SKL dibuat otomatis)">
+                          <i class="icon-base ri ri-pencil-line icon-18px"></i>
+                        </button>
+                      @endhasanyrole
+                    @endunless
                   @else
                     @hasanyrole('Operator Sekolah|Guru')
-                      @if (in_array($skl->status, ['draft', 'ditolak']))
+                      @if (in_array($skl->status, ['draft', 'ditolak']) && !($terkunci ?? false))
                         <a href="{{ route('skl.nilai.edit', $skl) }}"
                           class="btn btn-sm btn-icon btn-text-primary rounded-pill" title="Input Nilai">
                           <i class="icon-base ri ri-edit-line icon-18px"></i>
@@ -377,8 +384,9 @@
                          untuk peran + status baris ini (mis. Admin tidak punya isi sama
                          sekali; SKL disetujui tidak menyisakan aksi bagi Operator/Guru) --}}
                     @php
-                      $adaIsiMenu = (auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && $skl->status !== 'disetujui')
-                        || (auth()->user()->hasRole('Kepala Sekolah') && $skl->status === 'pengajuan');
+                      $adaIsiMenu = !($terkunci ?? false)
+                        && ((auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && $skl->status !== 'disetujui')
+                          || (auth()->user()->hasRole('Kepala Sekolah') && $skl->status === 'pengajuan'));
                     @endphp
                     @if ($adaIsiMenu)
                     <div class="dropdown">

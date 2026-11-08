@@ -515,6 +515,12 @@ class SklController extends Controller
   {
     $this->abortUnlessWaliKelasSkl($skl);
 
+    // Angkatan terkunci: formulir nilai tidak dibuka sama sekali,
+    // pengguna diarahkan ke tampilan detail yang hanya-lihat
+    if (KunciKelulusan::terkunci('skl', (int) $skl->sekolah_id, (int) $skl->semester_id)) {
+      return redirect()->route('skl.show', $skl);
+    }
+
     abort_if(
       !in_array($skl->status, ['draft', 'ditolak']),
       403,

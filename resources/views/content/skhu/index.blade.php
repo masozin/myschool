@@ -130,25 +130,29 @@
         </a>
       </div>
       <div class="d-flex gap-2">
-        {{-- Import Nilai (Operator & Guru wali kelas; untuk Guru baris di luar rombelnya dilewati) --}}
-        @hasanyrole('Operator Sekolah|Guru')
-          <button class="btn btn-label-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-import">
-            <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
-          </button>
-        @endhasanyrole
-        {{-- Tanggal & Penomoran (tanggal, tempat & nomor massal) --}}
-        @hasanyrole('Operator Sekolah')
-          <a href="{{ url('/skhu/pengaturan-angkatan') }}" class="btn btn-label-info btn-sm">
-            <i class="icon-base ri ri-calendar-2-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
-              Penomoran</span>
-          </a>
-        @endhasanyrole
-        {{-- Finalisasi Semua (controller menolak selain Operator) --}}
-        @hasanyrole('Operator Sekolah')
-          <button class="btn btn-warning btn-sm" id="btn-finalisasi-semua">
-            <i class="icon-base ri ri-checkbox-circle-line me-1"></i><span class="d-none d-md-block">Finalisasi Semua</span>
-          </button>
-        @endhasanyrole
+        {{-- Angkatan terkunci: semua tombol pengubah data disembunyikan
+             (server pun menolaknya); yang tersisa hanya aksi lihat/cetak --}}
+        @unless ($terkunci ?? false)
+          {{-- Import Nilai (Operator & Guru wali kelas; untuk Guru baris di luar rombelnya dilewati) --}}
+          @hasanyrole('Operator Sekolah|Guru')
+            <button class="btn btn-label-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-import">
+              <i class="icon-base ri ri-upload-2-line me-1"></i><span class="d-none d-md-block">Import Nilai</span>
+            </button>
+          @endhasanyrole
+          {{-- Tanggal & Penomoran (tanggal, tempat & nomor massal) --}}
+          @hasanyrole('Operator Sekolah')
+            <a href="{{ url('/skhu/pengaturan-angkatan') }}" class="btn btn-label-info btn-sm">
+              <i class="icon-base ri ri-calendar-2-line me-1"></i><span class="d-none d-md-block">Tanggal &amp;
+                Penomoran</span>
+            </a>
+          @endhasanyrole
+          {{-- Finalisasi Semua (controller menolak selain Operator) --}}
+          @hasanyrole('Operator Sekolah')
+            <button class="btn btn-warning btn-sm" id="btn-finalisasi-semua">
+              <i class="icon-base ri ri-checkbox-circle-line me-1"></i><span class="d-none d-md-block">Finalisasi Semua</span>
+            </button>
+          @endhasanyrole
+        @endunless
         {{-- Download Bulk --}}
         <button class="btn btn-success btn-sm" id="btn-download-bulk">
           <i class="ri ri-download-2-line me-1"></i><span class="d-none d-md-block">Download Semua PDF</span>
@@ -219,19 +223,26 @@
                        melihat lencana status — route updateStatus memang
                        menolak mereka, jadi saklarnya tidak ditampilkan. --}}
                   @hasanyrole('Operator Sekolah|Guru')
-                    <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                      <input type="checkbox" class="form-check-input btn-toggle-status" role="switch"
-                        id="statusToggle{{ $skhu->id }}" data-skhu-id="{{ $skhu->id }}"
-                        data-status="{{ $skhu->status }}" {{ $skhu->status === 'final' ? 'checked' : '' }}
-                        style="cursor:pointer;">
-                      <label class="form-check-label status-label" for="statusToggle{{ $skhu->id }}"
-                        style="cursor:pointer;">
-                        <span
-                          class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
-                          {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
-                        </span>
-                      </label>
-                    </div>
+                    @unless ($terkunci ?? false)
+                      <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                        <input type="checkbox" class="form-check-input btn-toggle-status" role="switch"
+                          id="statusToggle{{ $skhu->id }}" data-skhu-id="{{ $skhu->id }}"
+                          data-status="{{ $skhu->status }}" {{ $skhu->status === 'final' ? 'checked' : '' }}
+                          style="cursor:pointer;">
+                        <label class="form-check-label status-label" for="statusToggle{{ $skhu->id }}"
+                          style="cursor:pointer;">
+                          <span
+                            class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
+                            {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
+                          </span>
+                        </label>
+                      </div>
+                    @else
+                      <span
+                        class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
+                        {{ $skhu->status === 'final' ? 'Final' : 'Draft' }}
+                      </span>
+                    @endunless
                   @else
                     <span
                       class="badge rounded-pill {{ $skhu->status === 'final' ? 'bg-label-success' : 'bg-label-warning' }}">
@@ -247,7 +258,7 @@
                 <div class="d-flex gap-2">
                   {{-- SKHU final terkunci: tombol edit disembunyikan untuk peran pengisi
                        (server pun menolak simpan); peran lihat tetap mendapat tautannya --}}
-                  @if (!($skhu && $skhu->status === 'final' && auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru'])))
+                  @if (!(auth()->user()->hasAnyRole(['Operator Sekolah', 'Guru']) && (($skhu && $skhu->status === 'final') || ($terkunci ?? false))))
                     <a href="{{ url('/skhu/siswa/' . $siswa->id) }}"
                       class="btn btn-sm btn-icon btn-text-primary rounded-pill"
                       @hasanyrole('Operator Sekolah|Guru') title="{{ $skhu ? 'Edit SKHU' : 'Input SKHU' }}"
