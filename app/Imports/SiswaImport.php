@@ -19,6 +19,7 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
   protected array $kolomWajib = [
     'nama_siswa',
     'nisn',
+    'alamat',
     'jenis_kelamin',
     'tempat_lahir',
     'tgl_lahir',
@@ -88,7 +89,7 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     $dataNormalized = $dataRows->map(function ($row) use ($fieldToIndex) {
       $result = [];
       foreach ($fieldToIndex as $field => $index) {
-        $result[$field] = $row[$index] ?? null;
+        $result[$field] = $this->bersihkanNilai($row[$index] ?? null);
       }
       return $result;
     });
@@ -144,6 +145,7 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
     $wajib = [
       'nama_siswa'        => 'Nama Siswa',
       'nisn'              => 'NISN',
+      'alamat'            => 'Alamat',
       'jenis_kelamin'     => 'Jenis Kelamin',
       'tempat_lahir'      => 'Tempat Lahir',
       'tgl_lahir'         => 'Tanggal Lahir',
@@ -294,6 +296,26 @@ class SiswaImport implements ToCollection, SkipsEmptyRows, WithMultipleSheets
   private function err(int|string $baris, string $kolom, string $nilai, string $pesan): array
   {
     return compact('baris', 'kolom', 'nilai', 'pesan');
+  }
+
+  /**
+   * Nilai sampah khas file ekspor (sisa rumus yang gagal seperti
+   * '#N/A' / '#VALUE!', tanda '?' / '-' pengisi kolom kosong)
+   * dianggap KOSONG. Tanpa ini sampah tersebut lolos validasi
+   * dan tersimpan apa adanya — atau, untuk kolom NOT NULL
+   * seperti alamat, meledak sebagai galat sistem yang
+   * menggagalkan seluruh impor.
+   */
+  private function bersihkanNilai($nilai)
+  {
+    if (!is_string($nilai)) {
+      return $nilai;
+    }
+
+    $teks = trim($nilai);
+    $sampah = ['#N/A', '#VALUE!', '#REF!', '#NAME?', '#DIV/0!', 'N/A', '?', '-'];
+
+    return in_array(strtoupper($teks), $sampah, true) ? null : $nilai;
   }
 
   private function isValidDate($value): bool
