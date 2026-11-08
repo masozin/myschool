@@ -14,7 +14,11 @@ class Ptk extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_ptk';
-  protected $fillable = ['nama_ptk', 'nip', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo'];
+  protected $fillable = ['nama_ptk', 'nip', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+
+  protected $casts = [
+    'tanggal_keluar' => 'date',
+  ];
 
   public function user(): BelongsTo
   {

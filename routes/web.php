@@ -238,6 +238,7 @@ Route::controller(PtkController::class)
     Route::put('/{id}', 'update')->name('update');
     Route::delete('/{id}', 'destroy')->name('destroy');
     Route::post('/{id}/generate-akun', 'generateAkun')->name('generate-akun');
+    Route::post('/{id}/status', 'updateStatus')->name('status');
   });
 
 

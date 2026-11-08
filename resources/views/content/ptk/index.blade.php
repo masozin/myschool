@@ -110,6 +110,40 @@
       </form>
     </div>
   </div>
+
+  {{-- ── Modal Ubah Status PTK ─────────────────────────────────────── --}}
+  <div class="modal fade" id="modal-status-ptk" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Ubah Status PTK</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="status_ptk_id">
+          <p class="mb-3">Status untuk <strong id="status_ptk_nama">-</strong></p>
+          <div class="mb-3">
+            <label class="form-label" for="status_ptk_pilihan">Status</label>
+            <select class="form-select" id="status_ptk_pilihan">
+              <option value="aktif">Aktif</option>
+              <option value="tidak_aktif">Tidak Aktif</option>
+              <option value="pensiun">Pensiun</option>
+            </select>
+          </div>
+          <div class="mb-1" id="status_ptk_tanggal_wrap">
+            <label class="form-label" for="status_ptk_tanggal">Tanggal Keluar</label>
+            <input type="date" class="form-control" id="status_ptk_tanggal">
+            <small class="text-muted">Wajib diisi untuk status Tidak Aktif dan Pensiun.
+              Mengubah kembali ke Aktif akan mengosongkan tanggal ini.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-simpan-status">Simpan Status</button>
+        </div>
+      </div>
+    </div>
+  </div>
 @endsection
 
 @section('page-script')
@@ -148,7 +182,21 @@
       }, {
         data: 'jenis_kelamin'
       }, {
-        data: 'jabatan'
+        data: 'jabatan',
+        render: function(data, type, full) {
+          const petaStatus = {
+            aktif: ['Aktif', 'bg-label-success'],
+            tidak_aktif: ['Tidak Aktif', 'bg-label-secondary'],
+            pensiun: ['Pensiun', 'bg-label-warning']
+          };
+          const status = petaStatus[full.status] ? full.status : 'aktif';
+          const [labelStatus, kelasStatus] = petaStatus[status];
+          let html = `${data ?? '-'}<br><span class="badge ${kelasStatus} mt-1">${labelStatus}</span>`;
+          if (status !== 'aktif' && full.tanggal_keluar) {
+            html += `<br><small class="text-muted">Keluar: ${String(full.tanggal_keluar).slice(0, 10)}</small>`;
+          }
+          return html;
+        }
       }];
 
       if (isAdmin) {
@@ -230,6 +278,9 @@
                   '<a href="#" class="dropdown-item">View</a>' +
                   `<button class="dropdown-item hapus-ptk" data-id="${full['id']}" data-name="${full['nama_ptk']}"><i
           class="icon-base ri ri-delete-bin-7-line icon-22px me-2"></i>Hapus</button>` +
+                  `<button class="dropdown-item ubah-status" data-id="${full['id']}" data-name="${full['nama_ptk']}"
+          data-status="${full.status ?? 'aktif'}" data-tanggal="${full.tanggal_keluar ? String(full.tanggal_keluar).slice(0, 10) : ''}"><i
+          class="icon-base ri ri-user-follow-line icon-22px me-2"></i>Ubah Status</button>` +
                   akunBtn +
                   '</div>' +
                   '</div>'
@@ -625,6 +676,18 @@
           }
         }
 
+        const statusBtn = e.target.closest('.ubah-status');
+        if (statusBtn) {
+          document.getElementById('status_ptk_id').value = statusBtn.dataset.id;
+          document.getElementById('status_ptk_nama').textContent = statusBtn.dataset.name;
+          const pilihan = document.getElementById('status_ptk_pilihan');
+          pilihan.value = statusBtn.dataset.status || 'aktif';
+          document.getElementById('status_ptk_tanggal').value = statusBtn.dataset.tanggal || '';
+          document.getElementById('status_ptk_tanggal_wrap').style.display =
+            pilihan.value === 'aktif' ? 'none' : '';
+          new bootstrap.Modal(document.getElementById('modal-status-ptk')).show();
+        }
+
         const resetBtn = e.target.closest('.reset-password');
         if (resetBtn) {
           const id = resetBtn.dataset.id;
@@ -677,6 +740,46 @@
               });
             }
           });
+        }
+      });
+
+      // ─── Ubah Status PTK: tanggal keluar hanya untuk non-aktif ────
+      document.getElementById('status_ptk_pilihan')?.addEventListener('change', function() {
+        document.getElementById('status_ptk_tanggal_wrap').style.display =
+          this.value === 'aktif' ? 'none' : '';
+      });
+
+      document.getElementById('btn-simpan-status')?.addEventListener('click', async function() {
+        const id = document.getElementById('status_ptk_id').value;
+        const status = document.getElementById('status_ptk_pilihan').value;
+        const tanggal = document.getElementById('status_ptk_tanggal').value;
+
+        if (status !== 'aktif' && !tanggal) {
+          Swal.fire('Perhatian', 'Tanggal keluar wajib diisi untuk status Tidak Aktif dan Pensiun.', 'warning');
+          return;
+        }
+
+        try {
+          const res = await fetch(`/ptk/${id}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+              Accept: 'application/json'
+            },
+            body: JSON.stringify({
+              status: status,
+              tanggal_keluar: status === 'aktif' ? null : tanggal
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Gagal mengubah status.');
+
+          bootstrap.Modal.getInstance(document.getElementById('modal-status-ptk'))?.hide();
+          Swal.fire('Berhasil', data.message, 'success');
+          window.dtPtk.ajax.reload(null, false);
+        } catch (error) {
+          Swal.fire('Gagal', error.message, 'error');
         }
       });
 

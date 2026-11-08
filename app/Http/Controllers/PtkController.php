@@ -263,4 +263,34 @@ class PtkController extends Controller
       ], 500);
     }
   }
+
+  /**
+   * Ubah status kepegawaian PTK (aktif / tidak_aktif / pensiun)
+   * beserta tanggal keluarnya. Mengaktifkan kembali mengosongkan
+   * tanggal keluar; status lain wajib memiliki tanggal keluar.
+   */
+  public function updateStatus(Request $request, $id)
+  {
+    $ptk = Ptk::findOrFail($id);
+
+    $data = $request->validate([
+      'status'         => 'required|in:aktif,tidak_aktif,pensiun',
+      'tanggal_keluar' => 'nullable|date|required_if:status,tidak_aktif,pensiun',
+    ]);
+
+    $ptk->update([
+      'status'         => $data['status'],
+      'tanggal_keluar' => $data['status'] === 'aktif' ? null : $data['tanggal_keluar'],
+    ]);
+
+    $label = [
+      'aktif'       => 'Aktif',
+      'tidak_aktif' => 'Tidak Aktif',
+      'pensiun'     => 'Pensiun',
+    ][$data['status']];
+
+    return response()->json([
+      'message' => 'Status ' . $ptk->nama_ptk . ' kini ' . $label . '.',
+    ]);
+  }
 }
