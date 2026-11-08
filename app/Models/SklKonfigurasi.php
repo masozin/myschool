@@ -27,12 +27,14 @@ class SklKonfigurasi extends Model
     'semester_id',
     'mode_input',
     'is_terkunci',
+    'kunci_dibuka',
     'tempat_terbit',
     'tanggal_terbit',
   ];
 
   protected $casts = [
     'is_terkunci'    => 'boolean',
+    'kunci_dibuka'   => 'boolean',
     'tanggal_terbit' => 'date',
   ];
 

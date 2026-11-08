@@ -25,12 +25,14 @@ class SkhuKonfigurasi extends Model
     'tanggal_selesai_ujian',
     'tanggal_terbit',
     'tempat_terbit',
+    'kunci_dibuka',
   ];
 
   protected $casts = [
     'tanggal_mulai_ujian'   => 'date',
     'tanggal_selesai_ujian' => 'date',
     'tanggal_terbit'        => 'date',
+    'kunci_dibuka'          => 'boolean',
   ];
 
   public function sekolah(): BelongsTo

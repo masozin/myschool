@@ -463,6 +463,7 @@ Route::controller(SkhuController::class)
     Route::post('/template', 'templateStore');
     Route::put('/template/{id}', 'templateUpdate');
     Route::delete('/template/{id}', 'templateDestroy');
+    Route::post('/kunci', 'kunci')->name('skhu.kunci');
   });
 
 

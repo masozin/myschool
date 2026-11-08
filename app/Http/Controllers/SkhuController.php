@@ -13,6 +13,7 @@ use App\Models\Skhu;
 use App\Models\SkhuKonfigurasi;
 use App\Models\SkhuNilai;
 use App\Models\SkhuTemplate;
+use App\Support\KunciKelulusan;
 use Barryvdh\DomPDF\Facade\Pdf;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
@@ -179,6 +180,43 @@ class SkhuController extends Controller
     return (int) $sekolahId;
   }
 
+  /**
+   * Tolak perubahan pada angkatan yang sudah terkunci otomatis
+   * (musim kelulusan berikutnya telah dimulai dan Admin belum
+   * membuka kuncinya). Melihat dan mencetak tidak dibatasi.
+   */
+  private function abortJikaTerkunci(int $sekolahId, int $semesterId): void
+  {
+    abort_if(
+      KunciKelulusan::terkunci('skhu', $sekolahId, $semesterId),
+      403,
+      'Angkatan ini sudah terkunci karena musim kelulusan berikutnya telah dimulai. Admin dapat membuka kunci bila memang diperlukan.'
+    );
+  }
+
+  /** Buka / terapkan kembali kunci angkatan (khusus Admin). */
+  public function kunci(Request $request)
+  {
+    abort_unless(Auth::user()->hasRole('Admin'), 403);
+
+    $buka      = $request->input('aksi') === 'buka';
+    $sekolahId = $this->sekolahKonteksId();
+    $semesterId = (int) Semester::smtIdKelulusan();
+
+    $konfig = SkhuKonfigurasi::firstOrCreate([
+      'sekolah_id'  => $sekolahId,
+      'semester_id' => $semesterId,
+    ]);
+    $konfig->update(['kunci_dibuka' => $buka]);
+
+    return redirect()->back()->with(
+      'success',
+      $buka
+        ? 'Kunci angkatan dibuka. Perubahan kembali diizinkan.'
+        : 'Kunci angkatan diterapkan kembali.'
+    );
+  }
+
   private function sekolahKonteksId(): int
   {
     $sekolahId = $this->sekolahKonteksIdNullable();
@@ -277,6 +315,8 @@ class SkhuController extends Controller
   // =========================================================================
   public function simpan(Request $request, int $siswaId)
   {
+    $this->abortJikaTerkunci($this->sekolahKonteksId(), (int) Semester::smtIdKelulusan());
+
     $request->validate([
       'nomor_surat'           => 'nullable|string|max:100',
       'nomor_ujian'           => 'nullable|string|max:100',
@@ -366,6 +406,8 @@ class SkhuController extends Controller
     // ramah, bukan fatal 500.
     $skhu = Skhu::where('sekolah_id', $this->sekolahKonteksId())->findOrFail($skhuId);
 
+    $this->abortJikaTerkunci((int) $skhu->sekolah_id, (int) $skhu->semester_id);
+
     // Guru hanya boleh mengubah SKHU siswa rombelnya sendiri
     if ($user->hasRole('Guru')) {
       $this->abortUnlessWaliKelas((int) $skhu->siswa_id, (int) $skhu->sekolah_id, (int) $skhu->semester_id);
@@ -403,6 +445,8 @@ class SkhuController extends Controller
   // =========================================================================
   public function finalisasiSemua(Request $request)
   {
+    $this->abortJikaTerkunci($this->sekolahKonteksId(), (int) Semester::smtIdKelulusan());
+
     // Finalisasi massal berdampak ke seluruh sekolah — khusus Operator
     if (!Auth::user()->hasRole('Operator Sekolah')) {
       return response()->json(['message' => 'Akses ditolak. Finalisasi massal hanya untuk Operator Sekolah.'], 403);
@@ -521,6 +565,8 @@ class SkhuController extends Controller
 
   public function simpanPengaturanAngkatan(Request $request)
   {
+    $this->abortJikaTerkunci($this->sekolahKonteksId(), (int) Semester::smtIdKelulusan());
+
     $request->validate([
       'tanggal_mulai_ujian'   => 'nullable|date',
       'tanggal_selesai_ujian' => 'nullable|date|after_or_equal:tanggal_mulai_ujian',
@@ -1388,6 +1434,8 @@ class SkhuController extends Controller
   // =========================================================================
   public function importNilai(Request $request)
   {
+    $this->abortJikaTerkunci($this->sekolahKonteksId(), (int) Semester::smtIdKelulusan());
+
     $user = Auth::user();
 
     if (!$user->hasAnyRole(['Operator Sekolah', 'Guru'])) {

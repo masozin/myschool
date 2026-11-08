@@ -11,6 +11,7 @@ use App\Models\Siswa;
 use App\Models\Skl;
 use App\Models\SklKomponen;
 use App\Models\SklKonfigurasi;
+use App\Support\KunciKelulusan;
 use App\Models\SklNilai;
 use App\Models\SklNilaiKomponen;
 use App\Models\SklNilaiKomponenSub;
@@ -84,6 +85,41 @@ class SklController extends Controller
     $sekolahId = $user->ptk?->sekolah_id;
     abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
     return (int) $sekolahId;
+  }
+
+  /**
+   * Tolak perubahan pada angkatan yang sudah terkunci otomatis
+   * (musim kelulusan berikutnya telah dimulai dan Admin belum
+   * membuka kuncinya). Melihat dan mencetak tidak dibatasi.
+   */
+  private function abortJikaTerkunci(int $sekolahId, int $semesterId): void
+  {
+    abort_if(
+      KunciKelulusan::terkunci('skl', $sekolahId, $semesterId),
+      403,
+      'Angkatan ini sudah terkunci karena musim kelulusan berikutnya telah dimulai. Admin dapat membuka kunci bila memang diperlukan.'
+    );
+  }
+
+  /** Buka / terapkan kembali kunci angkatan (khusus Admin). */
+  public function kunci(Request $request)
+  {
+    abort_unless(Auth::user()->hasRole('Admin'), 403);
+
+    $buka = $request->input('aksi') === 'buka';
+
+    $konfig = SklKonfigurasi::firstOrCreate([
+      'sekolah_id'  => $this->getSekolahId(),
+      'semester_id' => (int) Semester::smtIdKelulusan(),
+    ]);
+    $konfig->update(['kunci_dibuka' => $buka]);
+
+    return redirect()->back()->with(
+      'success',
+      $buka
+        ? 'Kunci angkatan dibuka. Perubahan kembali diizinkan.'
+        : 'Kunci angkatan diterapkan kembali.'
+    );
   }
 
   private function getSekolahId(): int
@@ -304,6 +340,8 @@ class SklController extends Controller
 
   public function store(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     $request->validate(['siswa_id' => 'required|exists:tabel_siswa,id']);
 
     // Guru hanya boleh membuat SKL untuk siswa rombelnya sendiri
@@ -485,6 +523,8 @@ class SklController extends Controller
 
   public function updateNilai(Request $request, Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     $this->abortUnlessWaliKelasSkl($skl);
 
     abort_if(
@@ -517,6 +557,8 @@ class SklController extends Controller
 
   public function updateNomor(Request $request, Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     abort_if(!in_array($skl->status, ['draft', 'ditolak', 'disetujui']), 403);
 
     // Tanggal terbit tidak lagi per siswa — ia milik konfigurasi
@@ -541,6 +583,8 @@ class SklController extends Controller
 
   public function ajukan(Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     $this->abortUnlessWaliKelasSkl($skl);
 
     abort_if(!in_array($skl->status, ['draft', 'ditolak']), 403);
@@ -559,6 +603,8 @@ class SklController extends Controller
 
   public function setujui(Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
 
     abort_if($skl->status !== 'pengajuan', 403);
@@ -573,6 +619,8 @@ class SklController extends Controller
 
   public function tolak(Request $request, Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
 
     abort_if($skl->status !== 'pengajuan', 403);
@@ -586,6 +634,8 @@ class SklController extends Controller
 
   public function destroy(Skl $skl)
   {
+    $this->abortJikaTerkunci((int) $skl->sekolah_id, (int) $skl->semester_id);
+
     $this->abortUnlessWaliKelasSkl($skl);
 
     abort_if($skl->status === 'disetujui', 403, 'SKL yang sudah disetujui tidak dapat dihapus.');
@@ -617,6 +667,8 @@ class SklController extends Controller
 
   public function bulkAjukan(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     $request->validate(['ids' => 'required|array']);
 
     // Hanya ubah yang statusnya masih draft atau ditolak
@@ -629,6 +681,8 @@ class SklController extends Controller
 
   public function bulkSetujui(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
 
     $request->validate(['ids' => 'required|array']);
@@ -651,6 +705,8 @@ class SklController extends Controller
 
   public function bulkBatalSetujui(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
 
     $request->validate(['ids' => 'required|array']);
@@ -681,6 +737,8 @@ class SklController extends Controller
 
   public function bulkTolak(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     abort_unless(Auth::user()->hasRole('Kepala Sekolah'), 403, 'Persetujuan SKL hanya oleh Kepala Sekolah.');
 
     $request->validate([
@@ -701,6 +759,8 @@ class SklController extends Controller
 
   public function bulkHapus(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     $request->validate(['ids' => 'required|array']);
 
     // Opsional: cegah penghapusan data yang sudah disetujui
@@ -735,6 +795,8 @@ class SklController extends Controller
 
   public function simpanPengaturanNomor(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     abort_unless(Auth::user()->hasRole('Operator Sekolah'), 403);
 
     $data = $request->validate([
@@ -901,6 +963,8 @@ class SklController extends Controller
 
   public function sync(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     // Operator menyinkronkan seluruh sekolah; Guru wali kelas
     // hanya SKL siswa rombelnya (disaring tepat setelah ini)
     abort_unless(Auth::user()->hasAnyRole(['Operator Sekolah', 'Guru']), 403);
@@ -1538,6 +1602,8 @@ class SklController extends Controller
   // =========================================================================
   public function importNilai(Request $request)
   {
+    $this->abortJikaTerkunci($this->getSekolahId(), (int) Semester::smtIdKelulusan());
+
     $request->validate([
       'file_excel' => 'required|file|mimes:xlsx,xls|max:10240',
     ]);
