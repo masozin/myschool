@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Imports\KalenderPendidikanImport;
+use App\Imports\KalenderPendidikanWorkbook;
 use App\Models\KalenderPendidikan;
 use App\Models\SekolahDetail;
 use App\Models\SekolahLogo;
@@ -319,7 +320,10 @@ class KalenderPendidikanController extends Controller
     ]);
 
     $import = new KalenderPendidikanImport($request->tahun_pelajaran);
-    Excel::import($import, $request->file('file_excel'));
+    // Dibungkus agar hanya lembar pertama yang dibaca (lihat
+    // KalenderPendidikanWorkbook) — lembar 'Petunjuk' pada
+    // template tidak boleh ikut terimpor sebagai data
+    Excel::import(new KalenderPendidikanWorkbook($import), $request->file('file_excel'));
 
     return response()->json([
       'message'   => "Impor selesai. {$import->berhasil} kegiatan ditambahkan, {$import->dilewati} dilewati (duplikat).",
