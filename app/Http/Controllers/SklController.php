@@ -1304,6 +1304,21 @@ class SklController extends Controller
 
   public function downloadTemplate(Request $request)
   {
+    return $this->buatBukuNilai($request, false);
+  }
+
+  /**
+   * Leger SKL: bentuk sama persis dengan template impor, tetapi
+   * sel nilainya terisi nilai tersimpan; khusus mode manual
+   * ditambah lembar rekap Nilai Jadi di bagian akhir.
+   */
+  public function downloadLeger(Request $request)
+  {
+    return $this->buatBukuNilai($request, true);
+  }
+
+  private function buatBukuNilai(Request $request, bool $leger)
+  {
     $user = Auth::user();
 
     // Operator: template satu angkatan. Guru wali kelas: boleh,
@@ -1388,6 +1403,7 @@ class SklController extends Controller
     // 5. Ambil Data SKL yang sudah ada untuk mapping nomor & status lock
     $skls = Skl::where('sekolah_id', $sekolah->id)
       ->where('semester_id', $semester->id)
+      ->when($leger, fn($q) => $q->with('nilais.komponens.nilaiKomponenSub'))
       ->get()
       ->keyBy('siswa_id');
 
@@ -1449,7 +1465,17 @@ class SklController extends Controller
       $spreadsheet->setActiveSheetIndex(0);
     }
 
-    $namaFile = "Template-Nilai-SKL-{$jenjang}-" . str_replace('/', '-', $semester->tahun_pelajaran) . ".xlsx";
+    // Leger: tambahkan lembar Nilai Jadi (mode manual), lalu isi
+    // seluruh sel nilai dari kunci baris pertama tiap lembar
+    if ($leger) {
+      if ($konfigurasi->mode_input === 'manual') {
+        $this->tambahLembarNilaiJadi($spreadsheet, $mapels, $siswaList, $skls);
+      }
+
+      $this->isiNilaiLeger($spreadsheet, $skls);
+    }
+
+    $namaFile = ($leger ? 'Leger' : 'Template') . "-Nilai-SKL-{$jenjang}-" . str_replace('/', '-', $semester->tahun_pelajaran) . ".xlsx";
     $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
     // Kirim response stream download
@@ -1463,6 +1489,105 @@ class SklController extends Controller
       'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Cache-Control' => 'max-age=0',
     ]);
+  }
+
+  /**
+   * Lembar rekap Nilai Jadi pada leger mode manual: satu kolom
+   * per mapel berisi nilai akhir, mengikuti bentuk lembar mode
+   * jadi (termasuk kunci baris pertamanya) agar dapat diisi
+   * oleh pengisi leger yang sama.
+   */
+  private function tambahLembarNilaiJadi($spreadsheet, $mapels, $siswaList, $skls): void
+  {
+    $sheet = $spreadsheet->createSheet();
+    $sheet->setTitle('Nilai Jadi');
+
+    $sheet->setCellValue('A1', 'id_siswa');
+    $sheet->setCellValue('B1', 'Nama Siswa');
+    $sheet->setCellValue('C1', 'NISN');
+    $sheet->setCellValue('D1', 'Status');
+    $sheet->setCellValue('E1', 'nomor_skl');
+
+    $col = 6; // Mulai dari Kolom F
+    foreach ($mapels as $mapel) {
+      $sheet->setCellValue([$col, 1], "mapel_{$mapel->id}");
+
+      $sheet->mergeCells([$col, 2, $col, 3]);
+      $sheet->setCellValue([$col, 2], $this->tajukMapel($mapel->masterMapel));
+
+      $colStr = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+      $sheet->getComment("{$colStr}2")->getText()->createTextRun($mapel->masterMapel->nama . ' — Nilai Jadi');
+
+      $col++;
+    }
+
+    $this->fillDataSiswa($sheet, $siswaList, $skls, $col - 1);
+  }
+
+  /**
+   * Isi sel nilai pada buku leger dari kunci teknis baris
+   * pertama tiap lembar — kunci yang sama dengan yang dibaca
+   * mesin impor: mapel_{id} → nilai akhir; mapel_{m}_komp_{k}
+   * → nilai komponen; mapel_{m}_komp_{k}_sub_{s} → nilai
+   * sub-komponen.
+   */
+  private function isiNilaiLeger($spreadsheet, $skls): void
+  {
+    foreach ($spreadsheet->getAllSheets() as $sheet) {
+      $kolomAkhir = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString(
+        $sheet->getHighestDataColumn(1)
+      );
+      $barisAkhir = $sheet->getHighestDataRow();
+
+      // Peta kolom dari kunci baris pertama
+      $petaKolom = [];
+      for ($col = 6; $col <= $kolomAkhir; $col++) {
+        $kunci = (string) $sheet->getCell([$col, 1])->getValue();
+        if (preg_match('/^mapel_(\d+)(?:_komp_(\d+)(?:_sub_(\d+))?)?$/', $kunci, $m)) {
+          $petaKolom[$col] = [
+            'mapel' => (int) $m[1],
+            'komp'  => isset($m[2]) && $m[2] !== '' ? (int) $m[2] : null,
+            'sub'   => isset($m[3]) && $m[3] !== '' ? (int) $m[3] : null,
+          ];
+        }
+      }
+
+      if (!$petaKolom) {
+        continue;
+      }
+
+      for ($row = 4; $row <= $barisAkhir; $row++) {
+        $skl = $skls->get((int) $sheet->getCell([1, $row])->getValue());
+        if (!$skl) {
+          continue;
+        }
+
+        $nilaiPerMapel = $skl->nilais->keyBy('mapel_mapping_id');
+
+        foreach ($petaKolom as $col => $info) {
+          $nilaiMapel = $nilaiPerMapel->get($info['mapel']);
+          if (!$nilaiMapel) {
+            continue;
+          }
+
+          $isi = null;
+          if ($info['komp'] === null) {
+            $isi = $nilaiMapel->nilai_akhir;
+          } else {
+            $nilaiKomp = $nilaiMapel->komponens->firstWhere('komponen_id', $info['komp']);
+            if ($nilaiKomp) {
+              $isi = $info['sub'] === null
+                ? $nilaiKomp->nilai
+                : $nilaiKomp->nilaiKomponenSub->firstWhere('komponen_sub_id', $info['sub'])?->nilai;
+            }
+          }
+
+          if ($isi !== null) {
+            $sheet->setCellValue([$col, $row], $isi + 0);
+          }
+        }
+      }
+    }
   }
 
   // Helper: Build Sheet Mode Jadi (Tanpa Sub-Komponen)

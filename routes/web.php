@@ -380,6 +380,7 @@ Route::middleware(['fitur:skl'])->group(function () {
       Route::get('/pengaturan-nomor', 'pengaturanNomor')->name('pengaturan-nomor');
       Route::post('/pengaturan-nomor', 'simpanPengaturanNomor')->name('pengaturan-nomor.simpan');
       Route::get('/template/download', 'downloadTemplate')->name('template.download');
+      Route::get('/leger/download', 'downloadLeger')->name('leger.download');
       Route::post('/import', 'importNilai')->name('import');
     });
 
