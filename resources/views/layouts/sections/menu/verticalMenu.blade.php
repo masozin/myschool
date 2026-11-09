@@ -28,6 +28,23 @@
     </div>
   @endif
 
+  {{-- Identitas pengguna di bawah logo & nama aplikasi --}}
+  @auth
+    <div class="d-flex align-items-center gap-2 px-4 pt-2 pb-1">
+      <div class="avatar">
+        <span class="avatar-initial rounded-circle bg-label-primary fw-semibold">
+          {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+        </span>
+      </div>
+      <div class="overflow-hidden">
+        <div class="fw-semibold text-truncate" style="line-height:1.25;">{{ auth()->user()->name }}</div>
+        <small class="text-muted text-truncate d-block">
+          {{ auth()->user()->getRoleNames()->implode(', ') ?: 'Tanpa peran' }}
+        </small>
+      </div>
+    </div>
+  @endauth
+
   <div class="menu-inner-shadow"></div>
   <ul class="menu-inner py-1">
     @foreach ($menuData[0]->menu as $menu)
