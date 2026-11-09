@@ -17,6 +17,7 @@ use App\Http\Controllers\RombelAnggotaController;
 use App\Http\Controllers\RombelController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SekolahLogoController;
+use App\Http\Controllers\PembaruanController;
 use App\Http\Controllers\SekolahProfilController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\SiswaController;
@@ -117,6 +118,24 @@ Route::controller(SekolahProfilController::class)
   ->group(function () {
     Route::get('/', 'edit')->name('edit');
     Route::put('/', 'update')->name('update');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| PEMBARUAN APLIKASI (Admin) — pemutakhiran tanpa SSH untuk
+| hosting bersama: unggah paket .zip, aplikasi membackup file
+| lama, menimpa, menjalankan migrasi, dan membersihkan cache.
+| Path 'pembaruan' dikecualikan dari kunci semester global.
+|--------------------------------------------------------------------------
+*/
+Route::controller(PembaruanController::class)
+  ->prefix('pembaruan')
+  ->name('pembaruan.')
+  ->middleware(['auth:sanctum', 'role:Admin'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/terapkan', 'terapkan')->name('terapkan');
+    Route::post('/pulihkan', 'pulihkan')->name('pulihkan');
   });
 
 

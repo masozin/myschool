@@ -244,6 +244,15 @@
       "roles": [
         "Operator Sekolah"
       ]
+    },
+    {
+      "url": "/pembaruan",
+      "icon": "menu-icon icon-base ri ri-refresh-line",
+      "name": "Pembaruan Aplikasi",
+      "slug": "pembaruan.index",
+      "roles": [
+        "Admin"
+      ]
     }
   ]
 }

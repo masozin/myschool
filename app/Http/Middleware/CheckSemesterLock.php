@@ -21,6 +21,8 @@ use Illuminate\Http\Request;
  * - Modul SKHU/SKL punya kunci angkatan sendiri yang lebih
  *   halus (App\Support\KunciKelulusan) dan Kalender Pendidikan
  *   datanya per tahun pelajaran, bukan per semester.
+ * - Pembaruan Aplikasi (Admin) adalah urusan pemeliharaan
+ *   sistem, tidak terkait data semester mana pun.
  * - Admin tetap dapat mengelola halaman Semester (mengaktifkan
  *   semester dan membuka/menerapkan kunci).
  */
@@ -41,6 +43,7 @@ class CheckSemesterLock
     'skhu',
     'skl',
     'kalender-pendidikan',
+    'pembaruan',
     'up',
   ];
 
