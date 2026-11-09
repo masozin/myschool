@@ -417,5 +417,3 @@ class PembaruanController extends Controller
     $this->tulisJson($path, array_slice($riwayat, 0, 20));
   }
 }
-
-...[truncated 4471 chars]
