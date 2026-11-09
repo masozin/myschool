@@ -105,6 +105,17 @@
       ]
     },
     {
+      "url": "/presensi/rekap",
+      "icon": "menu-icon icon-base ri ri-bar-chart-2-line",
+      "name": "Rekap Presensi",
+      "slug": "Presensi Rekap",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah"
+      ]
+    },
+    {
       "url": "/kalender-pendidikan",
       "icon": "menu-icon icon-base ri ri-calendar-2-line",
       "name": "Kalender Pendidikan",

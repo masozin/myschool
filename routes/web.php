@@ -577,6 +577,9 @@ Route::controller(DhSiswaController::class)
 Route::prefix('presensi')->name('presensi.')->middleware(['auth:sanctum', 'role:Admin|Operator Sekolah|Guru|Kepala Sekolah', 'fitur:presensi'])->group(function () {
   Route::get('/', [PresensiController::class, 'index'])->name('index');
   Route::get('/ajax-siswa', [PresensiController::class, 'ajaxSiswa'])->name('ajaxSiswa');
+  Route::get('/rekap', [PresensiController::class, 'rekap'])->name('rekap');
+  Route::get('/rekap/excel', [PresensiController::class, 'rekapExcel'])->name('rekap.excel');
+  Route::get('/rekap/pdf', [PresensiController::class, 'rekapPdf'])->name('rekap.pdf');
 });
 
 // Presensi - Simpan (hanya peran pengisi: Operator Sekolah &

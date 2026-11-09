@@ -7,7 +7,11 @@ use App\Models\PresensiPengaturan;
 use App\Models\Rombel;
 use App\Models\RombelAnggota;
 use App\Models\Semester;
+use App\Models\SiswaRegistrasi;
 use App\Models\KalenderPendidikan;
+use Barryvdh\DomPDF\Facade\Pdf;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -388,6 +392,295 @@ class PresensiController extends Controller
       'success' => true,
       'message' => 'Presensi berhasil disimpan.',
     ]);
+  }
+
+  // =========================================================================
+  // REKAP PRESENSI
+  // =========================================================================
+
+  /**
+   * Kumpulkan seluruh data rekap untuk filter saat ini — dipakai
+   * bersama halaman rekap, ekspor Excel, dan ekspor PDF.
+   *
+   * Definisi "belum absen": hari efektif adalah tanggal-tanggal
+   * yang benar-benar memiliki isian presensi pada cakupan peran
+   * pengguna (bukan tebakan kalender). Seorang siswa "belum
+   * absen" pada hari efektif yang berada dalam masa registrasinya
+   * di sekolah rombelnya tetapi tidak memiliki baris presensi.
+   */
+  private function kumpulkanRekap(Request $request): array
+  {
+    $user = Auth::user();
+
+    // ── Periode: per semester atau per tahun pelajaran ──────────
+    $mode = $request->get('mode') === 'tahun' ? 'tahun' : 'semester';
+
+    $daftarSemester = Semester::orderByDesc('kode_semester')->get();
+    $daftarTahun    = $daftarSemester->pluck('tahun_pelajaran')->unique()->values();
+
+    if ($mode === 'tahun') {
+      $sesi            = Semester::find(session('semester_id'));
+      $tpDipilih       = (string) $request->get('tahun', $sesi?->tahun_pelajaran ?? $daftarTahun->first());
+      $semesters       = $daftarSemester->where('tahun_pelajaran', $tpDipilih)->values();
+      $semesterDipilih = null;
+      $labelPeriode    = 'Tahun Pelajaran ' . $tpDipilih;
+    } else {
+      $semesterDipilih = $daftarSemester->firstWhere('id', (int) $request->get('semester_id', session('semester_id')))
+        ?? $daftarSemester->first();
+      $semesters    = collect([$semesterDipilih]);
+      $tpDipilih    = $semesterDipilih?->tahun_pelajaran;
+      $labelPeriode = $semesterDipilih
+        ? $semesterDipilih->tahun_pelajaran . ' — Semester ' . $semesterDipilih->semester
+        : '-';
+    }
+
+    // ── Cakupan rombel mengikuti peran (sama seperti halaman isi) ─
+    $rombelCakupan = Rombel::with(['sekolah', 'semester'])
+      ->whereIn('semester_id', $semesters->pluck('id'))
+      ->when(
+        $user->hasAnyRole(['Operator Sekolah', 'Kepala Sekolah']),
+        fn($q) => $q->where('sekolah_id', $user->ptk?->sekolah_id)
+      )
+      ->when(
+        $user->hasRole('Guru') && !$user->hasAnyRole(['Operator Sekolah', 'Admin']),
+        fn($q) => $q->where('ptk_id', $user->ptk?->id)
+      )
+      ->orderBy('nama_rombel')
+      ->get();
+
+    $rombelDipilih = (int) $request->get('rombel_id') ?: null;
+    if ($rombelDipilih && !$rombelCakupan->contains('id', $rombelDipilih)) {
+      $rombelDipilih = null;
+    }
+    $rombelAktif = $rombelDipilih
+      ? $rombelCakupan->where('id', $rombelDipilih)->values()
+      : $rombelCakupan;
+
+    // ── Baris presensi pada cakupan peran ──────────────────────────
+    $barisSemua = Presensi::whereIn('semester_id', $semesters->pluck('id'))
+      ->whereIn('rombel_id', $rombelCakupan->pluck('id'))
+      ->get();
+
+    $hariEfektif = $barisSemua
+      ->map(fn($p) => $p->tanggal->format('Y-m-d'))
+      ->unique()->sort()->values();
+
+    $barisAktif = $barisSemua->whereIn('rombel_id', $rombelAktif->pluck('id'));
+
+    // Hitungan status per (siswa, rombel)
+    $hitungan = [];
+    foreach ($barisAktif as $p) {
+      $kunci = $p->siswa_id . ':' . $p->rombel_id;
+      $hitungan[$kunci][$p->status] = ($hitungan[$kunci][$p->status] ?? 0) + 1;
+    }
+
+    // Keanggotaan pada rombel aktif + interval registrasi siswa
+    $anggotaList = RombelAnggota::with('siswa')
+      ->whereIn('rombel_id', $rombelAktif->pluck('id'))
+      ->get();
+    $registrasi = SiswaRegistrasi::whereIn('siswa_id', $anggotaList->pluck('siswa_id')->unique()->all())
+      ->get()
+      ->groupBy('siswa_id');
+
+    $perSiswa = [];
+    foreach ($anggotaList as $anggota) {
+      $rombel = $rombelAktif->firstWhere('id', $anggota->rombel_id);
+      $siswa  = $anggota->siswa;
+      if (!$rombel || !$siswa) {
+        continue;
+      }
+
+      $mulai   = Carbon::parse($rombel->semester->tanggal_mulai)->format('Y-m-d');
+      $selesai = Carbon::parse($rombel->semester->tanggal_selesai)->format('Y-m-d');
+      $interval = ($registrasi->get($siswa->id) ?? collect())
+        ->filter(fn($r) => (int) $r->sekolah_id === (int) $rombel->sekolah_id);
+
+      $berhak = $hariEfektif->filter(function ($tgl) use ($mulai, $selesai, $interval) {
+        if ($tgl < $mulai || $tgl > $selesai) {
+          return false;
+        }
+
+        return $interval->contains(fn($r) =>
+          (!$r->tanggal_diterima || Carbon::parse($r->tanggal_diterima)->format('Y-m-d') <= $tgl)
+          && (!$r->tanggal_keluar || Carbon::parse($r->tanggal_keluar)->format('Y-m-d') >= $tgl));
+      })->count();
+
+      $c = $hitungan[$siswa->id . ':' . $rombel->id] ?? [];
+      $h = $c['hadir'] ?? 0;
+      $s = $c['sakit'] ?? 0;
+      $i = $c['izin'] ?? 0;
+      $a = $c['alpa'] ?? 0;
+      $belum = max(0, $berhak - ($h + $s + $i + $a));
+
+      $perSiswa[] = [
+        'siswa'  => $siswa,
+        'rombel' => $rombel,
+        'hadir'  => $h,
+        'sakit'  => $s,
+        'izin'   => $i,
+        'alpa'   => $a,
+        'belum'  => $belum,
+        'berhak' => $berhak,
+        'persen' => $berhak > 0 ? round($h / $berhak * 100, 1) : 0,
+      ];
+    }
+
+    $perSiswa = collect($perSiswa)
+      ->sort(function ($x, $y) {
+        $perRombel = strcmp($x['rombel']->nama_rombel, $y['rombel']->nama_rombel);
+
+        return $perRombel !== 0
+          ? $perRombel
+          : strcmp($x['siswa']->nama_siswa, $y['siswa']->nama_siswa);
+      })
+      ->values();
+
+    // ── Agregat per kelas ──────────────────────────────────────────
+    $agregat = function ($kumpulan) {
+      $h = $kumpulan->sum('hadir');
+      $berhak = $kumpulan->sum('berhak');
+
+      return [
+        'hadir'  => $h,
+        'sakit'  => $kumpulan->sum('sakit'),
+        'izin'   => $kumpulan->sum('izin'),
+        'alpa'   => $kumpulan->sum('alpa'),
+        'belum'  => $kumpulan->sum('belum'),
+        'persen' => $berhak > 0 ? round($h / $berhak * 100, 1) : 0,
+      ];
+    };
+
+    $perKelas = $rombelAktif->map(function ($rombel) use ($perSiswa, $agregat) {
+      $baris = $perSiswa->filter(fn($r) => $r['rombel']->id === $rombel->id)->values();
+
+      return array_merge([
+        'rombel'       => $rombel,
+        'jumlah_siswa' => $baris->count(),
+      ], $agregat($baris));
+    })->values();
+
+    $total = array_merge([
+      'jumlah_siswa' => $perSiswa->pluck('siswa.id')->unique()->count(),
+    ], $agregat($perSiswa));
+
+    return [
+      'mode'            => $mode,
+      'labelPeriode'    => $labelPeriode,
+      'daftarSemester'  => $daftarSemester,
+      'daftarTahun'     => $daftarTahun,
+      'semesterDipilih' => $semesterDipilih,
+      'tpDipilih'       => $tpDipilih,
+      'rombelCakupan'   => $rombelCakupan,
+      'rombelDipilih'   => $rombelDipilih,
+      'hariEfektif'     => $hariEfektif->count(),
+      'perSiswa'        => $perSiswa,
+      'perKelas'        => $perKelas,
+      'total'           => $total,
+    ];
+  }
+
+  /** Halaman rekap presensi (per siswa, per kelas, seluruh cakupan). */
+  public function rekap(Request $request)
+  {
+    return view('content.presensi.rekap', $this->kumpulkanRekap($request));
+  }
+
+  /** Ekspor rekap ke Excel: lembar Per Kelas + Per Siswa. */
+  public function rekapExcel(Request $request)
+  {
+    $data = $this->kumpulkanRekap($request);
+
+    $spreadsheet = new Spreadsheet();
+
+    // ── Lembar Per Kelas ─────────────────────────────────────────
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('Per Kelas');
+    $sheet->fromArray([
+      ['Rekap Presensi — ' . $data['labelPeriode']],
+      ['Hari efektif: ' . $data['hariEfektif'] . ' hari'],
+      [],
+      ['Rombel', 'Sekolah', 'Siswa', 'Hadir', 'Sakit', 'Izin', 'Alpa', 'Belum Absen', '% Hadir'],
+    ], null, 'A1');
+
+    $baris = 5;
+    foreach ($data['perKelas'] as $k) {
+      $sheet->fromArray([[
+        $k['rombel']->nama_rombel,
+        $k['rombel']->sekolah?->detailTerbaru?->nama_sekolah ?? '-',
+        $k['jumlah_siswa'],
+        $k['hadir'],
+        $k['sakit'],
+        $k['izin'],
+        $k['alpa'],
+        $k['belum'],
+        $k['persen'],
+      ]], null, 'A' . $baris);
+      $baris++;
+    }
+    $sheet->fromArray([[
+      'TOTAL', '', $data['total']['jumlah_siswa'],
+      $data['total']['hadir'], $data['total']['sakit'], $data['total']['izin'],
+      $data['total']['alpa'], $data['total']['belum'], $data['total']['persen'],
+    ]], null, 'A' . $baris);
+    $sheet->getStyle('A4:I4')->getFont()->setBold(true);
+    $sheet->getStyle('A' . $baris . ':I' . $baris)->getFont()->setBold(true);
+    foreach (range('A', 'I') as $kolom) {
+      $sheet->getColumnDimension($kolom)->setAutoSize(true);
+    }
+
+    // ── Lembar Per Siswa ─────────────────────────────────────────
+    $sheet2 = $spreadsheet->createSheet();
+    $sheet2->setTitle('Per Siswa');
+    $sheet2->fromArray([
+      ['Rekap Presensi — ' . $data['labelPeriode']],
+      ['Hari efektif: ' . $data['hariEfektif'] . ' hari'],
+      [],
+      ['Nama Siswa', 'NISN', 'Kelas', 'Hadir', 'Sakit', 'Izin', 'Alpa', 'Belum Absen', '% Hadir'],
+    ], null, 'A1');
+
+    $baris = 5;
+    foreach ($data['perSiswa'] as $r) {
+      $sheet2->fromArray([[
+        $r['siswa']->nama_siswa,
+        $r['siswa']->nisn,
+        $r['rombel']->nama_rombel,
+        $r['hadir'],
+        $r['sakit'],
+        $r['izin'],
+        $r['alpa'],
+        $r['belum'],
+        $r['persen'],
+      ]], null, 'A' . $baris);
+      $baris++;
+    }
+    $sheet2->getStyle('A4:I4')->getFont()->setBold(true);
+    foreach (range('A', 'I') as $kolom) {
+      $sheet2->getColumnDimension($kolom)->setAutoSize(true);
+    }
+
+    $namaFile = 'rekap-presensi-' . \Illuminate\Support\Str::slug($data['labelPeriode']) . '.xlsx';
+    $writer   = new XlsxWriter($spreadsheet);
+
+    return response()->streamDownload(function () use ($writer) {
+      if (ob_get_contents()) {
+        ob_end_clean();
+      }
+      $writer->save('php://output');
+    }, $namaFile, [
+      'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Cache-Control' => 'max-age=0',
+    ]);
+  }
+
+  /** Ekspor rekap ke PDF (tampilan cetak ringkas). */
+  public function rekapPdf(Request $request)
+  {
+    $data = $this->kumpulkanRekap($request);
+    $html = view('content.presensi.rekap-pdf', $data)->render();
+
+    return Pdf::loadHTML($html)
+      ->setPaper('a4', 'landscape')
+      ->download('rekap-presensi-' . \Illuminate\Support\Str::slug($data['labelPeriode']) . '.pdf');
   }
 
   /**

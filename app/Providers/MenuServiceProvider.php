@@ -252,6 +252,12 @@ class MenuServiceProvider extends ServiceProvider
           'slug'      => 'wali.kelas.absensi',
           'url_check' => '/wali-kelas/' . $rombel->id . '/absensi',
         ],
+        (object) [
+          'url'       => '/presensi/rekap?rombel_id=' . $rombel->id,
+          'name'      => 'Rekap Presensi',
+          'slug'      => 'wali.kelas.rekap',
+          'url_check' => '/presensi/rekap',
+        ],
       ],
     ];
   }

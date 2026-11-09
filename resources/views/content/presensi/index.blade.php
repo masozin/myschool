@@ -47,6 +47,12 @@
     </div>
   </div>
 
+  <div class="d-flex justify-content-end mb-4">
+    <a href="{{ route('presensi.rekap') }}" class="btn btn-label-primary">
+      <i class="ri ri-bar-chart-2-line me-1"></i> Rekap Presensi
+    </a>
+  </div>
+
   {{-- =========================================================== --}}
   {{-- FILTER: PILIH ROMBEL + TANGGAL                               --}}
   {{-- =========================================================== --}}
