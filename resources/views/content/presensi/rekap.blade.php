@@ -82,11 +82,6 @@
             @endforeach
           </select>
         </div>
-        <div class="col-12 col-md-3">
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="ri ri-filter-3-line me-1"></i> Terapkan
-          </button>
-        </div>
       </form>
       <div class="form-text mt-2">
         Hari efektif adalah hari dalam rentang semester sampai hari ini yang bukan libur Kalender
@@ -313,6 +308,12 @@
       mode.addEventListener('change', sesuaikanMode);
       sesuaikanMode();
 
+      // ── Filter berubah = langsung terapkan, tanpa tombol ──────
+      ['mode_periode', 'semester_id', 'tahun', 'rombel_id'].forEach(id => {
+        const el = document.getElementById(id);
+        el?.addEventListener('change', () => el.form?.submit());
+      });
+
       // ── Grafik ────────────────────────────────────────────────────
       if (typeof ApexCharts !== 'undefined') {
         const total = {
@@ -323,18 +324,31 @@
           belum: {{ $total['belum'] }},
         };
 
+        // Warna teks grafik mengikuti tema yang sedang aktif:
+        // diambil dari warna teks body hasil render tema (terang
+        // di mode gelap, gelap di mode terang), agar legenda dan
+        // label sumbu selalu terbaca. Tema tooltip mengikuti
+        // atribut data-bs-theme pada <html>.
+        const warnaTeksGrafik = getComputedStyle(document.body).color;
+        const temaGrafik = document.documentElement.getAttribute('data-bs-theme') === 'dark' ?
+          'dark' : 'light';
+
         const elDonat = document.getElementById('chart_donat');
         if (elDonat) {
           new ApexCharts(elDonat, {
             chart: {
               type: 'donut',
-              height: 300
+              height: 300,
+              foreColor: warnaTeksGrafik
             },
             series: [total.hadir, total.sakit, total.izin, total.alpa, total.belum],
             labels: ['Hadir', 'Sakit', 'Izin', 'Alpa', 'Belum Absen'],
             colors: ['#28c76f', '#ff9f43', '#00cfe8', '#ea5455', '#a8aaae'],
             legend: {
               position: 'bottom'
+            },
+            tooltip: {
+              theme: temaGrafik
             },
           }).render();
         }
@@ -345,7 +359,11 @@
           new ApexCharts(elKelas, {
             chart: {
               type: 'bar',
-              height: 300
+              height: 300,
+              foreColor: warnaTeksGrafik
+            },
+            tooltip: {
+              theme: temaGrafik
             },
             series: [{
               name: '% Hadir',
