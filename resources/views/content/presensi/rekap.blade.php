@@ -89,9 +89,9 @@
         </div>
       </form>
       <div class="form-text mt-2">
-        "Belum absen" dihitung dari hari efektif — tanggal-tanggal yang benar-benar memiliki isian
-        presensi pada cakupan Anda — dikurangi hari yang sudah tercatat untuk siswa itu, hanya
-        dalam masa registrasinya di sekolah.
+        Hari efektif adalah hari dalam rentang semester sampai hari ini yang bukan libur Kalender
+        Pendidikan dan bukan hari libur mingguan sekolah (diatur di detail sekolah). "Belum absen"
+        adalah hari efektif dalam masa registrasi aktif siswa yang belum tercatat presensinya.
       </div>
     </div>
   </div>
@@ -315,13 +315,13 @@
 
       // ── Grafik ────────────────────────────────────────────────────
       if (typeof ApexCharts !== 'undefined') {
-        const total = @json([
-            'hadir' => $total['hadir'],
-            'sakit' => $total['sakit'],
-            'izin' => $total['izin'],
-            'alpa' => $total['alpa'],
-            'belum' => $total['belum'],
-        ]);
+        const total = {
+          hadir: {{ $total['hadir'] }},
+          sakit: {{ $total['sakit'] }},
+          izin: {{ $total['izin'] }},
+          alpa: {{ $total['alpa'] }},
+          belum: {{ $total['belum'] }},
+        };
 
         const elDonat = document.getElementById('chart_donat');
         if (elDonat) {
@@ -341,7 +341,7 @@
 
         const elKelas = document.getElementById('chart_kelas');
         if (elKelas) {
-          const perKelas = @json($perKelas->map(fn($k) => ['kelas' => $k['rombel']->nama_rombel, 'persen' => $k['persen']]));
+          const perKelas = {!! json_encode($perKelas->map(fn($k) => ['kelas' => $k['rombel']->nama_rombel, 'persen' => $k['persen']])->values()) !!};
           new ApexCharts(elKelas, {
             chart: {
               type: 'bar',

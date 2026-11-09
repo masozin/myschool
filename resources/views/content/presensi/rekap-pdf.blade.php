@@ -144,8 +144,9 @@
   </table>
 
   <div class="catatan">
-    "Belum absen" = hari efektif (tanggal yang benar-benar memiliki isian presensi pada cakupan ini)
-    dalam masa registrasi siswa, dikurangi hari yang sudah tercatat.
+    Hari efektif = hari dalam rentang semester sampai hari berjalan yang bukan libur Kalender
+    Pendidikan dan bukan libur mingguan sekolah. "Belum absen" = hari efektif dalam masa
+    registrasi aktif siswa dikurangi hari yang sudah tercatat.
     Dicetak {{ now()->format('d M Y H:i') }}.
   </div>
 </body>

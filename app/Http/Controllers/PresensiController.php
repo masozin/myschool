@@ -402,11 +402,12 @@ class PresensiController extends Controller
    * Kumpulkan seluruh data rekap untuk filter saat ini — dipakai
    * bersama halaman rekap, ekspor Excel, dan ekspor PDF.
    *
-   * Definisi "belum absen": hari efektif adalah tanggal-tanggal
-   * yang benar-benar memiliki isian presensi pada cakupan peran
-   * pengguna (bukan tebakan kalender). Seorang siswa "belum
-   * absen" pada hari efektif yang berada dalam masa registrasinya
-   * di sekolah rombelnya tetapi tidak memiliki baris presensi.
+   * Definisi "belum absen" (Mark): hari efektif adalah hari
+   * dalam rentang semester periode sampai hari berjalan yang
+   * BUKAN libur Kalender Pendidikan dan BUKAN hari libur
+   * mingguan sekolah (detail sekolah), dibatasi masa registrasi
+   * aktif siswa di sekolahnya. "Belum absen" = hari efektif
+   * siswa itu dikurangi hari yang sudah tercatat presensinya.
    */
   private function kumpulkanRekap(Request $request): array
   {
@@ -435,7 +436,7 @@ class PresensiController extends Controller
     }
 
     // ── Cakupan rombel mengikuti peran (sama seperti halaman isi) ─
-    $rombelCakupan = Rombel::with(['sekolah', 'semester'])
+    $rombelCakupan = Rombel::with(['sekolah.detailTerbaru', 'semester'])
       ->whereIn('semester_id', $semesters->pluck('id'))
       ->when(
         $user->hasAnyRole(['Operator Sekolah', 'Kepala Sekolah']),
@@ -461,11 +462,71 @@ class PresensiController extends Controller
       ->whereIn('rombel_id', $rombelCakupan->pluck('id'))
       ->get();
 
-    $hariEfektif = $barisSemua
-      ->map(fn($p) => $p->tanggal->format('Y-m-d'))
-      ->unique()->sort()->values();
-
     $barisAktif = $barisSemua->whereIn('rombel_id', $rombelAktif->pluck('id'));
+
+    // ── Hari efektif (definisi Mark): tanggal dalam rentang
+    // semester periode, hanya sampai hari berjalan, BUKAN libur
+    // Kalender Pendidikan, dan BUKAN hari libur mingguan sekolah
+    // (libur_mingguan pada detail sekolah; bawaan Minggu bila
+    // belum diatur). Dihitung per sekolah karena libur mingguan
+    // dapat berbeda antar sekolah ────────────────────────────────
+    $hariIni = now()->startOfDay();
+
+    $daftarTanggal = collect();
+    foreach ($semesters as $sem) {
+      if (!$sem) {
+        continue;
+      }
+      $awal  = Carbon::parse($sem->tanggal_mulai)->startOfDay();
+      $akhir = Carbon::parse($sem->tanggal_selesai)->startOfDay();
+      if ($akhir->gt($hariIni)) {
+        $akhir = $hariIni->copy();
+      }
+      for ($t = $awal->copy(); $t->lte($akhir); $t->addDay()) {
+        $daftarTanggal->push($t->format('Y-m-d'));
+      }
+    }
+    $daftarTanggal = $daftarTanggal->unique()->values();
+
+    $rentangLibur = KalenderPendidikan::where('is_libur', true)
+      ->whereDate('tanggal_mulai', '<=', $hariIni)
+      ->get()
+      ->map(fn($k) => [
+        Carbon::parse($k->tanggal_mulai)->format('Y-m-d'),
+        Carbon::parse($k->tanggal_selesai)->format('Y-m-d'),
+      ]);
+    $tanggalLibur = array_flip(
+      $daftarTanggal
+        ->filter(fn($tgl) => $rentangLibur->contains(fn($r) => $tgl >= $r[0] && $tgl <= $r[1]))
+        ->all()
+    );
+
+    $petaHari = [
+      'Minggu' => 0, 'Senin' => 1, 'Selasa' => 2, 'Rabu' => 3,
+      'Kamis' => 4, 'Jumat' => 5, 'Sabtu' => 6,
+    ];
+
+    $efektifPerSekolah = [];
+    foreach ($rombelCakupan->pluck('sekolah')->filter()->unique('id') as $sekolah) {
+      $liburNama = $sekolah->detailTerbaru?->libur_mingguan;
+      $liburDow  = collect(is_array($liburNama) && $liburNama ? $liburNama : ['Minggu'])
+        ->map(fn($nama) => $petaHari[$nama] ?? null)
+        ->filter(fn($d) => $d !== null)
+        ->all();
+
+      $efektifPerSekolah[$sekolah->id] = $daftarTanggal
+        ->filter(fn($tgl) => !isset($tanggalLibur[$tgl])
+          && !in_array(Carbon::parse($tgl)->dayOfWeek, $liburDow, true))
+        ->values();
+    }
+
+    // Angka hari efektif untuk tampilan: gabungan tanggal efektif
+    // sekolah-sekolah pada rombel aktif
+    $hariEfektif = collect($efektifPerSekolah)
+      ->only($rombelAktif->pluck('sekolah_id')->unique()->all())
+      ->flatten()
+      ->unique()
+      ->count();
 
     // Hitungan status per (siswa, rombel)
     $hitungan = [];
@@ -495,7 +556,8 @@ class PresensiController extends Controller
       $interval = ($registrasi->get($siswa->id) ?? collect())
         ->filter(fn($r) => (int) $r->sekolah_id === (int) $rombel->sekolah_id);
 
-      $berhak = $hariEfektif->filter(function ($tgl) use ($mulai, $selesai, $interval) {
+      $tanggalEfektif = $efektifPerSekolah[$rombel->sekolah_id] ?? collect();
+      $berhak = $tanggalEfektif->filter(function ($tgl) use ($mulai, $selesai, $interval) {
         if ($tgl < $mulai || $tgl > $selesai) {
           return false;
         }
@@ -521,7 +583,7 @@ class PresensiController extends Controller
         'alpa'   => $a,
         'belum'  => $belum,
         'berhak' => $berhak,
-        'persen' => $berhak > 0 ? round($h / $berhak * 100, 1) : 0,
+        'persen' => $berhak > 0 ? min(100, round($h / $berhak * 100, 1)) : 0,
       ];
     }
 
@@ -546,7 +608,7 @@ class PresensiController extends Controller
         'izin'   => $kumpulan->sum('izin'),
         'alpa'   => $kumpulan->sum('alpa'),
         'belum'  => $kumpulan->sum('belum'),
-        'persen' => $berhak > 0 ? round($h / $berhak * 100, 1) : 0,
+        'persen' => $berhak > 0 ? min(100, round($h / $berhak * 100, 1)) : 0,
       ];
     };
 
@@ -572,7 +634,7 @@ class PresensiController extends Controller
       'tpDipilih'       => $tpDipilih,
       'rombelCakupan'   => $rombelCakupan,
       'rombelDipilih'   => $rombelDipilih,
-      'hariEfektif'     => $hariEfektif->count(),
+      'hariEfektif'     => $hariEfektif,
       'perSiswa'        => $perSiswa,
       'perKelas'        => $perKelas,
       'total'           => $total,
