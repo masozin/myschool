@@ -704,16 +704,18 @@
         });
 
         dtAnggota.on('draw.dt', function() {
-          const info = dtAnggota.page.info();
           const checkAll = document.getElementById('check-all-anggota');
           if (checkAll) checkAll.checked = false;
           segarkanTombolMassal();
+          // Indeks dari column().nodes() sudah posisi global pada
+          // urutan tampil — JANGAN ditambah info.start lagi, karena
+          // halaman 2 dst akan kelebihan satu halaman penuh
           dtAnggota.column(1, {
               search: 'applied',
               order: 'applied'
             })
             .nodes().each((cell, i) => {
-              cell.innerHTML = i + 1 + info.start;
+              cell.innerHTML = i + 1;
             });
         });
       }

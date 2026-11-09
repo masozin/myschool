@@ -371,7 +371,8 @@
 
         if (window.dtPtk) {
           window.dtPtk.on('draw.dt', function() {
-            let info = window.dtPtk.page.info();
+            // Indeks dari column().nodes() sudah posisi global pada
+            // urutan tampil — jangan ditambah info.start lagi
             window.dtPtk
               .column(0, {
                 search: 'applied',
@@ -379,7 +380,7 @@
               })
               .nodes()
               .each(function(cell, i) {
-                cell.innerHTML = i + 1 + info.start;
+                cell.innerHTML = i + 1;
               });
           });
         }
