@@ -57,7 +57,7 @@ class SklKonfigurasiController extends Controller
     $konfigurasi = SklKonfigurasi::firstOrDefault($sekolahId, $semesterId);
 
     // Mode input terkunci setelah ada SKL pertama dibuat,
-    // tapi tempat/tanggal/prefix tetap bisa diubah kapan saja
+    // tapi tempat/tanggal tetap bisa diubah kapan saja
     if ($konfigurasi->is_terkunci && $request->filled('mode_input')) {
       if ($request->expectsJson()) {
         return response()->json([
@@ -67,7 +67,7 @@ class SklKonfigurasiController extends Controller
       return back()->withErrors(['mode_input' => 'Mode input sudah terkunci.']);
     }
 
-    $updateData = $request->only(['tempat_terbit', 'tanggal_terbit', 'prefix_nomor']);
+    $updateData = $request->only(['tempat_terbit', 'tanggal_terbit']);
 
     if (!$konfigurasi->is_terkunci && $request->filled('mode_input')) {
       $updateData['mode_input'] = $request->mode_input;
