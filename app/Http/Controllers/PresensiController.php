@@ -197,7 +197,10 @@ class PresensiController extends Controller
         'nisn'          => $a->siswa->nisn,
         'photo'         => $a->siswa->photo,
         'jenis_kelamin' => $a->siswa->jenis_kelamin,
-        'status'        => $existing->status ?? Presensi::STATUS_HADIR,
+        // Belum tercatat = null (bukan bawaan hadir): kartu tampil
+        // tanpa status terpilih sampai guru memilihnya sendiri
+        // atau menekan "Semua Hadir"
+        'status'        => $existing->status ?? null,
         'keterangan' => $existing->keterangan ?? null,
         // Jejak pengubah: input_by selama ini sudah mencatat
         // pengisi/pengubah terakhir, kini ikut ditampilkan

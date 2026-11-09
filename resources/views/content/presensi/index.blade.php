@@ -87,12 +87,6 @@
             </button>
           </div>
         </div>
-        <div class="col-12 col-md-3">
-          <button type="submit" id="btn_tampilkan" class="btn btn-primary w-100"
-            @if (!$semester) disabled @endif>
-            <i class="ri ri-search-line me-1"></i> Tampilkan
-          </button>
-        </div>
       </form>
       @hasanyrole('Operator Sekolah')
         <div class="d-flex justify-content-end mt-3">
@@ -111,7 +105,7 @@
   <div id="state_kosong" class="card">
     <div class="card-body text-center py-5 text-muted">
       <i class="ri ri-file-list-3-line ri-2x mb-2 d-block"></i>
-      Silakan pilih rombel dan tanggal, lalu klik "Tampilkan".
+      Pilih rombel dan tanggal — daftar siswa tampil otomatis.
     </div>
   </div>
 
@@ -321,7 +315,7 @@
           const kartu = document.createElement('div');
           kartu.className = 'list-group-item kartu-siswa py-3';
           kartu.dataset.siswaId = s.siswa_id;
-          kartu.dataset.status = s.status;
+          kartu.dataset.status = s.status || '';
           kartu.dataset.nama = (s.nama_siswa || '').toLowerCase();
 
           const avatar = s.photo ?
@@ -380,8 +374,10 @@
         document.getElementById('jml_izin').textContent = hitung.izin;
         document.getElementById('jml_sakit').textContent = hitung.sakit;
         document.getElementById('jml_alpa').textContent = hitung.alpa;
+        const belumDipilih = total - (hitung.hadir + hitung.izin + hitung.sakit + hitung.alpa);
         infoTerisi.textContent =
-          `${total} siswa • ${hitung.hadir} hadir, ${hitung.izin + hitung.sakit + hitung.alpa} tidak hadir`;
+          `${total} siswa • ${hitung.hadir} hadir, ${hitung.izin + hitung.sakit + hitung.alpa} tidak hadir` +
+          (belumDipilih > 0 ? `, ${belumDipilih} belum dipilih` : '');
       }
 
       // Mode pantau (Kepala Sekolah/Admin) atau di luar jendela
@@ -472,6 +468,18 @@
         }
       });
 
+      // ── Filter berubah = langsung muat, tanpa tombol Tampilkan ──
+      const filterRombelEl = document.getElementById('filter_rombel');
+      const filterTanggalEl = document.getElementById('filter_tanggal');
+      function muatBilaLengkap() {
+        if (filterRombelEl.value && filterTanggalEl.value) {
+          formFilter.requestSubmit();
+        }
+      }
+      filterRombelEl.addEventListener('change', muatBilaLengkap);
+      filterTanggalEl.addEventListener('change', muatBilaLengkap);
+      muatBilaLengkap();
+
       // ── Tandai semua hadir ─────────────────────────────────────────────
       btnHadirSemua.addEventListener('click', function() {
         daftarSiswa.querySelectorAll('.kartu-siswa')
@@ -502,12 +510,20 @@
         const presensi = [];
 
         daftarSiswa.querySelectorAll('.kartu-siswa').forEach(k => {
+          // Siswa yang belum dipilih statusnya TIDAK dikirim —
+          // ia memang belum absen, bukan alpa dan bukan hadir
+          if (!k.dataset.status) return;
           presensi.push({
             siswa_id: k.dataset.siswaId,
-            status: k.dataset.status || 'alpa',
+            status: k.dataset.status,
             keterangan: k.querySelector('.keterangan-input').value.trim() || null,
           });
         });
+
+        if (presensi.length === 0) {
+          Swal.fire('Belum ada isian', 'Pilih status minimal satu siswa terlebih dahulu, atau gunakan tombol Semua Hadir.', 'warning');
+          return;
+        }
 
         btnSimpan.disabled = true;
         btnSimpan.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
