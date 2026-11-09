@@ -26,7 +26,7 @@
           </div>
           <div>
             <h4 class="mb-1">Presensi Siswa</h4>
-            <span class="text-muted">Pilih rombel dan tanggal untuk mulai mengisi presensi harian.</span>
+            <span class="text-muted">Pilih rombel, lalu klik tanggal pada kalender untuk mengisi presensi harian.</span>
             @if ($semester)
               <div class="mt-1">
                 <span class="badge bg-label-primary">
@@ -47,57 +47,66 @@
     </div>
   </div>
 
-  <div class="d-flex justify-content-end mb-4">
+  <div class="d-flex justify-content-end gap-2 mb-4">
+    @hasanyrole('Operator Sekolah')
+      <button type="button" class="btn btn-label-secondary" data-bs-toggle="modal"
+        data-bs-target="#modal-pengaturan-presensi">
+        <i class="ri ri-settings-3-line me-1"></i> Pengaturan Presensi
+      </button>
+    @endhasanyrole
     <a href="{{ route('presensi.rekap') }}" class="btn btn-label-primary">
       <i class="ri ri-bar-chart-2-line me-1"></i> Rekap Presensi
     </a>
   </div>
 
   {{-- =========================================================== --}}
-  {{-- FILTER: PILIH ROMBEL + TANGGAL                               --}}
+  {{-- BADAN: KIRI = ROMBEL + KALENDER + KEGIATAN                     --}}
+  {{--        KANAN = DAFTAR SISWA & INPUT PRESENSI                   --}}
   {{-- =========================================================== --}}
-  <div class="card mb-4">
-    <div class="card-body">
-      <form id="form_filter" class="row g-3 align-items-end">
-        <div class="col-12 col-md-5">
-          <label for="filter_rombel" class="form-label">Rombel</label>
-          <select id="filter_rombel" name="rombel_id" class="form-select">
-            <option value="">Pilih rombel</option>
-            @foreach ($rombelList as $r)
-              <option value="{{ $r->id }}" {{ (int) request('rombel_id') === $r->id ? 'selected' : '' }}>{{ $r->nama_rombel }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="col-12 col-md-4">
-          <label for="filter_tanggal" class="form-label">Tanggal</label>
-          <div class="input-group">
-            <button type="button" class="btn btn-outline-secondary" id="btn_tgl_kurang" title="Hari sebelumnya"
-              @if (!$semester) disabled @endif>
+  <div class="row g-4">
+    <div class="col-12 col-lg-4">
+      <div class="card">
+        <div class="card-body">
+          <form id="form_filter">
+            <label for="filter_rombel" class="form-label">Rombel</label>
+            <select id="filter_rombel" name="rombel_id" class="form-select">
+              <option value="">Pilih rombel</option>
+              @foreach ($rombelList as $r)
+                <option value="{{ $r->id }}" {{ (int) request('rombel_id') === $r->id ? 'selected' : '' }}>{{ $r->nama_rombel }}</option>
+              @endforeach
+            </select>
+            <input type="hidden" id="filter_tanggal" name="tanggal"
+              value="{{ now()->between(optional($semester)->tanggal_mulai, optional($semester)->tanggal_selesai) ? now()->format('Y-m-d') : optional($semester)->tanggal_mulai?->format('Y-m-d') }}">
+          </form>
+
+          <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+            <button type="button" class="btn btn-icon btn-sm btn-outline-secondary" id="btn_bulan_kurang"
+              title="Bulan sebelumnya">
               <i class="ri ri-arrow-left-s-line"></i>
             </button>
-            <input type="date" id="filter_tanggal" name="tanggal" class="form-control"
-              value="{{ now()->between(optional($semester)->tanggal_mulai, optional($semester)->tanggal_selesai) ? now()->format('Y-m-d') : optional($semester)->tanggal_mulai?->format('Y-m-d') }}"
-              @if ($semester) min="{{ $semester->tanggal_mulai->format('Y-m-d') }}"
-                max="{{ $semester->tanggal_selesai->format('Y-m-d') }}"
-              @else
-                disabled @endif>
-            <button type="button" class="btn btn-outline-secondary" id="btn_tgl_tambah" title="Hari berikutnya"
-              @if (!$semester) disabled @endif>
+            <span class="fw-semibold" id="judul_bulan">-</span>
+            <button type="button" class="btn btn-icon btn-sm btn-outline-secondary" id="btn_bulan_tambah"
+              title="Bulan berikutnya">
               <i class="ri ri-arrow-right-s-line"></i>
             </button>
           </div>
+          <div class="kal-hari-nama">
+            <span>Min</span><span>Sen</span><span>Sel</span><span>Rab</span>
+            <span>Kam</span><span>Jum</span><span>Sab</span>
+          </div>
+          <div id="kalender_grid"></div>
+          <div class="form-text mt-2">
+            Tanggal libur (kalender pendidikan / libur mingguan sekolah) dan tanggal yang
+            belum berjalan tidak dapat dipilih.
+          </div>
+
+          <h6 class="mt-4 mb-2">Kegiatan Bulan Ini</h6>
+          <ul class="list-unstyled mb-0 small" id="daftar_kegiatan"></ul>
         </div>
-      </form>
-      @hasanyrole('Operator Sekolah')
-        <div class="d-flex justify-content-end mt-3">
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
-            data-bs-target="#modal-pengaturan-presensi">
-            <i class="ri ri-settings-3-line me-1"></i> Pengaturan Presensi
-          </button>
-        </div>
-      @endhasanyrole
+      </div>
     </div>
-  </div>
+
+    <div class="col-12 col-lg-8">
 
   {{-- =========================================================== --}}
   {{-- STATE: BELUM DIPILIH                                         --}}
@@ -105,7 +114,7 @@
   <div id="state_kosong" class="card">
     <div class="card-body text-center py-5 text-muted">
       <i class="ri ri-file-list-3-line ri-2x mb-2 d-block"></i>
-      Pilih rombel dan tanggal — daftar siswa tampil otomatis.
+      Klik tanggal pada kalender untuk menampilkan daftar siswa.
     </div>
   </div>
 
@@ -164,6 +173,61 @@
       bottom: 0;
       z-index: 6;
       background-color: var(--bs-card-bg, #fff);
+    }
+
+    /* Kalender sebulan pada panel kiri presensi */
+    .kal-hari-nama,
+    .kal-baris {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+
+    .kal-hari-nama span {
+      text-align: center;
+      font-size: 11px;
+      color: var(--bs-secondary-color);
+      padding: 2px 0;
+    }
+
+    .kal-baris {
+      margin-top: 4px;
+    }
+
+    .kal-sel {
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 6px;
+      padding: 6px 0;
+      font-size: 13px;
+      text-align: center;
+      color: var(--bs-body-color);
+      width: 100%;
+    }
+
+    button.kal-sel:hover {
+      border-color: var(--bs-primary);
+    }
+
+    .kal-sel:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .kal-sel.libur {
+      color: var(--bs-danger);
+    }
+
+    .kal-sel.terpilih {
+      background-color: var(--bs-primary);
+      border-color: var(--bs-primary);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .kal-sel.hari-ini {
+      border-color: var(--bs-primary);
+      font-weight: 600;
     }
   </style>
 
@@ -228,6 +292,9 @@
       -
     </div>
   </div>
+
+    </div>{{-- /.col-lg-8 --}}
+  </div>{{-- /.row --}}
 
   {{-- =========================================================== --}}
   {{-- MODAL: PENGATURAN PRESENSI (Operator Sekolah)                --}}
@@ -468,7 +535,7 @@
         }
       });
 
-      // ── Filter berubah = langsung muat, tanpa tombol Tampilkan ──
+      // ── Filter & kalender ──────────────────────────────────────
       const filterRombelEl = document.getElementById('filter_rombel');
       const filterTanggalEl = document.getElementById('filter_tanggal');
       function muatBilaLengkap() {
@@ -476,8 +543,142 @@
           formFilter.requestSubmit();
         }
       }
-      filterRombelEl.addEventListener('change', muatBilaLengkap);
-      filterTanggalEl.addEventListener('change', muatBilaLengkap);
+      filterRombelEl.addEventListener('change', function() {
+        renderKalender();
+        muatBilaLengkap();
+      });
+
+      // ── Kalender sebulan ───────────────────────────────────────
+      // Data dari server: kegiatan Kalender Pendidikan sepanjang
+      // semester sesi dan libur mingguan per rombel. Tanggal libur
+      // (keduanya), tanggal masa depan, dan tanggal di luar
+      // rentang semester tidak dapat diklik.
+      const KEGIATAN_SEMESTER = {!! json_encode($kegiatanSemester->map(fn($k) => [
+        'kegiatan' => $k->kegiatan,
+        'mulai' => $k->tanggal_mulai->format('Y-m-d'),
+        'selesai' => $k->tanggal_selesai->format('Y-m-d'),
+        'libur' => (bool) $k->is_libur,
+      ])->values()) !!};
+      const LIBUR_MINGGUAN = {!! json_encode($liburMingguanPerRombel) !!};
+      const SEMESTER_MULAI = '{{ $semester?->tanggal_mulai?->format('Y-m-d') }}';
+      const SEMESTER_SELESAI = '{{ $semester?->tanggal_selesai?->format('Y-m-d') }}';
+      const HARI_INI = '{{ now()->format('Y-m-d') }}';
+
+      const gridKalender = document.getElementById('kalender_grid');
+      const judulBulan = document.getElementById('judul_bulan');
+      const btnBulanKurang = document.getElementById('btn_bulan_kurang');
+      const btnBulanTambah = document.getElementById('btn_bulan_tambah');
+      const daftarKegiatanEl = document.getElementById('daftar_kegiatan');
+
+      function fmtTgl(d) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+
+      // Himpunan tanggal libur kalender pendidikan (rentang diperluas per hari)
+      const SET_LIBUR = new Set();
+      KEGIATAN_SEMESTER.filter(k => k.libur).forEach(k => {
+        const d = new Date(k.mulai + 'T00:00:00');
+        const akhir = new Date(k.selesai + 'T00:00:00');
+        while (d <= akhir) {
+          SET_LIBUR.add(fmtTgl(d));
+          d.setDate(d.getDate() + 1);
+        }
+      });
+
+      let bulanTampil = (() => {
+        const awal = new Date((filterTanggalEl.value || HARI_INI) + 'T00:00:00');
+        return new Date(awal.getFullYear(), awal.getMonth(), 1);
+      })();
+
+      function renderKegiatanBulan(kunciBulan) {
+        const awalBulan = kunciBulan + '-01';
+        const akhirBulan = fmtTgl(new Date(bulanTampil.getFullYear(), bulanTampil.getMonth() + 1, 0));
+        const daftar = KEGIATAN_SEMESTER.filter(k => k.mulai <= akhirBulan && k.selesai >= awalBulan);
+
+        if (daftar.length === 0) {
+          daftarKegiatanEl.innerHTML = '<li class="text-muted">Tidak ada kegiatan tercatat pada bulan ini.</li>';
+          return;
+        }
+
+        const fmtSingkat = kunci => new Date(kunci + 'T00:00:00')
+          .toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short'
+          });
+        daftarKegiatanEl.innerHTML = daftar.map(k => `
+          <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+            <span>${k.kegiatan}</span>
+            <span class="text-nowrap text-muted">${fmtSingkat(k.mulai)}${k.selesai !== k.mulai ? ' – ' + fmtSingkat(k.selesai) : ''}${k.libur ? ' • Libur' : ''}</span>
+          </li>`).join('');
+      }
+
+      function renderKalender() {
+        const y = bulanTampil.getFullYear();
+        const m = bulanTampil.getMonth();
+        const kunciBulan = `${y}-${String(m + 1).padStart(2, '0')}`;
+        judulBulan.textContent = bulanTampil.toLocaleDateString('id-ID', {
+          month: 'long',
+          year: 'numeric'
+        });
+
+        const dowLibur = LIBUR_MINGGUAN[filterRombelEl.value] ?? [0];
+        const offsetAwal = new Date(y, m, 1).getDay();
+        const jumlahHari = new Date(y, m + 1, 0).getDate();
+        const totalSel = Math.ceil((offsetAwal + jumlahHari) / 7) * 7;
+
+        let html = '';
+        for (let i = 0; i < totalSel; i++) {
+          if (i % 7 === 0) html += '<div class="kal-baris">';
+          const tgl = i - offsetAwal + 1;
+          if (tgl < 1 || tgl > jumlahHari) {
+            html += '<span></span>';
+          } else {
+            const d = new Date(y, m, tgl);
+            const kunci = fmtTgl(d);
+            const liburKaldik = SET_LIBUR.has(kunci);
+            const liburMingguan = dowLibur.includes(d.getDay());
+            const terlarang = kunci < SEMESTER_MULAI || kunci > SEMESTER_SELESAI ||
+              kunci > HARI_INI || liburKaldik || liburMingguan;
+            const kelas = ['kal-sel'];
+            if (liburKaldik || liburMingguan) kelas.push('libur');
+            if (kunci === filterTanggalEl.value) kelas.push('terpilih');
+            if (kunci === HARI_INI) kelas.push('hari-ini');
+            const alasan = liburKaldik ? 'Libur kalender pendidikan' :
+              liburMingguan ? 'Libur mingguan sekolah' :
+              kunci > HARI_INI ? 'Tanggal belum berjalan' : 'Di luar rentang semester';
+            html += terlarang ?
+              `<button type="button" class="${kelas.join(' ')}" disabled title="${alasan}">${tgl}</button>` :
+              `<button type="button" class="${kelas.join(' ')}" data-tanggal="${kunci}">${tgl}</button>`;
+          }
+          if (i % 7 === 6) html += '</div>';
+        }
+        gridKalender.innerHTML = html;
+
+        btnBulanKurang.disabled = kunciBulan <= SEMESTER_MULAI.slice(0, 7);
+        const bulanTerakhir = SEMESTER_SELESAI.slice(0, 7) < HARI_INI.slice(0, 7) ?
+          SEMESTER_SELESAI.slice(0, 7) : HARI_INI.slice(0, 7);
+        btnBulanTambah.disabled = kunciBulan >= bulanTerakhir;
+
+        renderKegiatanBulan(kunciBulan);
+      }
+
+      gridKalender.addEventListener('click', function(e) {
+        const btn = e.target.closest('button[data-tanggal]');
+        if (!btn) return;
+        filterTanggalEl.value = btn.dataset.tanggal;
+        renderKalender();
+        muatBilaLengkap();
+      });
+      btnBulanKurang.addEventListener('click', function() {
+        bulanTampil.setMonth(bulanTampil.getMonth() - 1);
+        renderKalender();
+      });
+      btnBulanTambah.addEventListener('click', function() {
+        bulanTampil.setMonth(bulanTampil.getMonth() + 1);
+        renderKalender();
+      });
+
+      renderKalender();
       muatBilaLengkap();
 
       // ── Tandai semua hadir ─────────────────────────────────────────────
@@ -485,25 +686,6 @@
         daftarSiswa.querySelectorAll('.kartu-siswa')
           .forEach(k => aturStatus(k, 'hadir'));
       });
-
-      // ── Navigasi tanggal: sehari sebelum / sesudah ─────────────────────
-      function geserTanggal(selisih) {
-        const input = document.getElementById('filter_tanggal');
-        if (!input.value) return;
-
-        const t = new Date(input.value + 'T00:00:00');
-        t.setDate(t.getDate() + selisih);
-        const hasil = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-
-        if ((input.min && hasil < input.min) || (input.max && hasil > input.max)) return;
-        input.value = hasil;
-
-        if (document.getElementById('filter_rombel').value) {
-          formFilter.requestSubmit();
-        }
-      }
-      document.getElementById('btn_tgl_kurang')?.addEventListener('click', () => geserTanggal(-1));
-      document.getElementById('btn_tgl_tambah')?.addEventListener('click', () => geserTanggal(1));
 
       // ── Simpan presensi via AJAX ────────────────────────────────────────
       btnSimpan.addEventListener('click', async function() {
