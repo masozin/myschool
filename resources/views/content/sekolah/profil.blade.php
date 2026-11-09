@@ -93,7 +93,7 @@
         <div class="col-12">
           <label class="form-label fw-medium">Hari Libur Mingguan</label>
           <div class="d-flex flex-wrap gap-4">
-            @php $liburTerpilih = old('libur_mingguan', $detail->libur_mingguan ?? []); @endphp
+            @php $liburTerpilih = old('libur_mingguan', !empty($detail->libur_mingguan) ? $detail->libur_mingguan : ['Minggu']); @endphp
             @foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $hari)
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="libur_mingguan[]" value="{{ $hari }}"

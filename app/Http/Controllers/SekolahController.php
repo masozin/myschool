@@ -88,7 +88,7 @@ class SekolahController extends Controller
       'village'        => $detail->village_id ?? '',
       'alamat_sekolah' => $detail->alamat_sekolah ?? '',
       'fitur_aktif'   => $fiturAktif,
-      'libur_mingguan' => $detail->libur_mingguan ?? [],
+      'libur_mingguan' => !empty($detail->libur_mingguan) ? $detail->libur_mingguan : ['Minggu'],
     ]);
   }
 
@@ -214,7 +214,9 @@ class SekolahController extends Controller
         'alamat_sekolah' => $request->alamat_sekolah,
         'kepala_sekolah' => $request->kepala_sekolah,
         'nip'            => $request->nip,
-        'libur_mingguan' => $request->libur_mingguan ?? [],
+        // Sekolah baru: libur mingguan bawaan adalah Minggu bila
+        // tidak ada hari yang dipilih saat pembuatan
+        'libur_mingguan' => $request->libur_mingguan ?: ['Minggu'],
       ]);
 
       // C. Jika semua oke, simpan permanen

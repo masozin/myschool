@@ -33,7 +33,8 @@ class PresensiController extends Controller
     // Daftar rombel mengikuti peran: Guru hanya rombel wali
     // kelasnya, Operator & Kepala Sekolah rombel sekolahnya,
     // Admin semua rombel semester sesi (memantau lintas sekolah)
-    $rombelList = Rombel::where('semester_id', session('semester_id'))
+    $rombelList = Rombel::with('sekolah.detailTerbaru')
+      ->where('semester_id', session('semester_id'))
       ->when(
         $user->hasRole('Guru') && !$user->hasAnyRole(['Operator Sekolah', 'Admin']),
         fn($q) => $q->where('ptk_id', $user->ptk?->id)
@@ -48,7 +49,66 @@ class PresensiController extends Controller
     $semester     = Semester::find(session('semester_id'));
     $batasKoreksi = PresensiPengaturan::batasUntuk($user->ptk?->sekolah_id);
 
-    return view('content.presensi.index', compact('rombelList', 'semester', 'batasKoreksi'));
+    // Data kalender sebulan pada halaman presensi: seluruh
+    // kegiatan Kalender Pendidikan yang bersinggungan dengan
+    // rentang semester sesi — untuk menandai hari libur pada
+    // kalender dan daftar kegiatan per bulan
+    $kegiatanSemester = $semester
+      ? KalenderPendidikan::whereDate('tanggal_mulai', '<=', $semester->tanggal_selesai)
+        ->whereDate('tanggal_selesai', '>=', $semester->tanggal_mulai)
+        ->orderBy('tanggal_mulai')
+        ->get()
+      : collect();
+
+    // Libur mingguan per rombel, dari detail sekolah pemilik
+    // rombel, sebagai nomor hari (0=Minggu s/d 6=Sabtu).
+    // Bawaan Minggu bila sekolah belum mengaturnya.
+    $petaNamaHari = [
+      'Minggu' => 0, 'Senin' => 1, 'Selasa' => 2, 'Rabu' => 3,
+      'Kamis' => 4, 'Jumat' => 5, 'Sabtu' => 6,
+    ];
+    $liburMingguanPerRombel = $rombelList->mapWithKeys(function ($r) use ($petaNamaHari) {
+      $namaHari = $r->sekolah?->detailTerbaru?->libur_mingguan;
+      $dow = collect(is_array($namaHari) && $namaHari ? $namaHari : ['Minggu'])
+        ->map(fn($n) => $petaNamaHari[$n] ?? null)
+        ->filter(fn($d) => $d !== null)
+        ->values()
+        ->all();
+
+      return [$r->id => $dow];
+    });
+
+    return view('content.presensi.index', compact(
+      'rombelList',
+      'semester',
+      'batasKoreksi',
+      'kegiatanSemester',
+      'liburMingguanPerRombel'
+    ));
+  }
+
+  /**
+   * Tanggal yang tidak boleh dipresensi selain hari libur
+   * Kalender Pendidikan: tanggal yang belum berjalan (masa
+   * depan) dan hari libur mingguan sekolah pemilik rombel.
+   * Mengembalikan pesan penolakan, atau null bila tanggal
+   * boleh dipakai.
+   */
+  private function penolakanTanggal(Rombel $rombel, Carbon $tanggal): ?string
+  {
+    if ($tanggal->copy()->startOfDay()->gt(now()->startOfDay())) {
+      return 'Tanggal belum berjalan — presensi hanya dapat diisi untuk hari ini dan hari-hari sebelumnya.';
+    }
+
+    $namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][$tanggal->dayOfWeek];
+    $liburNama = $rombel->sekolah?->detailTerbaru?->libur_mingguan;
+    $liburNama = is_array($liburNama) && $liburNama ? $liburNama : ['Minggu'];
+
+    if (in_array($namaHari, $liburNama, true)) {
+      return 'Tanggal ini hari libur mingguan sekolah (' . $namaHari . ') — presensi tidak dapat diisi.';
+    }
+
+    return null;
   }
 
   /**
@@ -159,6 +219,15 @@ class PresensiController extends Controller
       return response()->json([
         'success' => false,
         'message' => 'Rombel ini bukan rombel semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester . '.',
+      ], 422);
+    }
+
+    // Tanggal masa depan dan libur mingguan sekolah tidak dapat
+    // dibuka untuk presensi (sama seperti libur kalender di atas)
+    if ($pesan = $this->penolakanTanggal($rombel, $tanggal)) {
+      return response()->json([
+        'success' => false,
+        'message' => $pesan,
       ], 422);
     }
 
@@ -320,6 +389,15 @@ class PresensiController extends Controller
       return response()->json([
         'success' => false,
         'message' => 'Rombel ini bukan rombel semester ' . $semester->tahun_pelajaran . ' - ' . $semester->semester . '.',
+      ], 422);
+    }
+
+    // Tanggal masa depan dan libur mingguan sekolah ditolak di
+    // server juga, bukan hanya disembunyikan di tampilan
+    if ($pesan = $this->penolakanTanggal($rombel, $tanggal)) {
+      return response()->json([
+        'success' => false,
+        'message' => $pesan,
       ], 422);
     }
 
