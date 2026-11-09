@@ -9,6 +9,7 @@ use App\Models\RombelAnggota;
 use App\Models\Semester;
 use App\Models\SiswaRegistrasi;
 use App\Models\KalenderPendidikan;
+use App\Support\PresensiLayanan;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
@@ -96,19 +97,7 @@ class PresensiController extends Controller
    */
   private function penolakanTanggal(Rombel $rombel, Carbon $tanggal): ?string
   {
-    if ($tanggal->copy()->startOfDay()->gt(now()->startOfDay())) {
-      return 'Tanggal belum berjalan — presensi hanya dapat diisi untuk hari ini dan hari-hari sebelumnya.';
-    }
-
-    $namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][$tanggal->dayOfWeek];
-    $liburNama = $rombel->sekolah?->detailTerbaru?->libur_mingguan;
-    $liburNama = is_array($liburNama) && $liburNama ? $liburNama : ['Minggu'];
-
-    if (in_array($namaHari, $liburNama, true)) {
-      return 'Tanggal ini hari libur mingguan sekolah (' . $namaHari . ') — presensi tidak dapat diisi.';
-    }
-
-    return null;
+    return PresensiLayanan::penolakanTanggal($rombel, $tanggal);
   }
 
   /**
@@ -118,21 +107,7 @@ class PresensiController extends Controller
    */
   private function bolehLihat(Rombel $rombel): bool
   {
-    $user = Auth::user();
-
-    if ($user->hasRole('Admin')) {
-      return true;
-    }
-
-    if ($user->hasAnyRole(['Operator Sekolah', 'Kepala Sekolah'])) {
-      return (int) $rombel->sekolah_id === (int) $user->ptk?->sekolah_id;
-    }
-
-    if ($user->hasRole('Guru')) {
-      return (int) $rombel->ptk_id === (int) $user->ptk?->id;
-    }
-
-    return false;
+    return PresensiLayanan::bolehLihat(Auth::user(), $rombel);
   }
 
   /**
@@ -142,17 +117,7 @@ class PresensiController extends Controller
    */
   private function bolehIsi(Rombel $rombel): bool
   {
-    $user = Auth::user();
-
-    if ($user->hasRole('Operator Sekolah')) {
-      return (int) $rombel->sekolah_id === (int) $user->ptk?->sekolah_id;
-    }
-
-    if ($user->hasRole('Guru')) {
-      return (int) $rombel->ptk_id === (int) $user->ptk?->id;
-    }
-
-    return false;
+    return PresensiLayanan::bolehIsi(Auth::user(), $rombel);
   }
 
   /**
@@ -162,9 +127,7 @@ class PresensiController extends Controller
    */
   private function dalamJendelaKoreksi(Rombel $rombel, Carbon $tanggal): bool
   {
-    $batas = PresensiPengaturan::batasUntuk((int) $rombel->sekolah_id);
-
-    return $tanggal->gte(now()->startOfDay()->subDays($batas));
+    return PresensiLayanan::dalamJendelaKoreksi($rombel, $tanggal);
   }
 
   /**
@@ -307,22 +270,7 @@ class PresensiController extends Controller
    */
   private function roster(Rombel $rombel, Carbon $tanggal)
   {
-    return RombelAnggota::with('siswa')
-      ->where('rombel_id', $rombel->id)
-      ->whereHas('siswa', function ($q) use ($rombel, $tanggal) {
-        $q->whereHas('siswaRegistrasi', function ($qr) use ($rombel, $tanggal) {
-          $qr->where('sekolah_id', $rombel->sekolah_id)
-            ->where(function ($qw) use ($tanggal) {
-              $qw->whereNull('tanggal_diterima')
-                ->orWhereDate('tanggal_diterima', '<=', $tanggal);
-            })
-            ->where(function ($qw) use ($tanggal) {
-              $qw->whereNull('tanggal_keluar')
-                ->orWhereDate('tanggal_keluar', '>=', $tanggal);
-            });
-        });
-      })
-      ->get();
+    return PresensiLayanan::roster($rombel, $tanggal);
   }
 
   /**
