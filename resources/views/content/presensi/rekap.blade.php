@@ -3,11 +3,11 @@
 @section('title', 'Rekap Presensi')
 
 @section('vendor-style')
-  @vite(['resources/assets/vendor/libs/apex-charts/apex-charts.scss'])
+  @vite(['resources/assets/vendor/libs/apex-charts/apex-charts.scss', 'resources/assets/vendor/libs/datatables-bs5/datatables.bootstrap5.scss', 'resources/assets/vendor/libs/datatables-responsive-bs5/responsive.bootstrap5.scss'])
 @endsection
 
 @section('vendor-script')
-  @vite(['resources/assets/vendor/libs/apex-charts/apexcharts.js'])
+  @vite(['resources/assets/vendor/libs/apex-charts/apexcharts.js', 'resources/assets/vendor/libs/datatables-bs5/datatables-bootstrap5.js'])
 @endsection
 
 @section('content')
@@ -191,7 +191,7 @@
         <h5 class="mb-0">Rekap per Kelas</h5>
       </div>
       <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0" id="tabel_rekap_kelas">
           <thead class="table-light">
             <tr>
               <th>Kelas</th>
@@ -214,7 +214,7 @@
                 <td class="text-center">{{ $k['izin'] }}</td>
                 <td class="text-center">{{ $k['alpa'] }}</td>
                 <td class="text-center">{{ $k['belum'] }}</td>
-                <td>
+                <td data-order="{{ $k['persen'] }}">
                   <div class="d-flex align-items-center gap-2">
                     <div class="progress flex-grow-1" style="height:8px;">
                       <div class="progress-bar bg-success" style="width:{{ $k['persen'] }}%"></div>
@@ -249,7 +249,7 @@
         <h5 class="mb-0">Rekap per Siswa</h5>
       </div>
       <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0" id="tabel_rekap_siswa">
           <thead class="table-light">
             <tr>
               <th style="width:40px;" class="text-center">#</th>
@@ -279,7 +279,7 @@
                 <td class="text-center">{{ $r['izin'] }}</td>
                 <td class="text-center">{{ $r['alpa'] }}</td>
                 <td class="text-center">{{ $r['belum'] }}</td>
-                <td>
+                <td data-order="{{ $r['persen'] }}">
                   <div class="d-flex align-items-center gap-2">
                     <div class="progress flex-grow-1" style="height:8px;">
                       <div class="progress-bar bg-success" style="width:{{ $r['persen'] }}%"></div>
@@ -363,6 +363,47 @@
               formatter: v => v + '%'
             },
           }).render();
+        }
+      }
+
+      // ── Tabel rekap bisa diurutkan per kolom ───────────────────
+      // Tanpa paging/pencarian: urutan bawaan dari server dipertahankan
+      // (order: []), pengguna bebas klik judul kolom untuk mengurutkan.
+      // Kolom % memakai data-order angka agar tidak terurut sebagai teks.
+      if (window.jQuery && $.fn.DataTable) {
+        const elKelas = document.getElementById('tabel_rekap_kelas');
+        if (elKelas) {
+          $(elKelas).DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            order: [],
+          });
+        }
+
+        const elSiswa = document.getElementById('tabel_rekap_siswa');
+        if (elSiswa) {
+          const dtSiswa = $(elSiswa).DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            order: [],
+            columnDefs: [{
+              targets: 0,
+              orderable: false,
+              searchable: false
+            }],
+          });
+          // Nomor baris mengikuti urutan tampil setelah diurutkan
+          dtSiswa.on('draw.dt', function() {
+            dtSiswa.rows({
+                order: 'applied',
+                search: 'applied'
+              })
+              .nodes().each(function(row, i) {
+                row.cells[0].innerHTML = i + 1;
+              });
+          });
         }
       }
     });
