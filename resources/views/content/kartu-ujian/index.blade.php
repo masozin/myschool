@@ -111,13 +111,10 @@
           </div>
           <div class="col-12 col-md-4">
             <div class="form-floating form-floating-outline">
-              <input type="text" name="pola_nomor" class="form-control" required maxlength="60"
-                value="{{ old('pola_nomor', '{t}-{no:3}') }}">
-              <label for="pola_nomor">Pola Nomor Peserta</label>
+              <input type="text" name="tahun_pelajaran" class="form-control" required maxlength="20"
+                value="{{ old('tahun_pelajaran', $bawaan['tahun_pelajaran']) }}">
+              <label for="tahun_pelajaran">Tahun Pelajaran</label>
             </div>
-            <small class="text-muted">Token: <code>{no}</code> nomor urut, <code>{no:3}</code> 3 digit,
-              <code>{t}</code> tingkat, <code>{tahun}</code> tahun. Contoh: <code>PS-{t}-{no:3}</code> →
-              PS-6-007.</small>
           </div>
           <div class="col-12 col-md-4">
             <div class="form-floating form-floating-outline">
@@ -134,12 +131,66 @@
 
         <div class="row g-3 mt-1">
           <div class="col-12 col-md-6">
+            <div class="form-floating form-floating-outline">
+              <input type="text" name="pola_nomor" class="form-control" required maxlength="60"
+                value="{{ old('pola_nomor', '{t}-{no:3}') }}">
+              <label for="pola_nomor">Pola Nomor Peserta</label>
+            </div>
+            <small class="text-muted">Token: <code>{no}</code> nomor urut, <code>{no:3}</code> 3 digit,
+              <code>{t}</code> tingkat, <code>{tahun}</code> tahun. Contoh: <code>PS-{t}-{no:3}</code> →
+              PS-6-007.</small>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="form-floating form-floating-outline">
+              <select name="logo_kiri" class="form-select">
+                <option value="pemda" {{ old('logo_kiri', 'pemda') === 'pemda' ? 'selected' : '' }}>Logo Pemda
+                </option>
+                <option value="sekolah" {{ old('logo_kiri') === 'sekolah' ? 'selected' : '' }}>Logo Sekolah</option>
+                <option value="twh" {{ old('logo_kiri') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
+                </option>
+                <option value="kosong" {{ old('logo_kiri') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
+              </select>
+              <label for="logo_kiri">Logo Kiri</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="form-floating form-floating-outline">
+              <select name="logo_kanan" class="form-select">
+                <option value="pemda" {{ old('logo_kanan') === 'pemda' ? 'selected' : '' }}>Logo Pemda</option>
+                <option value="sekolah" {{ old('logo_kanan', 'sekolah') === 'sekolah' ? 'selected' : '' }}>Logo
+                  Sekolah</option>
+                <option value="twh" {{ old('logo_kanan') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
+                </option>
+                <option value="kosong" {{ old('logo_kanan') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
+              </select>
+              <label for="logo_kanan">Logo Kanan</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-12">
+            <label class="form-label d-block">Urutan Field pada Kartu</label>
+          </div>
+          @foreach ([['nomor', 'Nomor', 1], ['rombel', 'Rombel', 2], ['ttl', 'TTL', 3], ['nis_nisn', 'NIS/NISN', 4]] as [$fk, $fl, $fu])
+            <div class="col-6 col-md-3">
+              <div class="form-floating form-floating-outline">
+                <select name="urutan_{{ $fk }}" class="form-select">
+                  @for ($i = 1; $i <= 4; $i++)
+                    <option value="{{ $i }}" {{ (int) old('urutan_' . $fk, $fu) === $i ? 'selected' : '' }}>
+                      {{ $i }}</option>
+                  @endfor
+                </select>
+                <label>{{ $fl }}</label>
+              </div>
+            </div>
+          @endforeach
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-12">
             <label class="form-label d-block">Tampilan Kartu</label>
             <div class="d-flex gap-4 flex-wrap">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="pakai_kop" id="pakai_kop" value="1" checked>
-                <label class="form-check-label" for="pakai_kop">Kop kartu sekolah</label>
-              </div>
               <div class="form-check">
                 <input type="checkbox" class="form-check-input" name="pakai_foto" id="pakai_foto" value="1" checked>
                 <label class="form-check-label" for="pakai_foto">Foto siswa</label>
@@ -152,36 +203,6 @@
                 <input type="checkbox" class="form-check-input" name="pakai_stempel" id="pakai_stempel" value="1"
                   checked>
                 <label class="form-check-label" for="pakai_stempel">Stempel</label>
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label d-block">Field yang Ditampilkan</label>
-            <div class="d-flex gap-4 flex-wrap">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_ttl" id="tampil_ttl" value="1" checked>
-                <label class="form-check-label" for="tampil_ttl">Tempat, tgl lahir</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_nis" id="tampil_nis" value="1" checked>
-                <label class="form-check-label" for="tampil_nis">NIS</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_nisn" id="tampil_nisn" value="1" checked>
-                <label class="form-check-label" for="tampil_nisn">NISN</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_kelas" id="tampil_kelas" value="1"
-                  checked>
-                <label class="form-check-label" for="tampil_kelas">Kelas</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_jk" id="tampil_jk" value="1">
-                <label class="form-check-label" for="tampil_jk">Jenis kelamin</label>
-              </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="tampil_agama" id="tampil_agama" value="1">
-                <label class="form-check-label" for="tampil_agama">Agama</label>
               </div>
             </div>
           </div>

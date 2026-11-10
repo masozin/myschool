@@ -41,80 +41,71 @@
     background: #ffffff;
   }
 
-  .kop-img {
+  /* ── Kepala kartu: logo — judul/sekolah/tahun — logo ── */
+  .kepala {
     width: 100%;
+    border-collapse: collapse;
+    border-bottom: 0.7mm double #0a3c6e;
+  }
+
+  .kepala td {
+    vertical-align: middle;
+    padding: 1.8mm 0 1.4mm 0;
+  }
+
+  .kepala-logo {
+    width: 14mm;
+    text-align: center;
+  }
+
+  .logo-kepala {
+    width: 11mm;
     height: 11mm;
-    object-fit: cover;
-    display: block;
+    object-fit: contain;
   }
 
   .kepala-teks {
     text-align: center;
-    padding: 2.2mm 4mm 1.6mm 4mm;
-    border-bottom: 0.55mm solid #0a3c6e;
   }
 
-  .kepala-teks .nama {
-    font-size: 9.5pt;
-    font-weight: bold;
-    color: #0a3c6e;
-    letter-spacing: 0.3pt;
-  }
-
-  .kepala-teks .npsn {
-    font-size: 6pt;
-    color: #4a5b70;
-    margin-top: 0.4mm;
-  }
-
-  .judul {
-    text-align: center;
-    margin-top: 1.4mm;
-    padding: 0 4mm;
-  }
-
-  .judul .label {
-    font-size: 5.6pt;
-    letter-spacing: 2.2pt;
-    color: #7a8aa0;
-  }
-
-  .judul .teks {
+  .kepala-teks .judul-ujian {
     font-size: 10pt;
     font-weight: bold;
     color: #0a3c6e;
     text-transform: uppercase;
     line-height: 1.15;
+  }
+
+  .kepala-teks .nama-sekolah {
+    font-size: 8.6pt;
+    font-weight: bold;
+    color: #12233f;
+    text-transform: uppercase;
+    margin-top: 0.5mm;
+    line-height: 1.15;
+  }
+
+  .kepala-teks .tahun {
+    font-size: 6.4pt;
+    color: #4a5b70;
     margin-top: 0.4mm;
   }
 
-  .nomor {
-    margin: 1.4mm auto 0 auto;
-    width: 44mm;
+  /* ── Nama siswa: besar, di tengah, tanpa label ── */
+  .nama-besar {
     text-align: center;
-    background: #eef3fa;
-    border: 0.25mm solid #b9cde6;
-    border-radius: 1.2mm;
-    padding: 1.1mm 0 1.3mm 0;
-  }
-
-  .nomor .label {
-    font-size: 5.2pt;
-    letter-spacing: 1.6pt;
-    color: #5a718c;
-  }
-
-  .nomor .nilai {
-    font-size: 11.5pt;
+    font-size: 9.6pt;
     font-weight: bold;
-    color: #0a3c6e;
-    letter-spacing: 0.6pt;
-    line-height: 1.1;
+    color: #0a2c50;
+    text-transform: uppercase;
+    margin-top: 2.2mm;
+    padding: 0 4mm;
+    line-height: 1.15;
   }
-</style>
-<style>
+
+  /* ── Isi: foto kiri sejajar baris-baris field ── */
   .isi {
-    margin-top: 1.6mm;
+    margin-top: 1.8mm;
     padding: 0 4mm;
   }
 
@@ -153,28 +144,19 @@
     padding-left: 2.5mm;
   }
 
-  .nama-siswa {
-    font-size: 8.6pt;
-    font-weight: bold;
-    color: #0a2c50;
-    text-transform: uppercase;
-    line-height: 1.15;
-    margin-bottom: 1mm;
-  }
-
   .field-table {
     width: 100%;
   }
 
   .field-table td {
-    font-size: 6.4pt;
-    line-height: 1.45;
+    font-size: 7pt;
+    line-height: 1.55;
     padding: 0;
     vertical-align: top;
   }
 
   .f-label {
-    width: 15mm;
+    width: 16mm;
     color: #4a5b70;
   }
 
@@ -187,6 +169,14 @@
     color: #111e30;
   }
 
+  .f-nomor {
+    font-size: 8pt;
+    font-weight: bold;
+    color: #0a3c6e;
+    letter-spacing: 0.4pt;
+  }
+</style>
+<style>
   .signature {
     position: absolute;
     right: 4mm;
@@ -262,24 +252,27 @@
     @endif
     <td class="sel">
       <div class="kartu">
-        @if ($pengaturan['pakai_kop'] && $pengaturan['kopPath'])
-          <img src="{{ $pengaturan['kopPath'] }}" class="kop-img">
-        @else
-          <div class="kepala-teks">
-            <div class="nama">{{ $sekolahGlobal['nama_sekolah'] }}</div>
-            <div class="npsn">NPSN: {{ $sekolahGlobal['npsn'] }}</div>
-          </div>
-        @endif
+        <table class="kepala">
+          <tr>
+            <td class="kepala-logo">
+              @if ($pengaturan['logoKiriPath'])
+                <img src="{{ $pengaturan['logoKiriPath'] }}" class="logo-kepala">
+              @endif
+            </td>
+            <td class="kepala-teks">
+              <div class="judul-ujian">{{ $pengaturan['judul'] }}</div>
+              <div class="nama-sekolah">{{ $sekolahGlobal['nama_sekolah'] }}</div>
+              <div class="tahun">Tahun Pelajaran {{ $pengaturan['tahun_pelajaran'] }}</div>
+            </td>
+            <td class="kepala-logo">
+              @if ($pengaturan['logoKananPath'])
+                <img src="{{ $pengaturan['logoKananPath'] }}" class="logo-kepala">
+              @endif
+            </td>
+          </tr>
+        </table>
 
-        <div class="judul">
-          <div class="label">KARTU PESERTA</div>
-          <div class="teks">{{ $pengaturan['judul'] }}</div>
-        </div>
-
-        <div class="nomor">
-          <div class="label">NOMOR PESERTA</div>
-          <div class="nilai">{{ $siswa->nomor_peserta }}</div>
-        </div>
+        <div class="nama-besar">{{ $siswa->nama_siswa }}</div>
 
         <div class="isi">
           <table>
@@ -294,50 +287,14 @@
                 </td>
               @endif
               <td class="rincian">
-                <div class="nama-siswa">{{ $siswa->nama_siswa }}</div>
                 <table class="field-table">
-                  @if ($pengaturan['tampil']['ttl'])
+                  @foreach ($pengaturan['urutan_field'] as $fk)
                     <tr>
-                      <td class="f-label">TTL</td>
+                      <td class="f-label">{{ $pengaturan['label_field'][$fk] }}</td>
                       <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->ttl_label }}</td>
+                      <td class="f-value {{ $fk === 'nomor' ? 'f-nomor' : '' }}">{{ $siswa->nilai_field[$fk] }}</td>
                     </tr>
-                  @endif
-                  @if ($pengaturan['tampil']['nis'])
-                    <tr>
-                      <td class="f-label">NIS</td>
-                      <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->nis_label }}</td>
-                    </tr>
-                  @endif
-                  @if ($pengaturan['tampil']['nisn'])
-                    <tr>
-                      <td class="f-label">NISN</td>
-                      <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->nisn ?? '-' }}</td>
-                    </tr>
-                  @endif
-                  @if ($pengaturan['tampil']['kelas'])
-                    <tr>
-                      <td class="f-label">Kelas</td>
-                      <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->kelas_label }}</td>
-                    </tr>
-                  @endif
-                  @if ($pengaturan['tampil']['jk'])
-                    <tr>
-                      <td class="f-label">Jenis Kelamin</td>
-                      <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->jk_label }}</td>
-                    </tr>
-                  @endif
-                  @if ($pengaturan['tampil']['agama'])
-                    <tr>
-                      <td class="f-label">Agama</td>
-                      <td class="f-colon">:</td>
-                      <td class="f-value">{{ $siswa->agama ?? '-' }}</td>
-                    </tr>
-                  @endif
+                  @endforeach
                 </table>
               </td>
             </tr>

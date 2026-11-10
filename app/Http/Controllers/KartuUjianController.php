@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Rombel;
 use App\Models\Sekolah;
 use App\Models\SekolahLogo;
+use App\Models\Semester;
 use App\Models\Siswa;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -12,9 +13,11 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Kartu Peserta Ujian: generator kartu peserta untuk penilaian /
- * ujian sekolah. Pengaturan kartu (judul, kop, foto, field yang
- * tampil, pola nomor peserta, titimangsa, penanda tangan, tanda
- * tangan & stempel) diisi per cetakan lewat formulir — tidak
+ * ujian sekolah. Kepala kartu = judul, nama sekolah, dan tahun
+ * pelajaran, diapit logo kiri/kanan pilihan pengguna (pemda /
+ * sekolah / Tut Wuri Handayani). Field kartu tetap — nomor,
+ * rombel, TTL, NIS/NISN — dengan urutan yang bisa disusun
+ * pengguna. Pengaturan diisi per cetakan lewat formulir, tidak
  * disimpan. Pola nomor memakai token {no}, {no:3}, {t}, {t:2},
  * {tahun}; penomoran bisa berurutan per tingkat atau menyeluruh.
  */
@@ -80,20 +83,22 @@ class KartuUjianController extends Controller
       : collect();
 
     // Nilai bawaan formulir dari data sekolah konteks: penanda
-    // tangan = kepala sekolah, NIP-nya, dan tempat titimangsa =
-    // kabupaten sekolah. Semua masih bisa diubah di formulir.
+    // tangan = kepala sekolah, NIP-nya, tempat titimangsa =
+    // kecamatan sekolah, tahun pelajaran dari semester sesi.
+    // Semua masih bisa diubah di formulir.
     $detail = $sekolahId ? Sekolah::find($sekolahId)?->detailTerbaru : null;
     $bawaan = [
       'penanda_tangan'    => $detail->kepala_sekolah ?? '',
       'nip_penanda'       => $detail->nip ?? '',
       'titimangsa_tempat' => '',
       'titimangsa_tanggal' => now()->format('Y-m-d'),
+      'tahun_pelajaran'   => Semester::find(session('semester_id'))?->tahun_pelajaran ?? '',
     ];
 
     if ($detail) {
-      $detail->loadMissing('regency');
-      if ($detail->regency?->name) {
-        $bawaan['titimangsa_tempat'] = ucwords(strtolower($detail->regency->name));
+      $detail->loadMissing('district');
+      if ($detail->district?->name) {
+        $bawaan['titimangsa_tempat'] = ucwords(strtolower($detail->district->name));
       }
     }
 
@@ -140,8 +145,15 @@ class KartuUjianController extends Controller
       'siswa_ids'          => 'required|array|min:1',
       'siswa_ids.*'        => 'exists:tabel_siswa,id',
       'judul'              => 'required|string|max:100',
+      'tahun_pelajaran'    => 'required|string|max:20',
       'pola_nomor'         => 'required|string|max:60',
       'penomoran'          => 'required|in:per_tingkat,semua',
+      'logo_kiri'          => 'required|in:pemda,sekolah,twh,kosong',
+      'logo_kanan'         => 'required|in:pemda,sekolah,twh,kosong',
+      'urutan_nomor'       => 'nullable|integer|between:1,4',
+      'urutan_rombel'      => 'nullable|integer|between:1,4',
+      'urutan_ttl'         => 'nullable|integer|between:1,4',
+      'urutan_nis_nisn'    => 'nullable|integer|between:1,4',
       'titimangsa_tempat'  => 'required|string|max:100',
       'titimangsa_tanggal' => 'required|date',
       'penanda_tangan'     => 'required|string|max:100',
@@ -183,6 +195,7 @@ class KartuUjianController extends Controller
       $siswa->kelas_label = $rombelSesi?->nama_rombel ?? '-';
       $siswa->tingkat_acuan = (int) ($rombelSesi?->tingkat ?? 0);
       $siswa->nis_label = $siswa->registrasiTerbaru?->nis ?? '-';
+      $siswa->nis_nisn_label = $siswa->nis_label . ' / ' . ($siswa->nisn ?? '-');
       $siswa->ttl_label = trim(
         ($siswa->tempat_lahir ?? '-') . ', ' .
           ($siswa->tgl_lahir
@@ -209,6 +222,12 @@ class KartuUjianController extends Controller
         $nomor = ++$hitungSemua;
       }
       $siswa->nomor_peserta = $this->formatNomor($data['pola_nomor'], $nomor, $siswa->tingkat_acuan, $tahun);
+      $siswa->nilai_field = [
+        'nomor'    => $siswa->nomor_peserta,
+        'rombel'   => $siswa->kelas_label,
+        'ttl'      => $siswa->ttl_label,
+        'nis_nisn' => $siswa->nis_nisn_label,
+      ];
     }
 
     $sekolah = Sekolah::find($sekolahId);
@@ -221,7 +240,8 @@ class KartuUjianController extends Controller
 
     $logos = SekolahLogo::where('sekolah_id', $sekolahId)
       ->whereIn('tipe', [
-        SekolahLogo::TIPE_KOP_KARTU,
+        SekolahLogo::TIPE_LOGO_KABUPATEN,
+        SekolahLogo::TIPE_LOGO_SEKOLAH,
         SekolahLogo::TIPE_TTD_KS,
         SekolahLogo::TIPE_STEMPEL,
       ])
@@ -232,26 +252,40 @@ class KartuUjianController extends Controller
       return $logo && file_exists($logo->absolute_path) ? $logo->absolute_path : null;
     };
 
+    // Logo pengapit kepala kartu: pemda / sekolah dari tabel logo,
+    // twh (Tut Wuri Handayani) dari berkas aset yang ditaruh manual
+    // di public/assets/img/logo-twh.png.
+    $ambilLogo = function (string $pilihan) use ($ambilPath) {
+      return match ($pilihan) {
+        'pemda'   => $ambilPath(SekolahLogo::TIPE_LOGO_KABUPATEN),
+        'sekolah' => $ambilPath(SekolahLogo::TIPE_LOGO_SEKOLAH),
+        'twh'     => file_exists(public_path('assets/img/logo-twh.png'))
+          ? public_path('assets/img/logo-twh.png')
+          : null,
+        default   => null,
+      };
+    };
+
     $pengaturan = [
-      'judul'       => $data['judul'],
-      'pakai_kop'   => $request->boolean('pakai_kop'),
-      'pakai_foto'  => $request->boolean('pakai_foto'),
-      'pakai_ttd'   => $request->boolean('pakai_ttd'),
-      'pakai_stempel' => $request->boolean('pakai_stempel'),
-      'tampil'      => [
-        'ttl'   => $request->boolean('tampil_ttl'),
-        'nis'   => $request->boolean('tampil_nis'),
-        'nisn'  => $request->boolean('tampil_nisn'),
-        'kelas' => $request->boolean('tampil_kelas'),
-        'jk'    => $request->boolean('tampil_jk'),
-        'agama' => $request->boolean('tampil_agama'),
+      'judul'           => $data['judul'],
+      'tahun_pelajaran' => $data['tahun_pelajaran'],
+      'pakai_foto'      => $request->boolean('pakai_foto'),
+      'pakai_ttd'       => $request->boolean('pakai_ttd'),
+      'pakai_stempel'   => $request->boolean('pakai_stempel'),
+      'titimangsa'      => $data['titimangsa_tempat'] . ', ' . $this->labelTanggal($data['titimangsa_tanggal']),
+      'penanda_tangan'  => $data['penanda_tangan'],
+      'nip_penanda'     => $data['nip_penanda'] ?? '',
+      'logoKiriPath'    => $ambilLogo($data['logo_kiri']),
+      'logoKananPath'   => $ambilLogo($data['logo_kanan']),
+      'ttdPath'         => $ambilPath(SekolahLogo::TIPE_TTD_KS),
+      'stempelPath'     => $ambilPath(SekolahLogo::TIPE_STEMPEL),
+      'urutan_field'    => $this->urutanField($data),
+      'label_field'     => [
+        'nomor'    => 'Nomor',
+        'rombel'   => 'Rombel',
+        'ttl'      => 'TTL',
+        'nis_nisn' => 'NIS/NISN',
       ],
-      'titimangsa'  => $data['titimangsa_tempat'] . ', ' . $this->labelTanggal($data['titimangsa_tanggal']),
-      'penanda_tangan' => $data['penanda_tangan'],
-      'nip_penanda' => $data['nip_penanda'] ?? '',
-      'kopPath'     => $ambilPath(SekolahLogo::TIPE_KOP_KARTU),
-      'ttdPath'     => $ambilPath(SekolahLogo::TIPE_TTD_KS),
-      'stempelPath' => $ambilPath(SekolahLogo::TIPE_STEMPEL),
     ];
 
     $pdf = Pdf::setPaper('a4', 'portrait');
@@ -287,6 +321,25 @@ class KartuUjianController extends Controller
     );
 
     return str_replace('{tahun}', (string) $tahun, $hasil);
+  }
+
+  /**
+   * Urutan field pada kartu dari pilihan pengguna. Bawaan: nomor,
+   * rombel, ttl, nis/nisn. Angka urutan yang sama diselesaikan
+   * dengan urutan bawaan, jadi tidak ada field yang hilang.
+   */
+  private function urutanField(array $data): array
+  {
+    $bawaan = ['nomor' => 1, 'rombel' => 2, 'ttl' => 3, 'nis_nisn' => 4];
+    $kunci = array_keys($bawaan);
+
+    usort($kunci, function ($a, $b) use ($data, $bawaan) {
+      $ua = (int) ($data['urutan_' . $a] ?? $bawaan[$a]);
+      $ub = (int) ($data['urutan_' . $b] ?? $bawaan[$b]);
+      return [$ua, $bawaan[$a]] <=> [$ub, $bawaan[$b]];
+    });
+
+    return $kunci;
   }
 
   /** "2026-11-10" → "10 November 2026". */
