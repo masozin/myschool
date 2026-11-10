@@ -322,6 +322,7 @@ Route::controller(SekolahLogoController::class)
   ->middleware(['auth:sanctum', 'role:Operator Sekolah'])
   ->group(function () {
     Route::get('/', 'index')->name('logo');
+    Route::get('/lihat/{tipe}', 'lihat');
     Route::post('/upload', 'upload');
     Route::post('/hapus', 'hapus');
   });

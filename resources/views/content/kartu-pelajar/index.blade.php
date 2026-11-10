@@ -117,27 +117,15 @@
   <div class="card mb-4">
     <div class="card-header pb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
       <h5 class="mb-0">Pilih Siswa</h5>
-      <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
-    </div>
-    <div class="card-body pb-0">
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <div class="form-floating form-floating-outline">
-            <select id="filter-rombel" class="form-select">
-              <option value="">-- Semua Kelas --</option>
-              @foreach ($rombels as $r)
-                <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
-              @endforeach
-            </select>
-            <label for="filter-rombel">Kelas / Rombel</label>
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="form-floating form-floating-outline">
-            <input type="text" id="filter-search" class="form-control" placeholder="Cari nama / NISN">
-            <label for="filter-search">Cari Nama / NISN Siswa</label>
-          </div>
-        </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <select id="filter-rombel" class="form-select form-select-sm" style="width: 180px;">
+          <option value="">-- Semua Kelas --</option>
+          @foreach ($rombels as $r)
+            <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
+          @endforeach
+        </select>
+        <input type="text" id="filter-search" class="form-control form-control-sm" style="width: 200px;"
+          placeholder="Cari nama / NISN">
       </div>
     </div>
     <div class="table-responsive">
@@ -166,8 +154,7 @@
   {{-- =========================================================== --}}
   <div class="card border-primary shadow" style="position:sticky;bottom:1rem;z-index:10">
     <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
-      <h5 class="mb-0">Cetak</h5>
-      <span class="text-muted" id="ringkasan-cetak">Belum ada siswa dipilih.</span>
+      <span class="text-muted" id="ringkasan-cetak">0 siswa, 0 dipilih</span>
       <button type="button" id="btn-cetak" class="btn btn-primary ms-auto" disabled>
         <i class="ri ri-printer-line me-1"></i> Cetak PDF (<span id="info-jumlah-dipilih">0</span> siswa)
       </button>
@@ -189,6 +176,7 @@
 
       // ── State ───────────────────────────────────────────────────
       let allSiswa = [];
+      let totalTampil = 0;
       const selectedIds = new Set();
 
       const AVATAR_PALETTE = [
@@ -270,13 +258,14 @@
         } catch (err) {
           tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-danger">
             <i class="ri ri-error-warning-line me-1"></i> Gagal memuat data. ${err.message}</td></tr>`;
-          document.getElementById('info-jumlah-siswa').textContent = 'gagal memuat';
+          totalTampil = 0;
+          syncRingkasan();
         }
       }
 
       function renderTabelSiswa(data) {
         const tbody = document.getElementById('tbody-siswa');
-        document.getElementById('info-jumlah-siswa').textContent = `${data.length} siswa tampil`;
+        totalTampil = data.length;
 
         if (!data.length) {
           const rombelDipilih = document.getElementById('filter-rombel').value !== '';
@@ -319,15 +308,9 @@
       }
 
       function syncRingkasan() {
-        const n = selectedIds.size;
-        const temaLabel = document.querySelector('input[name="tema_kartu"]:checked')
-          ?.closest('div')?.querySelector('label small')?.textContent?.trim() ?? '';
-        const mode = document.querySelector('input[name="mode_sisi"]:checked')?.value === '2' ?
-          '2 sisi (depan-belakang)' : '1 sisi';
-        document.getElementById('ringkasan-cetak').textContent = n === 0 ?
-          'Belum ada siswa dipilih.' :
-          `${n} siswa dipilih • tema ${temaLabel} • mode ${mode}.`;
-        document.getElementById('btn-cetak').disabled = n === 0;
+        document.getElementById('ringkasan-cetak').textContent =
+          `${totalTampil} siswa, ${selectedIds.size} dipilih`;
+        document.getElementById('btn-cetak').disabled = selectedIds.size === 0;
       }
 
       function setBarisTerpilih(tr, id, pilih) {

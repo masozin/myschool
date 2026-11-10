@@ -63,7 +63,7 @@ class SekolahLogoController extends Controller
       $asets[$tipe] = array_merge($info, [
         'tipe'      => $tipe,
         'aset'      => $asetAda,
-        'url'       => $asetAda ? Storage::url($asetAda->path_file) : null,
+        'url'       => $asetAda ? url('/logo/lihat/' . $tipe) : null,
       ]);
     }
 
@@ -105,8 +105,30 @@ class SekolahLogoController extends Controller
 
     return response()->json([
       'message' => $this->tipeAset[$tipe]['label'] . ' berhasil diupload.',
-      'url'     => Storage::url($path),
+      'url'     => url('/logo/lihat/' . $tipe),
     ]);
+  }
+
+  // ── Tampilkan berkas aset (dialirkan dari disk public) ──────────
+  // Pratinjau di halaman SENGAJA tidak memakai Storage::url():
+  // URL /storage/... butuh symlink public/storage yang di
+  // sebagian pemasangan (Laragon lokal / shared hosting) tidak
+  // ada, sehingga gambar tampak pecah padahal berkasnya tersimpan
+  // dan terbaca normal saat mencetak dokumen (dibaca dari path
+  // disk). Method ini mengalirkan berkasnya langsung.
+  public function lihat(string $tipe)
+  {
+    abort_unless(array_key_exists($tipe, $this->tipeAset), 404);
+
+    $sekolahId = Auth::user()->ptk->sekolah_id;
+
+    $aset = SekolahLogo::where('sekolah_id', $sekolahId)
+      ->where('tipe', $tipe)
+      ->first();
+
+    abort_if(!$aset || !Storage::disk('public')->exists($aset->path_file), 404);
+
+    return Storage::disk('public')->response($aset->path_file);
   }
 
   // ── Hapus aset ────────────────────────────────────────────────────────
