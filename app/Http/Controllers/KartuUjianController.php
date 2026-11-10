@@ -18,8 +18,10 @@ use Illuminate\Support\Facades\Auth;
  * sekolah / Tut Wuri Handayani). Field kartu tetap — nomor,
  * rombel, TTL, NIS/NISN — dengan urutan yang bisa disusun
  * pengguna. Pengaturan diisi per cetakan lewat formulir, tidak
- * disimpan. Pola nomor memakai token {no}, {no:3}, {t}, {t:2},
- * {tahun}; penomoran bisa berurutan per tingkat atau menyeluruh.
+ * disimpan. Pola nomor memakai token {no}, {no:3}, {no:3:1}
+ * (angka terakhir = nomor mulai), dan {t} / {t:2} untuk tingkat;
+ * penomoran bisa berurutan per tingkat atau menyeluruh, dengan
+ * urutan di dalam kelas menurut nama atau NIS.
  */
 class KartuUjianController extends Controller
 {
@@ -148,6 +150,7 @@ class KartuUjianController extends Controller
       'tahun_pelajaran'    => 'required|string|max:20',
       'pola_nomor'         => 'required|string|max:60',
       'penomoran'          => 'required|in:per_tingkat,semua',
+      'urutan_kelas'       => 'required|in:nama,nis',
       'logo_kiri'          => 'required|in:pemda,sekolah,twh,kosong',
       'logo_kanan'         => 'required|in:pemda,sekolah,twh,kosong',
       'urutan_nomor'       => 'nullable|integer|between:1,4',
@@ -160,7 +163,7 @@ class KartuUjianController extends Controller
       'nip_penanda'        => 'nullable|string|max:30',
     ]);
 
-    if (!preg_match('/\{no(?:[:;]\d+)?\}/', $data['pola_nomor'])) {
+    if (!preg_match('/\{no(?:[:;]\d+){0,2}\}/', $data['pola_nomor'])) {
       return back()->withInput()
         ->with('error', 'Pola nomor peserta harus mengandung token nomor, contoh {no:3}.');
     }
@@ -196,6 +199,11 @@ class KartuUjianController extends Controller
       $siswa->tingkat_acuan = (int) ($rombelSesi?->tingkat ?? 0);
       $siswa->nis_label = $siswa->registrasiTerbaru?->nis ?? '-';
       $siswa->nis_nisn_label = $siswa->nis_label . ' / ' . ($siswa->nisn ?? '-');
+      // Kunci urut di dalam kelas: nama (A-Z) atau NIS (angka
+      // dinaturalkan dengan nol di depan agar 9 < 10 terbaca benar).
+      $siswa->kunci_urut = ($data['urutan_kelas'] ?? 'nama') === 'nis'
+        ? preg_replace_callback('/\d+/', fn($m) => str_pad($m[0], 10, '0', STR_PAD_LEFT), (string) $siswa->nis_label)
+        : mb_strtoupper($siswa->nama_siswa);
       $siswa->ttl_label = trim(
         ($siswa->tempat_lahir ?? '-') . ', ' .
           ($siswa->tgl_lahir
@@ -205,13 +213,14 @@ class KartuUjianController extends Controller
       $siswa->jk_label = $siswa->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan';
     }
 
-    // Urutan cetak: tingkat, lalu nama rombel, lalu nama siswa.
+    // Urutan cetak: tingkat, lalu nama rombel, lalu kunci urut
+    // dalam kelas (nama atau NIS, sesuai pilihan pengguna).
+    // Nomor peserta mengikuti urutan cetak ini.
     $siswaList = $siswaList
-      ->sortBy(fn($s) => [$s->tingkat_acuan, $s->kelas_label, $s->nama_siswa])
+      ->sortBy(fn($s) => [$s->tingkat_acuan, $s->kelas_label, $s->kunci_urut])
       ->values();
 
     // Penomoran peserta sesuai pola.
-    $tahun = (int) date('Y', strtotime($data['titimangsa_tanggal']));
     $hitungSemua = 0;
     $hitungPerTingkat = [];
     foreach ($siswaList as $siswa) {
@@ -221,7 +230,7 @@ class KartuUjianController extends Controller
       } else {
         $nomor = ++$hitungSemua;
       }
-      $siswa->nomor_peserta = $this->formatNomor($data['pola_nomor'], $nomor, $siswa->tingkat_acuan, $tahun);
+      $siswa->nomor_peserta = $this->formatNomor($data['pola_nomor'], $nomor, $siswa->tingkat_acuan);
       $siswa->nilai_field = [
         'nomor'    => $siswa->nomor_peserta,
         'rombel'   => $siswa->kelas_label,
@@ -296,31 +305,34 @@ class KartuUjianController extends Controller
   }
 
   /**
-   * Pola → nomor peserta jadi. Token: {no}, {no:3} / {no;3} (nomor
-   * urut, diberi nol di depan sampai lebar digit), {t}, {t:2} / {t;2}
-   * (tingkat), dan {tahun}. Contoh: "PS-{t:1}-{no:3}" → "PS-6-007".
-   * {t:1} berarti tingkat ditulis apa adanya (lebar 1 tidak menambah
-   * nol untuk tingkat satu digit).
+   * Pola → nomor peserta jadi. Token nomor: {no}, {no:3} (3 digit),
+   * dan {no:3:1} — angka kedua setelah lebar adalah nomor MULAI,
+   * jadi urutan tidak harus diawali 1. Pemisah boleh ":" atau ";".
+   * Token tingkat: {t}, {t:2}. Contoh: "PS-{t}-{no:3:21}" untuk
+   * peserta ke-1 tingkat 6 → "PS-6-021".
    */
-  private function formatNomor(string $pola, int $nomor, int $tingkat, int $tahun): string
+  private function formatNomor(string $pola, int $nomor, int $tingkat): string
   {
     $hasil = preg_replace_callback(
-      '/\{no(?:[:;](\d+))?\}/',
-      fn($m) => isset($m[1]) && $m[1] !== ''
-        ? str_pad((string) $nomor, (int) $m[1], '0', STR_PAD_LEFT)
-        : (string) $nomor,
+      '/\{no(?:[:;](\d+))?(?:[:;](\d+))?\}/',
+      function ($m) use ($nomor) {
+        $lebar = isset($m[1]) && $m[1] !== '' ? (int) $m[1] : 0;
+        $mulai = isset($m[2]) && $m[2] !== '' ? (int) $m[2] : 1;
+        $nilai = $mulai + $nomor - 1;
+        return $lebar > 0
+          ? str_pad((string) $nilai, $lebar, '0', STR_PAD_LEFT)
+          : (string) $nilai;
+      },
       trim($pola)
     );
 
-    $hasil = preg_replace_callback(
+    return preg_replace_callback(
       '/\{t(?:[:;](\d+))?\}/',
       fn($m) => isset($m[1]) && $m[1] !== ''
         ? str_pad((string) $tingkat, (int) $m[1], '0', STR_PAD_LEFT)
         : (string) $tingkat,
       $hasil
     );
-
-    return str_replace('{tahun}', (string) $tahun, $hasil);
   }
 
   /**

@@ -34,7 +34,7 @@
 
   .kartu {
     width: 93mm;
-    height: 54mm;
+    height: 60mm;
     margin: 0;
     position: relative;
     overflow: hidden;

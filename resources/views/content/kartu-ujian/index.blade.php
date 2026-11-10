@@ -52,7 +52,7 @@
       <div>
         <h4 class="mb-1">Cetak Kartu Peserta Ujian</h4>
         <div class="text-muted small">
-          <i class="icon-base ri ri-ruler-line me-1"></i>Ukuran kartu 9,3 × 5,4 cm
+          <i class="icon-base ri ri-ruler-line me-1"></i>Ukuran kartu 9,3 × 6 cm
           <span class="mx-1">•</span>
           <i class="icon-base ri ri-file-paper-2-line me-1"></i>Dicetak di kertas A4, 8 kartu per halaman
         </div>
@@ -98,13 +98,23 @@
                   <label for="penomoran">Cara Penomoran</label>
                 </div>
               </div>
-              <div class="col-12">
+              <div class="col-6">
                 <div class="form-floating form-floating-outline">
                   <input type="text" name="pola_nomor" class="form-control" required maxlength="60"
                     value="{{ old('pola_nomor', '{t}-{no:3}') }}">
                   <label for="pola_nomor">Pola Nomor Peserta</label>
                 </div>
-                <small class="text-muted">Token: {t} tingkat, {no:3} nomor urut 3 digit, {tahun} tahun.</small>
+                <small class="text-muted">Token: {t} tingkat, {no:3:1} nomor urut 3 digit mulai dari 1.</small>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <select name="urutan_kelas" class="form-select">
+                    <option value="nama" {{ old('urutan_kelas', 'nama') === 'nama' ? 'selected' : '' }}>Nama siswa
+                    </option>
+                    <option value="nis" {{ old('urutan_kelas') === 'nis' ? 'selected' : '' }}>NIS</option>
+                  </select>
+                  <label for="urutan_kelas">Urutan dalam Kelas</label>
+                </div>
               </div>
               <div class="col-6">
                 <div class="form-floating form-floating-outline">
