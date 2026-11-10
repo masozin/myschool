@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Autentikasi aplikasi mobile (Flutter) berbasis token Sanctum.
- * Guru/Operator masuk dengan email + kata sandi yang sama dengan
- * aplikasi web; server menerbitkan token per perangkat yang bisa
- * dicabut kapan pun (logout / ganti perangkat).
+ * Guru/Operator masuk dengan kredensial yang sama dengan aplikasi
+ * web: kolom "email" boleh diisi email ATAU user_name (NIP/NPSN),
+ * persis aturan Fortify::authenticateUsing di web. Server
+ * menerbitkan token per perangkat yang bisa dicabut kapan pun
+ * (logout / ganti perangkat).
  */
 class AuthApiController extends Controller
 {
@@ -39,18 +41,22 @@ class AuthApiController extends Controller
   public function login(Request $request)
   {
     $data = $request->validate([
-      'email' => ['required', 'email'],
+      // BUKAN format email: isinya boleh email atau user_name (NIP).
+      'email' => ['required', 'string', 'max:255'],
       'password' => ['required', 'string'],
       'nama_perangkat' => ['nullable', 'string', 'max:100'],
     ]);
 
-    if (!Auth::attempt(['email' => $data['email'], 'password' => $data['password']])) {
+    // Sama seperti login web: cocokkan ke email ATAU user_name.
+    $isian = trim($data['email']);
+    $user = User::where('email', $isian)->orWhere('user_name', $isian)->first();
+
+    if (!$user || !Hash::check($data['password'], $user->password)) {
       return response()->json([
-        'message' => 'Email atau kata sandi salah.',
+        'message' => 'Email/NIP atau kata sandi salah.',
       ], 401);
     }
 
-    $user = Auth::user();
     $token = $user->createToken($data['nama_perangkat'] ?? 'Aplikasi Mobile')->plainTextToken;
 
     return response()->json([
