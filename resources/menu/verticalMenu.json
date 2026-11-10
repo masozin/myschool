@@ -136,6 +136,18 @@
       "fitur": "kartu-pelajar"
     },
     {
+      "url": "/kartu-ujian",
+      "icon": "menu-icon icon-base ri ri-file-list-line",
+      "name": "Kartu Ujian",
+      "slug": "kartu-ujian",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah"
+      ],
+      "fitur": "kartu-ujian"
+    },
+    {
       "url": "/kalender-pendidikan",
       "icon": "menu-icon icon-base ri ri-calendar-2-line",
       "name": "Kalender Pendidikan",

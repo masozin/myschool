@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DhSiswaController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
+use App\Http\Controllers\KartuUjianController;
 use App\Http\Controllers\LearningController;
 use App\Http\Controllers\LearningModuleController;
 use App\Http\Controllers\LearningQuizController;
@@ -568,6 +569,22 @@ Route::controller(KartuPelajarController::class)
   ->prefix('kartu-pelajar')
   ->name('kartu-pelajar.')
   ->middleware(['auth:sanctum', 'fitur:kartu-pelajar'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/data', 'data')->name('data');
+    Route::post('/cetak', 'cetak')->name('cetak');
+  });
+
+
+/*
+|--------------------------------------------------------------------------
+| KARTU PESERTA UJIAN (fitur: kartu-ujian)
+|--------------------------------------------------------------------------
+*/
+Route::controller(KartuUjianController::class)
+  ->prefix('kartu-ujian')
+  ->name('kartu-ujian.')
+  ->middleware(['auth:sanctum', 'fitur:kartu-ujian'])
   ->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/data', 'data')->name('data');

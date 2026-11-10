@@ -14,7 +14,7 @@ class FiturSeeder extends Seeder
       ['kode' => 'eraport',         'nama' => 'Raport Digital',      'deskripsi' => ''],
       ['kode' => 'kaldik',          'nama' => 'Kalender Pendidikan', 'deskripsi' => ''],
       ['kode' => 'kartu-pelajar',   'nama' => 'Kartu Pelajar',       'deskripsi' => ''],
-      ['kode' => 'kartu-ujian',     'nama' => 'Kartu Ujuan',         'deskripsi' => ''],
+      ['kode' => 'kartu-ujian',     'nama' => 'Kartu Ujian',         'deskripsi' => ''],
       ['kode' => 'skl',             'nama' => 'SKL',                 'deskripsi' => ''],
       ['kode' => 'skhu',            'nama' => 'SKHU',                'deskripsi' => ''],
       ['kode' => 'dh-siswa',        'nama' => 'Daftar Hadir Siswa',  'deskripsi' => 'Lembah daftar hadir siswa'],
