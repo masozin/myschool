@@ -1,0 +1,108 @@
+@extends('layouts/layoutMaster')
+
+@section('title', 'Pengaturan Jam — Jadwal Pelajaran')
+
+@section('content')
+
+  @if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+  @endif
+
+  <div class="card mb-4">
+    <div class="card-body py-4 d-flex align-items-center gap-4 flex-wrap">
+      <div class="avatar avatar-xl flex-shrink-0">
+        <span class="avatar-initial rounded-circle bg-label-primary">
+          <i class="icon-base ri ri-time-line ri-28px"></i>
+        </span>
+      </div>
+      <div class="flex-grow-1">
+        <h4 class="mb-1">Pengaturan Jam</h4>
+        <div class="text-muted small">
+          Kerangka waktu {{ $sekolah->detailTerbaru->nama_sekolah ?? '-' }}
+          @if ($semester)
+            <span class="mx-1">•</span> Semester {{ $semester->semester }} {{ $semester->tahun_pelajaran }}
+          @endif
+        </div>
+      </div>
+      <a href="{{ route('jadwal-pelajaran.index') }}" class="btn btn-outline-secondary">
+        <i class="ri ri-arrow-left-line me-1"></i> Kembali
+      </a>
+    </div>
+  </div>
+
+  @if (!$tersimpan)
+    <div class="alert alert-info">Kerangka belum pernah disimpan — nilai di bawah ini pola bawaan. Sesuaikan lalu
+      simpan.</div>
+  @endif
+
+  <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.simpan') }}">
+    @csrf
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Hari</th>
+              <th style="width: 130px;">Jumlah Jam</th>
+              <th style="width: 140px;">Jam Mulai</th>
+              <th style="width: 130px;">Menit / Jam</th>
+              <th>Istirahat 1 (sesudah jam ke- …, … menit)</th>
+              <th>Istirahat 2 (sesudah jam ke- …, … menit)</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach ($namaHari as $hari => $nama)
+              @php
+                $f = $kerangka[$hari] ?? null;
+                $j1 = $f['istirahat'][0] ?? null;
+                $j2 = $f['istirahat'][1] ?? null;
+              @endphp
+              <tr>
+                <td class="fw-semibold">{{ $nama }}</td>
+                <td>
+                  <input type="number" class="form-control" name="hari[{{ $hari }}][jumlah_jam]"
+                    value="{{ $f['jumlah_jam'] ?? '' }}" min="0" max="12" placeholder="0">
+                </td>
+                <td>
+                  <input type="time" class="form-control" name="hari[{{ $hari }}][mulai]"
+                    value="{{ $f['mulai'] ?? '07:00' }}">
+                </td>
+                <td>
+                  <input type="number" class="form-control" name="hari[{{ $hari }}][menit]"
+                    value="{{ $f['menit'] ?? 35 }}" min="15" max="90">
+                </td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][0][setelah]"
+                      value="{{ $j1['setelah'] ?? '' }}" min="1" max="11" placeholder="Jam ke-">
+                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][0][menit]"
+                      value="{{ $j1['menit'] ?? '' }}" min="5" max="90" placeholder="Menit">
+                  </div>
+                </td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][1][setelah]"
+                      value="{{ $j2['setelah'] ?? '' }}" min="1" max="11" placeholder="Jam ke-">
+                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][1][menit]"
+                      value="{{ $j2['menit'] ?? '' }}" min="5" max="90" placeholder="Menit">
+                  </div>
+                </td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body border-top d-flex align-items-center gap-3 flex-wrap">
+        <button type="submit" class="btn btn-primary">
+          <i class="ri ri-save-line me-1"></i> Simpan Kerangka
+        </button>
+        <small class="text-muted">Jumlah jam 0 atau kosong = tidak ada pelajaran hari itu. Mengubah kerangka tidak
+          menghapus jadwal yang sudah terisi; kotak yang jatuh di luar kerangka baru akan ditandai di editor.</small>
+      </div>
+    </div>
+  </form>
+
+@endsection

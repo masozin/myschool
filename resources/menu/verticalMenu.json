@@ -193,6 +193,19 @@
       ]
     },
     {
+      "url": "/jadwal-pelajaran",
+      "icon": "menu-icon icon-base ri ri-calendar-schedule-line",
+      "name": "Jadwal Pelajaran",
+      "slug": "jadwal-pelajaran",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Guru",
+        "Kepala Sekolah"
+      ],
+      "fitur": "jadwal-pelajaran"
+    },
+    {
       "url": "/kalender-pendidikan",
       "icon": "menu-icon icon-base ri ri-calendar-2-line",
       "name": "Kalender Pendidikan",

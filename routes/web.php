@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DhSiswaController;
+use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
 use App\Http\Controllers\KartuUjianController;
@@ -590,6 +591,38 @@ Route::controller(KartuUjianController::class)
     Route::get('/', 'index')->name('index');
     Route::get('/data', 'data')->name('data');
     Route::post('/cetak', 'cetak')->name('cetak');
+  });
+
+
+/*
+|--------------------------------------------------------------------------
+| JADWAL PELAJARAN (fitur: jadwal-pelajaran)
+|--------------------------------------------------------------------------
+| Melihat: Admin, Operator Sekolah, Kepala Sekolah, Guru.
+| Menyusun (pengaturan jam, pengampu, isi kotak) hanya Operator
+| Sekolah — peran lain mode lihat saja.
+*/
+Route::controller(JadwalPelajaranController::class)
+  ->prefix('jadwal-pelajaran')
+  ->name('jadwal-pelajaran.')
+  ->middleware(['auth:sanctum', 'fitur:jadwal-pelajaran'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
+    Route::get('/editor/{rombel}', 'editor')->name('editor')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
+    Route::get('/pengaturan', 'pengaturan')->name('pengaturan')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')
+      ->middleware('role:Operator Sekolah');
+    Route::get('/pengampu/{rombel}', 'pengampu')->name('pengampu')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/pengampu/{rombel}', 'simpanPengampu')->name('pengampu.simpan')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/sel/simpan', 'simpanSel')->name('sel.simpan')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/sel/hapus', 'hapusSel')->name('sel.hapus')
+      ->middleware('role:Operator Sekolah');
   });
 
 

@@ -13,6 +13,7 @@ class FiturSeeder extends Seeder
     $fiturs = [
       ['kode' => 'eraport',         'nama' => 'Raport Digital',      'deskripsi' => ''],
       ['kode' => 'kaldik',          'nama' => 'Kalender Pendidikan', 'deskripsi' => ''],
+      ['kode' => 'jadwal-pelajaran', 'nama' => 'Jadwal Pelajaran',   'deskripsi' => ''],
       ['kode' => 'kartu-pelajar',   'nama' => 'Kartu Pelajar',       'deskripsi' => ''],
       ['kode' => 'kartu-ujian',     'nama' => 'Kartu Ujian',         'deskripsi' => ''],
       ['kode' => 'skl',             'nama' => 'SKL',                 'deskripsi' => ''],
