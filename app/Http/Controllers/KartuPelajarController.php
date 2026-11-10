@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Siswa;
 use App\Models\Rombel;
+use App\Models\Sekolah;
 use App\Models\SekolahLogo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -58,19 +59,83 @@ class KartuPelajarController extends Controller
     12 => 'Desember',
   ];
 
+  /**
+   * Sekolah konteks pengguna — pola yang sama dengan SKHU/SKL.
+   * Peran berkait sekolah memakai sekolah PTK-nya. Admin tidak punya
+   * PTK, jadi konteksnya dipilih lewat parameter ?sekolah_id=
+   * (disimpan di sesi 'admin_sekolah_id') atau — bila hanya ada satu
+   * sekolah — sekolah satu-satunya itu. Null hanya untuk Admin yang
+   * belum memilih di antara beberapa sekolah; peran lain tanpa
+   * tautan sekolah menerima 403.
+   */
+  private function sekolahKonteksIdNullable(): ?int
+  {
+    $user = Auth::user();
+
+    if ($user->hasRole('Admin')) {
+      if (request()->filled('sekolah_id')) {
+        session(['admin_sekolah_id' => request()->integer('sekolah_id')]);
+      }
+
+      $sekolahId = session('admin_sekolah_id') ?? $user->ptk?->sekolah_id;
+
+      if (!$sekolahId && Sekolah::count() === 1) {
+        $sekolahId = Sekolah::value('id');
+      }
+
+      return $sekolahId ? (int) $sekolahId : null;
+    }
+
+    $sekolahId = $user->ptk?->sekolah_id;
+    abort_if(!$sekolahId, 403, 'Akun Anda belum terhubung ke sekolah.');
+
+    return (int) $sekolahId;
+  }
+
   public function index()
   {
-    $rombels = Rombel::orderBy('nama_rombel')->get();
+    $sekolahId = $this->sekolahKonteksIdNullable();
     $temaList = self::$temaList;
-    return view('content.kartu-pelajar.index', compact('rombels', 'temaList'));
+
+    // Rombel dibatasi sekolah konteks + semester sesi (dulu: semua
+    // rombel dari semua sekolah dan semester tercampur).
+    $rombels = $sekolahId
+      ? Rombel::where('sekolah_id', $sekolahId)
+        ->where('semester_id', session('semester_id'))
+        ->orderBy('nama_rombel')
+        ->get()
+      : collect();
+
+    $daftarSekolah = Auth::user()->hasRole('Admin')
+      ? Sekolah::with('detailTerbaru')->orderBy('id')->get()
+      : collect();
+
+    return view('content.kartu-pelajar.index', compact('rombels', 'temaList', 'sekolahId', 'daftarSekolah'));
   }
 
   public function data(Request $request)
   {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+
+    if (!$sekolahId) {
+      return response()->json([]);
+    }
+
     $query = Siswa::query()
-      ->whereHas('registrasiTerbaru', fn($q) => $q->where('status', 'aktif'));
+      ->whereHas('registrasiTerbaru', fn($q) => $q->where('status', 'aktif')->where('sekolah_id', $sekolahId));
 
     if ($request->filled('rombel_id')) {
+      // Rombel saringan harus milik sekolah konteks pada semester
+      // sesi; rombel sekolah/semester lain dianggap tidak ada.
+      $rombelValid = Rombel::where('id', $request->rombel_id)
+        ->where('sekolah_id', $sekolahId)
+        ->where('semester_id', session('semester_id'))
+        ->exists();
+
+      if (!$rombelValid) {
+        return response()->json([]);
+      }
+
       $query->whereHas('rombels', fn($q) => $q->where('tabel_rombel_anggota.rombel_id', $request->rombel_id));
     }
     if ($request->filled('search')) {
@@ -93,15 +158,26 @@ class KartuPelajarController extends Controller
       'tema'        => 'required|in:' . implode(',', array_keys(self::$temaList)),
     ]);
 
+    $sekolahId = $this->sekolahKonteksIdNullable();
 
+    if (!$sekolahId) {
+      return back()->with('error', 'Pilih sekolah dulu lewat pemilih konteks sekolah di halaman Kartu Pelajar.');
+    }
 
+    // Hanya siswa sekolah konteks yang dicetak — id siswa sekolah
+    // lain yang ikut terkirim disaring keluar.
     $siswaList = Siswa::with([
       'rombels' => fn($q) => $q->orderByDesc('tabel_rombel_anggota.id'),
       'registrasiTerbaru',
     ])
       ->whereIn('id', $request->siswa_ids)
+      ->whereHas('registrasiTerbaru', fn($q) => $q->where('sekolah_id', $sekolahId))
       ->orderBy('nama_siswa')
       ->get();
+
+    if ($siswaList->isEmpty()) {
+      return back()->with('error', 'Tidak ada siswa terpilih yang termasuk sekolah konteks Anda.');
+    }
 
     $barcodeGenerator = new BarcodeGeneratorPNG();
 
@@ -136,13 +212,13 @@ class KartuPelajarController extends Controller
       $siswa->qrcode_base64 = $qrGenerator->render($qrData);
     }
 
-    $sekolah = null;
-    if (Auth::check() && Auth::user()->ptk) {
-      $sekolah = Auth::user()->ptk->sekolah;
-    }
+    // Sekolah dari konteks (PTK pengguna / pilihan Admin), bukan
+    // lagi hanya dari PTK — Admin tanpa PTK dulu error di sini
+    // karena $sekolah bernilai null.
+    $sekolah = Sekolah::find($sekolahId);
 
     // load relasi wilayah dari detailTerbaru
-    $detail = $sekolah->detailTerbaru()->with(['village', 'district', 'regency', 'province'])->first();
+    $detail = $sekolah?->detailTerbaru()->with(['village', 'district', 'regency', 'province'])->first();
     $alamatLengkap = collect([
       $detail->alamat_sekolah ?? null,
       $detail->village->name ?? null,

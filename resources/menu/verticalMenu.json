@@ -124,6 +124,18 @@
       ]
     },
     {
+      "url": "/kartu-pelajar",
+      "icon": "menu-icon icon-base ri ri-bank-card-2-line",
+      "name": "Kartu Pelajar",
+      "slug": "kartu-pelajar",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah"
+      ],
+      "fitur": "kartu-pelajar"
+    },
+    {
       "url": "/kalender-pendidikan",
       "icon": "menu-icon icon-base ri ri-calendar-2-line",
       "name": "Kalender Pendidikan",

@@ -12,6 +12,36 @@
 
 @section('content')
 
+  @if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+  @endif
+
+  {{-- Pemilih konteks sekolah untuk Admin --}}
+  @hasanyrole('Admin')
+    <div class="card mb-4">
+      <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
+        <span class="text-muted"><i class="icon-base ri ri-school-line me-1"></i>Anda masuk sebagai Admin — konteks
+          sekolah:</span>
+        <form method="GET" action="{{ url('/kartu-pelajar') }}">
+          <select name="sekolah_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            @foreach ($daftarSekolah as $ds)
+              <option value="{{ $ds->id }}" {{ $ds->id === $sekolahId ? 'selected' : '' }}>
+                {{ $ds->detailTerbaru->nama_sekolah ?? 'Sekolah #' . $ds->id }}</option>
+            @endforeach
+          </select>
+        </form>
+      </div>
+    </div>
+  @endhasanyrole
+
+  @if (!$sekolahId)
+    <div class="alert alert-warning">Pilih sekolah dulu lewat pemilih di atas — daftar rombel dan siswa mengikuti
+      sekolah yang dipilih.</div>
+  @endif
+
   {{-- =========================================================== --}}
   {{-- HEADER INFO                                                 --}}
   {{-- =========================================================== --}}
