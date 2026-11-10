@@ -74,6 +74,18 @@
         </li>
       </ul>
     </li>
+    {{-- Nama + jabatan pengguna di samping avatar; dua baris
+         berline-height rapat agar tinggi navbar tidak berubah --}}
+    @auth
+      <li class="nav-item d-none d-md-flex align-items-center me-2">
+        <div class="text-end lh-sm">
+          <div class="fw-semibold text-truncate" style="max-width: 200px;">{{ Auth::user()->name }}</div>
+          <small class="text-body-secondary d-block text-truncate" style="max-width: 200px;">
+            {{ Auth::user()?->ptk?->jabatan ?? (Auth::user()->getRoleNames()->first() ?: 'Pengguna') }}
+          </small>
+        </div>
+      </li>
+    @endauth
     <li class="nav-item navbar-dropdown dropdown-user dropdown">
       <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown">
         <div class="avatar avatar-online">

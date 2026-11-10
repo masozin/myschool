@@ -102,25 +102,35 @@
       ]
     },
     {
-      "url": "/presensi",
-      "icon": "menu-icon icon-base ri ri-table-line",
       "name": "Presensi",
-      "slug": "Presensi",
+      "icon": "menu-icon icon-base ri ri-table-line",
+      "slug": "presensi.",
       "roles": [
         "Admin",
         "Operator Sekolah",
         "Kepala Sekolah"
-      ]
-    },
-    {
-      "url": "/presensi/rekap",
-      "icon": "menu-icon icon-base ri ri-bar-chart-2-line",
-      "name": "Rekap Presensi",
-      "slug": "Presensi Rekap",
-      "roles": [
-        "Admin",
-        "Operator Sekolah",
-        "Kepala Sekolah"
+      ],
+      "submenu": [
+        {
+          "url": "/presensi",
+          "name": "Isi Presensi",
+          "slug": "presensi.index",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/presensi/rekap",
+          "name": "Rekap Presensi",
+          "slug": "presensi.rekap",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        }
       ]
     },
     {
@@ -152,6 +162,14 @@
       "icon": "menu-icon icon-base ri ri-calendar-2-line",
       "name": "Kalender Pendidikan",
       "slug": "Kalender-pendidikan"
+    },
+    {
+      "url": "https://sdn01ttr.ozinsq.my.id/erapor/",
+      "icon": "menu-icon icon-base ri ri-external-link-line",
+      "name": "E-Rapor",
+      "slug": "erapor",
+      "target": "_blank",
+      "fitur": "erapor"
     },
     {
       "menuHeader": "Kelulusan"
@@ -216,54 +234,12 @@
       ]
     },
     {
-      "menuHeader": "Edukasi"
-    },
-    {
-      "url": "/learning-modules",
-      "icon": "menu-icon icon-base ri ri-book-open-line",
-      "name": "Modul Pembelajaran",
-      "slug": "learning-modules"
-    },
-    {
-      "url": "/learning/topics",
-      "icon": "menu-icon icon-base ri ri-book-open-line",
-      "name": "Media Pembelajaran",
-      "slug": "learning.topics"
-    },
-    {
-      "menuHeader": "Tools"
-    },
-    {
-      "name": "Utilitas",
-      "icon": "menu-icon icon-base ri ri-tools-line",
-      "slug": "kartu-pelajar.index",
-      "submenu": [
-        {
-          "url": "/kartu-pelajar",
-          "name": "Kartu Pelajar",
-          "slug": "kartu-pelajar.index"
-        },
-        {
-          "url": "/koreksi-soal",
-          "name": "Koreksi Soal",
-          "slug": "learning.topics.index1"
-        },
-        {
-          "url": "https://sdn01ttr.ozinsq.my.id/erapor/",
-          "name": "E-rapor",
-          "slug": "erapor",
-          "target": "_blank",
-          "fitur": "erapor"
-        }
-      ]
-    },
-    {
       "menuHeader": "Pengaturan"
     },
     {
       "url": "/logo",
       "icon": "menu-icon icon-base ri ri-image-edit-line",
-      "name": "Aset Sekolah",
+      "name": "Logo Sekolah",
       "slug": "logo",
       "roles": [
         "Operator Sekolah"
