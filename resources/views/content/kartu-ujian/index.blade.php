@@ -52,9 +52,9 @@
       <div>
         <h4 class="mb-1">Cetak Kartu Peserta Ujian</h4>
         <div class="text-muted small">
-          <i class="icon-base ri ri-ruler-line me-1"></i>Ukuran kartu 8,6 × 5,4 cm
+          <i class="icon-base ri ri-ruler-line me-1"></i>Lebar kartu 9 cm, tinggi menyesuaikan isi
           <span class="mx-1">•</span>
-          <i class="icon-base ri ri-file-paper-2-line me-1"></i>Dicetak di kertas A4, 8 kartu per halaman
+          <i class="icon-base ri ri-file-paper-2-line me-1"></i>Dicetak di kertas A4, 10 kartu per halaman
         </div>
       </div>
     </div>
@@ -63,228 +63,218 @@
   <form id="form-cetak" action="{{ route('kartu-ujian.cetak') }}" method="POST" target="_blank">
     @csrf
 
-    {{-- ========================================================= --}}
-    {{-- KELAS & PENCARIAN                                         --}}
-    {{-- ========================================================= --}}
-    <div class="card mb-4">
-      <div class="card-header pb-0">
-        <h5 class="mb-0">Kelas &amp; Pencarian</h5>
-      </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-12 col-md-6">
-            <div class="form-floating form-floating-outline">
-              <select id="filter-rombel" class="form-select">
-                <option value="">-- Semua Kelas --</option>
-                @foreach ($rombels as $r)
-                  <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
-                @endforeach
-              </select>
-              <label for="filter-rombel">Kelas / Rombel</label>
-            </div>
+    <div class="row g-4">
+      {{-- ============================================= --}}
+      {{-- KIRI: PENGATURAN KARTU                        --}}
+      {{-- ============================================= --}}
+      <div class="col-12 col-lg-5">
+        <div class="card">
+          <div class="card-header pb-0">
+            <h5 class="mb-0">Pengaturan Kartu</h5>
           </div>
-          <div class="col-12 col-md-6">
-            <div class="form-floating form-floating-outline">
-              <input type="text" id="filter-search" class="form-control" placeholder="Cari nama / NISN">
-              <label for="filter-search">Cari Nama / NISN Siswa</label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {{-- ========================================================= --}}
-    {{-- PENGATURAN KARTU                                          --}}
-    {{-- ========================================================= --}}
-    <div class="card mb-4">
-      <div class="card-header pb-0">
-        <h5 class="mb-0">Pengaturan Kartu</h5>
-      </div>
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-12 col-md-4">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="judul" id="input-judul" class="form-control" required maxlength="100"
-                placeholder="Penilaian Akhir Semester" value="{{ old('judul') }}">
-              <label for="input-judul">Judul Ujian</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="tahun_pelajaran" class="form-control" required maxlength="20"
-                value="{{ old('tahun_pelajaran', $bawaan['tahun_pelajaran']) }}">
-              <label for="tahun_pelajaran">Tahun Pelajaran</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-4">
-            <div class="form-floating form-floating-outline">
-              <select name="penomoran" class="form-select">
-                <option value="per_tingkat" {{ old('penomoran') === 'per_tingkat' ? 'selected' : '' }}>Berurutan per
-                  tingkat</option>
-                <option value="semua" {{ old('penomoran') === 'semua' ? 'selected' : '' }}>Berurutan semua siswa
-                </option>
-              </select>
-              <label for="penomoran">Cara Penomoran</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3 mt-1">
-          <div class="col-12 col-md-6">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="pola_nomor" class="form-control" required maxlength="60"
-                value="{{ old('pola_nomor', '{t}-{no:3}') }}">
-              <label for="pola_nomor">Pola Nomor Peserta</label>
-            </div>
-            <small class="text-muted">Token: <code>{no}</code> nomor urut, <code>{no:3}</code> 3 digit,
-              <code>{t}</code> tingkat, <code>{tahun}</code> tahun. Contoh: <code>PS-{t}-{no:3}</code> →
-              PS-6-007.</small>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <select name="logo_kiri" class="form-select">
-                <option value="pemda" {{ old('logo_kiri', 'pemda') === 'pemda' ? 'selected' : '' }}>Logo Pemda
-                </option>
-                <option value="sekolah" {{ old('logo_kiri') === 'sekolah' ? 'selected' : '' }}>Logo Sekolah</option>
-                <option value="twh" {{ old('logo_kiri') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
-                </option>
-                <option value="kosong" {{ old('logo_kiri') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
-              </select>
-              <label for="logo_kiri">Logo Kiri</label>
-            </div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <select name="logo_kanan" class="form-select">
-                <option value="pemda" {{ old('logo_kanan') === 'pemda' ? 'selected' : '' }}>Logo Pemda</option>
-                <option value="sekolah" {{ old('logo_kanan', 'sekolah') === 'sekolah' ? 'selected' : '' }}>Logo
-                  Sekolah</option>
-                <option value="twh" {{ old('logo_kanan') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
-                </option>
-                <option value="kosong" {{ old('logo_kanan') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
-              </select>
-              <label for="logo_kanan">Logo Kanan</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3 mt-1">
-          <div class="col-12">
-            <label class="form-label d-block">Urutan Field pada Kartu</label>
-          </div>
-          @foreach ([['nomor', 'Nomor', 1], ['rombel', 'Rombel', 2], ['ttl', 'TTL', 3], ['nis_nisn', 'NIS/NISN', 4]] as [$fk, $fl, $fu])
-            <div class="col-6 col-md-3">
-              <div class="form-floating form-floating-outline">
-                <select name="urutan_{{ $fk }}" class="form-select">
-                  @for ($i = 1; $i <= 4; $i++)
-                    <option value="{{ $i }}" {{ (int) old('urutan_' . $fk, $fu) === $i ? 'selected' : '' }}>
-                      {{ $i }}</option>
-                  @endfor
-                </select>
-                <label>{{ $fl }}</label>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="judul" id="input-judul" class="form-control" required maxlength="45"
+                    placeholder="Penilaian Akhir Semester" value="{{ old('judul') }}">
+                  <label for="input-judul">Judul Ujian (maks. 45 karakter)</label>
+                </div>
               </div>
-            </div>
-          @endforeach
-        </div>
-
-        <div class="row g-3 mt-1">
-          <div class="col-12">
-            <label class="form-label d-block">Tampilan Kartu</label>
-            <div class="d-flex gap-4 flex-wrap">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="pakai_foto" id="pakai_foto" value="1" checked>
-                <label class="form-check-label" for="pakai_foto">Foto siswa</label>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="tahun_pelajaran" class="form-control" required maxlength="20"
+                    value="{{ old('tahun_pelajaran', $bawaan['tahun_pelajaran']) }}">
+                  <label for="tahun_pelajaran">Tahun Pelajaran</label>
+                </div>
               </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="pakai_ttd" id="pakai_ttd" value="1" checked>
-                <label class="form-check-label" for="pakai_ttd">Tanda tangan</label>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <select name="penomoran" class="form-select">
+                    <option value="per_tingkat" {{ old('penomoran') === 'per_tingkat' ? 'selected' : '' }}>Per tingkat
+                    </option>
+                    <option value="semua" {{ old('penomoran') === 'semua' ? 'selected' : '' }}>Semua siswa</option>
+                  </select>
+                  <label for="penomoran">Cara Penomoran</label>
+                </div>
               </div>
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" name="pakai_stempel" id="pakai_stempel" value="1"
-                  checked>
-                <label class="form-check-label" for="pakai_stempel">Stempel</label>
+              <div class="col-12">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="pola_nomor" class="form-control" required maxlength="60"
+                    value="{{ old('pola_nomor', '{t}-{no:3}') }}">
+                  <label for="pola_nomor">Pola Nomor Peserta</label>
+                </div>
+                <small class="text-muted">Token: {t} tingkat, {no:3} nomor urut 3 digit, {tahun} tahun.</small>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <select name="logo_kiri" class="form-select">
+                    <option value="pemda" {{ old('logo_kiri', 'pemda') === 'pemda' ? 'selected' : '' }}>Logo Pemda
+                    </option>
+                    <option value="sekolah" {{ old('logo_kiri') === 'sekolah' ? 'selected' : '' }}>Logo Sekolah
+                    </option>
+                    <option value="twh" {{ old('logo_kiri') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
+                    </option>
+                    <option value="kosong" {{ old('logo_kiri') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
+                  </select>
+                  <label for="logo_kiri">Logo Kiri</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <select name="logo_kanan" class="form-select">
+                    <option value="pemda" {{ old('logo_kanan') === 'pemda' ? 'selected' : '' }}>Logo Pemda</option>
+                    <option value="sekolah" {{ old('logo_kanan', 'sekolah') === 'sekolah' ? 'selected' : '' }}>Logo
+                      Sekolah</option>
+                    <option value="twh" {{ old('logo_kanan') === 'twh' ? 'selected' : '' }}>Logo Tut Wuri Handayani
+                    </option>
+                    <option value="kosong" {{ old('logo_kanan') === 'kosong' ? 'selected' : '' }}>— Kosong —</option>
+                  </select>
+                  <label for="logo_kanan">Logo Kanan</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <label class="form-label d-block">Urutan Field pada Kartu</label>
+                <ul class="list-group" id="daftar-urutan">
+                  @foreach ([['nomor', 'Nomor'], ['rombel', 'Rombel'], ['ttl', 'TTL'], ['nis_nisn', 'NIS/NISN']] as [$fk, $fl])
+                    <li class="list-group-item d-flex align-items-center gap-2 py-2" data-field="{{ $fk }}">
+                      <span class="badge bg-label-secondary nomor-urut">1</span>
+                      <span class="flex-grow-1">{{ $fl }}</span>
+                      <button type="button" class="btn btn-sm btn-outline-secondary btn-naik" title="Naikkan">
+                        <i class="ri ri-arrow-up-line"></i>
+                      </button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary btn-turun" title="Turunkan">
+                        <i class="ri ri-arrow-down-line"></i>
+                      </button>
+                    </li>
+                  @endforeach
+                </ul>
+                <input type="hidden" name="urutan_nomor" id="urutan_nomor" value="1">
+                <input type="hidden" name="urutan_rombel" id="urutan_rombel" value="2">
+                <input type="hidden" name="urutan_ttl" id="urutan_ttl" value="3">
+                <input type="hidden" name="urutan_nis_nisn" id="urutan_nis_nisn" value="4">
+              </div>
+              <div class="col-12">
+                <label class="form-label d-block">Tampilan Kartu</label>
+                <div class="d-flex gap-4 flex-wrap">
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="pakai_foto" id="pakai_foto" value="1"
+                      checked>
+                    <label class="form-check-label" for="pakai_foto">Foto siswa</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="pakai_ttd" id="pakai_ttd" value="1" checked>
+                    <label class="form-check-label" for="pakai_ttd">Tanda tangan</label>
+                  </div>
+                  <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="pakai_stempel" id="pakai_stempel"
+                      value="1" checked>
+                    <label class="form-check-label" for="pakai_stempel">Stempel</label>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="titimangsa_tempat" class="form-control" required maxlength="100"
+                    value="{{ old('titimangsa_tempat', $bawaan['titimangsa_tempat']) }}">
+                  <label for="titimangsa_tempat">Titimangsa — Tempat</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="date" name="titimangsa_tanggal" class="form-control" required
+                    value="{{ old('titimangsa_tanggal', $bawaan['titimangsa_tanggal']) }}">
+                  <label for="titimangsa_tanggal">Titimangsa — Tanggal</label>
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="penanda_tangan" class="form-control" required maxlength="100"
+                    value="{{ old('penanda_tangan', $bawaan['penanda_tangan']) }}">
+                  <label for="penanda_tangan">Penanda Tangan (Kepala Sekolah)</label>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" name="nip_penanda" class="form-control" maxlength="30"
+                    value="{{ old('nip_penanda', $bawaan['nip_penanda']) }}">
+                  <label for="nip_penanda">NIP Penanda Tangan</label>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="row g-3 mt-1">
-          <div class="col-12 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="titimangsa_tempat" class="form-control" required maxlength="100"
-                value="{{ old('titimangsa_tempat', $bawaan['titimangsa_tempat']) }}">
-              <label for="titimangsa_tempat">Titimangsa — Tempat</label>
-            </div>
+      {{-- ============================================= --}}
+      {{-- KANAN: KELAS, PENCARIAN & DAFTAR SISWA        --}}
+      {{-- ============================================= --}}
+      <div class="col-12 col-lg-7">
+        <div class="card mb-4">
+          <div class="card-header pb-0">
+            <h5 class="mb-0">Kelas &amp; Pencarian</h5>
           </div>
-          <div class="col-12 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <input type="date" name="titimangsa_tanggal" class="form-control" required
-                value="{{ old('titimangsa_tanggal', $bawaan['titimangsa_tanggal']) }}">
-              <label for="titimangsa_tanggal">Titimangsa — Tanggal</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="penanda_tangan" class="form-control" required maxlength="100"
-                value="{{ old('penanda_tangan', $bawaan['penanda_tangan']) }}">
-              <label for="penanda_tangan">Penanda Tangan (Kepala Sekolah)</label>
-            </div>
-          </div>
-          <div class="col-12 col-md-3">
-            <div class="form-floating form-floating-outline">
-              <input type="text" name="nip_penanda" class="form-control" maxlength="30"
-                value="{{ old('nip_penanda', $bawaan['nip_penanda']) }}">
-              <label for="nip_penanda">NIP Penanda Tangan</label>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <select id="filter-rombel" class="form-select">
+                    <option value="">-- Semua Kelas --</option>
+                    @foreach ($rombels as $r)
+                      <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
+                    @endforeach
+                  </select>
+                  <label for="filter-rombel">Kelas / Rombel</label>
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="form-floating form-floating-outline">
+                  <input type="text" id="filter-search" class="form-control" placeholder="Cari nama / NISN">
+                  <label for="filter-search">Cari Nama / NISN Siswa</label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    {{-- ========================================================= --}}
-    {{-- PILIH SISWA                                               --}}
-    {{-- ========================================================= --}}
-    <div class="card mb-4">
-      <div class="card-header pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="mb-0">Pilih Siswa</h5>
-        <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
-      </div>
-      <div class="card-body py-3 d-flex align-items-center flex-wrap gap-3">
-        <div class="form-check mb-0">
-          <input type="checkbox" class="form-check-input" id="check-all">
-          <label class="form-check-label" for="check-all">Pilih semua yang tampil</label>
+        <div class="card">
+          <div class="card-header pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0">Pilih Siswa</h5>
+            <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
+          </div>
+          <div class="card-body py-3">
+            <div class="form-check mb-0">
+              <input type="checkbox" class="form-check-input" id="check-all">
+              <label class="form-check-label" for="check-all">Pilih semua yang tampil</label>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th width="40" class="text-center"></th>
+                  <th>Siswa</th>
+                  <th>NISN</th>
+                  <th class="text-center">JK</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-siswa">
+                <tr>
+                  <td colspan="4" class="text-center py-4 text-muted">
+                    <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-bersihkan">
-          <i class="ri ri-eraser-line me-1"></i>Bersihkan pilihan
-        </button>
-        <small class="text-muted ms-auto">Klik baris siswa untuk memilih / membatalkan. Pilihan tetap tersimpan
-          walau kelas atau pencarian diganti.</small>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th width="40" class="text-center"></th>
-              <th>Siswa</th>
-              <th>NISN</th>
-              <th class="text-center">JK</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-siswa">
-            <tr>
-              <td colspan="4" class="text-center py-4 text-muted">
-                <span class="spinner-border spinner-border-sm me-2"></span> Memuat data...
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
 
     {{-- ========================================================= --}}
     {{-- BILAH CETAK                                               --}}
     {{-- ========================================================= --}}
-    <div class="card border-primary shadow" style="position:sticky;bottom:1rem;z-index:10">
+    <div class="card border-primary shadow mt-4" style="position:sticky;bottom:1rem;z-index:10">
       <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
         <h5 class="mb-0">Cetak</h5>
         <span class="text-muted" id="ringkasan-cetak">Belum ada siswa dipilih.</span>
@@ -453,12 +443,6 @@
         syncPilihan();
       });
 
-      document.getElementById('btn-bersihkan').addEventListener('click', function() {
-        selectedIds.clear();
-        document.querySelectorAll('tr.baris-siswa').forEach(tr => setBarisTerpilih(tr, tr.dataset.id, false));
-        syncPilihan();
-      });
-
       document.getElementById('filter-rombel').addEventListener('change', loadSiswa);
       document.getElementById('filter-search').addEventListener('input', function() {
         clearTimeout(window._searchTimer);
@@ -466,7 +450,40 @@
       });
       document.getElementById('input-judul').addEventListener('input', syncRingkasan);
 
-      // Kirim: sisipkan id siswa terpilih ke formulir lebih dulu.
+      // ── Urutan field: tombol panah naik / turun ─────────────────
+      const daftarUrutan = document.getElementById('daftar-urutan');
+
+      function segarkanUrutan() {
+        const items = [...daftarUrutan.querySelectorAll('li')];
+        items.forEach((li, i) => {
+          li.querySelector('.nomor-urut').textContent = i + 1;
+          li.querySelector('.btn-naik').disabled = i === 0;
+          li.querySelector('.btn-turun').disabled = i === items.length - 1;
+          document.getElementById('urutan_' + li.dataset.field).value = i + 1;
+        });
+      }
+
+      daftarUrutan.addEventListener('click', function(e) {
+        const btnNaik = e.target.closest('.btn-naik');
+        const btnTurun = e.target.closest('.btn-turun');
+        if (btnNaik) {
+          const li = btnNaik.closest('li');
+          if (li.previousElementSibling) {
+            daftarUrutan.insertBefore(li, li.previousElementSibling);
+            segarkanUrutan();
+          }
+        } else if (btnTurun) {
+          const li = btnTurun.closest('li');
+          if (li.nextElementSibling) {
+            daftarUrutan.insertBefore(li.nextElementSibling, li);
+            segarkanUrutan();
+          }
+        }
+      });
+
+      segarkanUrutan();
+
+      // ── Kirim: sisipkan id siswa terpilih ke formulir ───────────
       document.getElementById('form-cetak').addEventListener('submit', function(e) {
         e.preventDefault();
         if (selectedIds.size === 0) {
@@ -477,6 +494,7 @@
           });
           return;
         }
+        segarkanUrutan();
         const wrapper = document.getElementById('wrapper-siswa-ids');
         wrapper.innerHTML = '';
         selectedIds.forEach(id => {

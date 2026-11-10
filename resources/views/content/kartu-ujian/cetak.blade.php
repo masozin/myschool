@@ -10,9 +10,9 @@
     color: #12233f;
   }
 
-  /* Kisi kartu memakai TABEL (2 kolom x 4 baris per halaman A4),
-     sama seperti Kartu Pelajar — float tidak bisa diandalkan
-     di DomPDF untuk banyak kartu. */
+  /* Kisi kartu memakai TABEL (2 kolom, tinggi baris menyesuaikan
+     isi kartu, 10 kartu per halaman A4), sama seperti Kartu
+     Pelajar — float tidak bisa diandalkan di DomPDF. */
   .grid {
     width: 100%;
     border-collapse: separate;
@@ -25,13 +25,13 @@
 
   .grid td.sel {
     width: 95mm;
-    padding: 0 4.7mm 6mm 4.7mm;
+    padding: 0 2.5mm 3mm 2.5mm;
     vertical-align: top;
   }
 
   .kartu {
-    width: 85.6mm;
-    height: 53.98mm;
+    width: 90mm;
+    min-height: 50mm;
     margin: 0;
     position: relative;
     overflow: hidden;
@@ -69,7 +69,7 @@
   }
 
   .kepala-teks .judul-ujian {
-    font-size: 10pt;
+    font-size: 7pt;
     font-weight: bold;
     color: #0a3c6e;
     text-transform: uppercase;

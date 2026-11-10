@@ -144,7 +144,7 @@ class KartuUjianController extends Controller
     $data = $request->validate([
       'siswa_ids'          => 'required|array|min:1',
       'siswa_ids.*'        => 'exists:tabel_siswa,id',
-      'judul'              => 'required|string|max:100',
+      'judul'              => 'required|string|max:45',
       'tahun_pelajaran'    => 'required|string|max:20',
       'pola_nomor'         => 'required|string|max:60',
       'penomoran'          => 'required|in:per_tingkat,semua',
