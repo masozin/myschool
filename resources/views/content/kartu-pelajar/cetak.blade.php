@@ -1,22 +1,42 @@
 <style>
   @page {
-    margin: 0;
+    margin: 12mm 10mm;
     size: A4 portrait;
   }
 
   body {
-    margin: 15mm 13mm;
+    margin: 0;
     font-family: Arial, Helvetica, sans-serif;
     color: #12233f;
+  }
+
+  /* Kisi kartu memakai TABEL (2 kolom x 4 baris per halaman A4):
+     float tidak bisa diandalkan di DomPDF untuk banyak kartu —
+     kartu menumpuk sebaris dan terpotong di tepi halaman. Tabel
+     membuat DomPDF memutus halaman per baris dengan rapi. */
+  .grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .grid tr {
+    page-break-inside: avoid;
+  }
+
+  .grid td.sel {
+    width: 95mm;
+    padding: 0 4.7mm 6mm 4.7mm;
+    vertical-align: top;
   }
 
   .kartu {
     width: 85.6mm;
     height: 53.98mm;
-    float: left;
-    margin: 0 4mm 6mm 0;
+    margin: 0;
     position: relative;
     overflow: hidden;
+    page-break-inside: avoid;
     border-radius: 3mm;
     background-image: url('{{ $bgDepan }}');
     background-size: cover;
@@ -375,7 +395,8 @@
   }
 </style>
 
-<div>
+@php $kolom = 0; @endphp
+<table class="grid">
   @foreach ($siswaList as $siswa)
     @php
       $rombel = $siswa->rombels->first();
@@ -383,6 +404,10 @@
       $ada_foto = $fotoPath && file_exists($fotoPath);
     @endphp
 
+    @if ($kolom % 2 === 0)
+      <tr>
+    @endif
+    <td class="sel">
     {{-- ============ DEPAN ============ --}}
     <div class="kartu">
       <div class="school-head">
@@ -460,9 +485,18 @@
         <small>NIP. {{ $sekolahGlobal['nip_kepsek'] }}</small>
       </div>
     </div>
+    </td>
+    @php $kolom++; @endphp
+    @if ($kolom % 2 === 0)
+      </tr>
+    @endif
 
     {{-- ============ BELAKANG ============ --}}
     @if ($sisi == 2)
+      @if ($kolom % 2 === 0)
+        <tr>
+      @endif
+      <td class="sel">
       <div class="kartu back">
         <div class="back-header">
           <div class="judul">{{ $sekolahGlobal['nama_sekolah'] }}</div>
@@ -508,6 +542,15 @@
           </table>
         </div>
       </div>
+      </td>
+      @php $kolom++; @endphp
+      @if ($kolom % 2 === 0)
+        </tr>
+      @endif
     @endif
   @endforeach
-</div>
+  @if ($kolom % 2 === 1)
+    <td class="sel"></td>
+    </tr>
+  @endif
+</table>

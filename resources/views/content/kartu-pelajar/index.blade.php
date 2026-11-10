@@ -62,20 +62,15 @@
           </div>
         </div>
       </div>
-      <div class="d-flex gap-2 flex-wrap mt-4">
-        <span class="badge bg-primary rounded-pill px-3 py-2">1 — Pilih kelas, tema &amp; mode</span>
-        <span class="badge bg-label-primary rounded-pill px-3 py-2">2 — Centang siswa yang dicetak</span>
-        <span class="badge bg-label-primary rounded-pill px-3 py-2">3 — Tekan tombol Cetak PDF di bawah</span>
-      </div>
     </div>
   </div>
 
   {{-- =========================================================== --}}
-  {{-- LANGKAH 1: KELAS, TEMA, MODE                                --}}
+  {{-- KELAS & PENCARIAN                                           --}}
   {{-- =========================================================== --}}
   <div class="card mb-4">
     <div class="card-header pb-0">
-      <h5 class="mb-0"><span class="badge bg-primary me-2">1</span>Kelas, Tema &amp; Mode Cetak</h5>
+      <h5 class="mb-0">Kelas &amp; Pencarian</h5>
     </div>
     <div class="card-body">
       <div class="row g-3">
@@ -98,7 +93,18 @@
         </div>
       </div>
 
-      <div class="row g-3 mt-1">
+    </div>
+  </div>
+
+  {{-- =========================================================== --}}
+  {{-- TEMA & MODE SISI (satu kartu)                               --}}
+  {{-- =========================================================== --}}
+  <div class="card mb-4">
+    <div class="card-header pb-0">
+      <h5 class="mb-0">Tema &amp; Mode Cetak</h5>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
         <div class="col-12 col-lg-8">
           <label class="form-label d-block">Tema Kartu</label>
           <div class="row g-2">
@@ -114,7 +120,7 @@
                     @elseif($key === 'emerald-modern') #0a6958
                     @else #4a0c19 @endif
                   "></span>
-                    <small>{{ $label }}</small>
+                    <small>{{ ['navy-gold' => 'Navy Gold', 'emerald-modern' => 'Emerald', 'maroon-elegant' => 'Maroon'][$key] ?? $label }}</small>
                   </span>
                 </label>
               </div>
@@ -144,7 +150,7 @@
   {{-- =========================================================== --}}
   <div class="card mb-4">
     <div class="card-header pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <h5 class="mb-0"><span class="badge bg-primary me-2">2</span>Pilih Siswa</h5>
+      <h5 class="mb-0">Pilih Siswa</h5>
       <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
     </div>
     <div class="card-body py-3 d-flex align-items-center flex-wrap gap-3">
@@ -184,7 +190,7 @@
   {{-- =========================================================== --}}
   <div class="card border-primary shadow" style="position:sticky;bottom:1rem;z-index:10">
     <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
-      <h5 class="mb-0"><span class="badge bg-primary me-2">3</span>Cetak</h5>
+      <h5 class="mb-0">Cetak</h5>
       <span class="text-muted" id="ringkasan-cetak">Belum ada siswa dipilih.</span>
       <button type="button" id="btn-cetak" class="btn btn-primary ms-auto" disabled>
         <i class="ri ri-printer-line me-1"></i> Cetak PDF (<span id="info-jumlah-dipilih">0</span> siswa)
