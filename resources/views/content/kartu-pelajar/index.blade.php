@@ -66,43 +66,9 @@
   </div>
 
   {{-- =========================================================== --}}
-  {{-- KELAS & PENCARIAN                                           --}}
+  {{-- TEMA & MODE SISI (satu kartu, tanpa judul)                  --}}
   {{-- =========================================================== --}}
   <div class="card mb-4">
-    <div class="card-header pb-0">
-      <h5 class="mb-0">Kelas &amp; Pencarian</h5>
-    </div>
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-12 col-md-6">
-          <div class="form-floating form-floating-outline">
-            <select id="filter-rombel" class="form-select">
-              <option value="">-- Semua Kelas --</option>
-              @foreach ($rombels as $r)
-                <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
-              @endforeach
-            </select>
-            <label for="filter-rombel">Kelas / Rombel</label>
-          </div>
-        </div>
-        <div class="col-12 col-md-6">
-          <div class="form-floating form-floating-outline">
-            <input type="text" id="filter-search" class="form-control" placeholder="Cari nama / NISN">
-            <label for="filter-search">Cari Nama / NISN Siswa</label>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  {{-- =========================================================== --}}
-  {{-- TEMA & MODE SISI (satu kartu)                               --}}
-  {{-- =========================================================== --}}
-  <div class="card mb-4">
-    <div class="card-header pb-0">
-      <h5 class="mb-0">Tema &amp; Mode Cetak</h5>
-    </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-12 col-lg-8">
@@ -153,20 +119,37 @@
       <h5 class="mb-0">Pilih Siswa</h5>
       <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
     </div>
-    <div class="card-body py-3 d-flex align-items-center flex-wrap gap-3">
-      <div class="form-check mb-0">
-        <input type="checkbox" class="form-check-input" id="check-all">
-        <label class="form-check-label" for="check-all">Pilih semua yang tampil</label>
+    <div class="card-body pb-0">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <div class="form-floating form-floating-outline">
+            <select id="filter-rombel" class="form-select">
+              <option value="">-- Semua Kelas --</option>
+              @foreach ($rombels as $r)
+                <option value="{{ $r->id }}">{{ $r->nama_rombel }}</option>
+              @endforeach
+            </select>
+            <label for="filter-rombel">Kelas / Rombel</label>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="form-floating form-floating-outline">
+            <input type="text" id="filter-search" class="form-control" placeholder="Cari nama / NISN">
+            <label for="filter-search">Cari Nama / NISN Siswa</label>
+          </div>
+        </div>
       </div>
-      <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-bersihkan">
-        <i class="ri ri-eraser-line me-1"></i>Bersihkan pilihan
-      </button>
-      <small class="text-muted ms-auto">Klik baris siswa untuk memilih / membatalkan. Pilihan tetap tersimpan
-        walau kelas atau pencarian diganti.</small>
     </div>
     <div class="table-responsive">
       <table class="table table-hover mb-0">
         <thead class="table-light">
+          <tr>
+            <th colspan="4">
+              <button type="button" class="btn btn-sm btn-outline-primary" id="btn-pilih-semua">
+                <i class="ri ri-check-double-line me-1"></i>Pilih Semua
+              </button>
+            </th>
+          </tr>
           <tr>
             <th width="40" class="text-center"></th>
             <th>Siswa</th>
@@ -333,11 +316,6 @@
 
       // ── Sinkronkan status pilih-semua, hitungan, dan bilah cetak ──
       function syncPilihan() {
-        const boxes = [...document.querySelectorAll('.chk-siswa')];
-        const tercentang = boxes.filter(b => b.checked).length;
-        const checkAll = document.getElementById('check-all');
-        checkAll.checked = boxes.length > 0 && tercentang === boxes.length;
-        checkAll.indeterminate = tercentang > 0 && tercentang < boxes.length;
         document.getElementById('info-jumlah-dipilih').textContent = selectedIds.size;
         syncRingkasan();
       }
@@ -376,16 +354,14 @@
         syncPilihan();
       });
 
-      document.getElementById('check-all').addEventListener('change', function() {
-        document.querySelectorAll('tr.baris-siswa').forEach(tr => {
-          setBarisTerpilih(tr, tr.dataset.id, this.checked);
-        });
-        syncPilihan();
-      });
-
-      document.getElementById('btn-bersihkan').addEventListener('click', function() {
-        selectedIds.clear();
-        document.querySelectorAll('tr.baris-siswa').forEach(tr => setBarisTerpilih(tr, tr.dataset.id, false));
+      // Tombol Pilih Semua di kepala tabel: memilih semua baris
+      // yang tampil; bila semuanya sudah terpilih, klik berikutnya
+      // membatalkan pilihan pada baris yang tampil itu.
+      document.getElementById('btn-pilih-semua').addEventListener('click', function() {
+        const rows = [...document.querySelectorAll('tr.baris-siswa')];
+        const semuaTerpilih = rows.length > 0 &&
+          rows.every(tr => tr.querySelector('.chk-siswa')?.checked);
+        rows.forEach(tr => setBarisTerpilih(tr, tr.dataset.id, !semuaTerpilih));
         syncPilihan();
       });
 

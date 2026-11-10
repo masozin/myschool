@@ -252,15 +252,16 @@
             <h5 class="mb-0">Pilih Siswa</h5>
             <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
           </div>
-          <div class="card-body py-3">
-            <div class="form-check mb-0">
-              <input type="checkbox" class="form-check-input" id="check-all">
-              <label class="form-check-label" for="check-all">Pilih semua yang tampil</label>
-            </div>
-          </div>
           <div class="table-responsive">
             <table class="table table-hover mb-0">
               <thead class="table-light">
+                <tr>
+                  <th colspan="4">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-pilih-semua">
+                      <i class="ri ri-check-double-line me-1"></i>Pilih Semua
+                    </button>
+                  </th>
+                </tr>
                 <tr>
                   <th width="40" class="text-center"></th>
                   <th>Siswa</th>
@@ -408,11 +409,6 @@
       }
 
       function syncPilihan() {
-        const boxes = [...document.querySelectorAll('.chk-siswa')];
-        const tercentang = boxes.filter(b => b.checked).length;
-        const checkAll = document.getElementById('check-all');
-        checkAll.checked = boxes.length > 0 && tercentang === boxes.length;
-        checkAll.indeterminate = tercentang > 0 && tercentang < boxes.length;
         document.getElementById('info-jumlah-dipilih').textContent = selectedIds.size;
         syncRingkasan();
       }
@@ -446,10 +442,14 @@
         syncPilihan();
       });
 
-      document.getElementById('check-all').addEventListener('change', function() {
-        document.querySelectorAll('tr.baris-siswa').forEach(tr => {
-          setBarisTerpilih(tr, tr.dataset.id, this.checked);
-        });
+      // Tombol Pilih Semua di kepala tabel: memilih semua baris
+      // yang tampil; bila semuanya sudah terpilih, klik berikutnya
+      // membatalkan pilihan pada baris yang tampil itu.
+      document.getElementById('btn-pilih-semua').addEventListener('click', function() {
+        const rows = [...document.querySelectorAll('tr.baris-siswa')];
+        const semuaTerpilih = rows.length > 0 &&
+          rows.every(tr => tr.querySelector('.chk-siswa')?.checked);
+        rows.forEach(tr => setBarisTerpilih(tr, tr.dataset.id, !semuaTerpilih));
         syncPilihan();
       });
 
