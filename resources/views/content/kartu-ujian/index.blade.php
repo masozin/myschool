@@ -52,9 +52,9 @@
       <div>
         <h4 class="mb-1">Cetak Kartu Peserta Ujian</h4>
         <div class="text-muted small">
-          <i class="icon-base ri ri-ruler-line me-1"></i>Lebar kartu 9 cm, tinggi menyesuaikan isi
+          <i class="icon-base ri ri-ruler-line me-1"></i>Ukuran kartu 9,3 × 5,4 cm
           <span class="mx-1">•</span>
-          <i class="icon-base ri ri-file-paper-2-line me-1"></i>Dicetak di kertas A4, 10 kartu per halaman
+          <i class="icon-base ri ri-file-paper-2-line me-1"></i>Dicetak di kertas A4, 8 kartu per halaman
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@
       {{-- ============================================= --}}
       <div class="col-12 col-lg-5">
         <div class="card">
-          <div class="card-header pb-0">
+          <div class="card-header pb-3">
             <h5 class="mb-0">Pengaturan Kartu</h5>
           </div>
           <div class="card-body">
@@ -211,7 +211,7 @@
       {{-- ============================================= --}}
       <div class="col-12 col-lg-7">
         <div class="card mb-4">
-          <div class="card-header pb-0">
+          <div class="card-header pb-3">
             <h5 class="mb-0">Kelas &amp; Pencarian</h5>
           </div>
           <div class="card-body">
@@ -238,7 +238,7 @@
         </div>
 
         <div class="card">
-          <div class="card-header pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="card-header pb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h5 class="mb-0">Pilih Siswa</h5>
             <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
           </div>

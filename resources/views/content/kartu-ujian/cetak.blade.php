@@ -10,9 +10,12 @@
     color: #12233f;
   }
 
-  /* Kisi kartu memakai TABEL (2 kolom, tinggi baris menyesuaikan
-     isi kartu, 10 kartu per halaman A4), sama seperti Kartu
-     Pelajar — float tidak bisa diandalkan di DomPDF. */
+  /* Kisi kartu memakai TABEL (2 kolom x 4 baris per halaman A4),
+     sama seperti Kartu Pelajar — float tidak bisa diandalkan
+     di DomPDF. Tinggi kartu TETAP (bukan min-height): blok tanda
+     tangan memakai position absolute yang di DomPDF hanya
+     terjangkar benar pada kotak bertinggi pasti — dengan tinggi
+     menyesuaikan, blok itu hilang dari hasil cetak. */
   .grid {
     width: 100%;
     border-collapse: separate;
@@ -25,13 +28,13 @@
 
   .grid td.sel {
     width: 95mm;
-    padding: 0 2.5mm 3mm 2.5mm;
+    padding: 0 1mm 2mm 1mm;
     vertical-align: top;
   }
 
   .kartu {
-    width: 90mm;
-    min-height: 50mm;
+    width: 93mm;
+    height: 54mm;
     margin: 0;
     position: relative;
     overflow: hidden;
@@ -54,13 +57,13 @@
   }
 
   .kepala-logo {
-    width: 14mm;
+    width: 12.5mm;
     text-align: center;
   }
 
   .logo-kepala {
-    width: 11mm;
-    height: 11mm;
+    width: 9.5mm;
+    height: 9.5mm;
     object-fit: contain;
   }
 
