@@ -26,7 +26,11 @@ class SekolahScope implements Scope
         $sekolahId = $user->ptk->sekolah_id ?? null;
 
         if ($sekolahId) {
-          $builder->where('sekolah_id', $sekolahId);
+          // WAJIB dikualifikasi nama tabel modelnya: kolom tanpa nama
+          // tabel membuat query yang men-JOIN tabel lain pemilik kolom
+          // sekolah_id juga (mis. tabel_rombel_anggota) gagal dengan
+          // "Column 'sekolah_id' in where clause is ambiguous" (1052).
+          $builder->where($model->getTable() . '.sekolah_id', $sekolahId);
         }
       }
     }
