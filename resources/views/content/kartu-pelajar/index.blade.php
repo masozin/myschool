@@ -115,7 +115,7 @@
   {{-- LANGKAH 2: PILIH SISWA                                      --}}
   {{-- =========================================================== --}}
   <div class="card mb-4">
-    <div class="card-header pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card-header pb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
       <h5 class="mb-0">Pilih Siswa</h5>
       <small class="text-muted" id="info-jumlah-siswa">0 siswa tampil</small>
     </div>
@@ -144,14 +144,7 @@
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th colspan="4">
-              <button type="button" class="btn btn-sm btn-outline-primary" id="btn-pilih-semua">
-                <i class="ri ri-check-double-line me-1"></i>Pilih Semua
-              </button>
-            </th>
-          </tr>
-          <tr>
-            <th width="40" class="text-center"></th>
+            <th width="40" class="text-center"><input type="checkbox" class="form-check-input" id="check-all"></th>
             <th>Siswa</th>
             <th>NISN</th>
             <th class="text-center">JK</th>
@@ -316,6 +309,11 @@
 
       // ── Sinkronkan status pilih-semua, hitungan, dan bilah cetak ──
       function syncPilihan() {
+        const boxes = [...document.querySelectorAll('.chk-siswa')];
+        const tercentang = boxes.filter(b => b.checked).length;
+        const checkAll = document.getElementById('check-all');
+        checkAll.checked = boxes.length > 0 && tercentang === boxes.length;
+        checkAll.indeterminate = tercentang > 0 && tercentang < boxes.length;
         document.getElementById('info-jumlah-dipilih').textContent = selectedIds.size;
         syncRingkasan();
       }
@@ -354,14 +352,12 @@
         syncPilihan();
       });
 
-      // Tombol Pilih Semua di kepala tabel: memilih semua baris
-      // yang tampil; bila semuanya sudah terpilih, klik berikutnya
-      // membatalkan pilihan pada baris yang tampil itu.
-      document.getElementById('btn-pilih-semua').addEventListener('click', function() {
-        const rows = [...document.querySelectorAll('tr.baris-siswa')];
-        const semuaTerpilih = rows.length > 0 &&
-          rows.every(tr => tr.querySelector('.chk-siswa')?.checked);
-        rows.forEach(tr => setBarisTerpilih(tr, tr.dataset.id, !semuaTerpilih));
+      // Kotak centang pilih-semua di kepala tabel (pola yang sama
+      // dengan tabel SKL & anggota rombel).
+      document.getElementById('check-all').addEventListener('change', function() {
+        document.querySelectorAll('tr.baris-siswa').forEach(tr => {
+          setBarisTerpilih(tr, tr.dataset.id, this.checked);
+        });
         syncPilihan();
       });
 

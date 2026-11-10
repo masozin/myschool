@@ -134,6 +134,23 @@
       ]
     },
     {
+      "url": "/kalender-pendidikan",
+      "icon": "menu-icon icon-base ri ri-calendar-2-line",
+      "name": "Kalender Pendidikan",
+      "slug": "Kalender-pendidikan"
+    },
+    {
+      "url": "https://sdn01ttr.ozinsq.my.id/erapor/",
+      "icon": "menu-icon icon-base ri ri-external-link-line",
+      "name": "E-Rapor",
+      "slug": "erapor",
+      "target": "_blank",
+      "fitur": "erapor"
+    },
+    {
+      "menuHeader": "Tools"
+    },
+    {
       "url": "/kartu-pelajar",
       "icon": "menu-icon icon-base ri ri-bank-card-2-line",
       "name": "Kartu Pelajar",
@@ -156,20 +173,6 @@
         "Kepala Sekolah"
       ],
       "fitur": "kartu-ujian"
-    },
-    {
-      "url": "/kalender-pendidikan",
-      "icon": "menu-icon icon-base ri ri-calendar-2-line",
-      "name": "Kalender Pendidikan",
-      "slug": "Kalender-pendidikan"
-    },
-    {
-      "url": "https://sdn01ttr.ozinsq.my.id/erapor/",
-      "icon": "menu-icon icon-base ri ri-external-link-line",
-      "name": "E-Rapor",
-      "slug": "erapor",
-      "target": "_blank",
-      "fitur": "erapor"
     },
     {
       "menuHeader": "Kelulusan"
