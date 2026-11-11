@@ -37,10 +37,11 @@
   </div>
 
   <div class="alert alert-info">
-    Setiap rombel otomatis memakai model yang rentang tingkatnya mencakup tingkat rombel itu — misalnya model
-    <strong>Kelas Bawah</strong> untuk tingkat 1–3 dan <strong>Kelas Atas</strong> untuk tingkat 4–6, masing-masing
-    dengan durasi dan jumlah jamnya sendiri. Tingkat yang tidak tercakup model mana pun mengikuti model umum
-    (rentang tingkat kosong); bila belum ada model sama sekali, yang berlaku pola bawaan.
+    Model dipilih <strong>per rombel</strong> saat menyusun jadwal — dari pemilih model di kepala editor rombel.
+    Jadi kelas bawah dan kelas atas bisa memakai model berbeda (durasi dan jumlah jamnya sendiri-sendiri) tanpa
+    terikat tingkat. Rombel yang belum memilih mengikuti model pertama dalam daftar ini; bila belum ada model sama
+    sekali, yang berlaku pola bawaan. Mengganti model rombel tidak menghapus jadwalnya — kotak yang jatuh di
+    luar kerangka baru akan ditandai di editor.
   </div>
 
   <div class="card mb-4">
@@ -49,7 +50,6 @@
         <thead class="table-light">
           <tr>
             <th>Nama Model</th>
-            <th>Rentang Tingkat</th>
             <th>Kerangka</th>
             <th class="text-center">Dipakai</th>
             <th class="text-end">Aksi</th>
@@ -63,7 +63,6 @@
             @endphp
             <tr>
               <td class="fw-semibold">{{ $m->nama }}</td>
-              <td>{{ $m->labelRentang() }}</td>
               <td>{{ count($hariModel) }} hari aktif · {{ $totalJp }} jam/minggu</td>
               <td class="text-center">{{ $pemakai[$m->id] ?? 0 }} rombel</td>
               <td class="text-end">
@@ -81,7 +80,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="5" class="text-center text-muted py-4">Belum ada model jadwal — semua rombel mengikuti
+              <td colspan="4" class="text-center text-muted py-4">Belum ada model jadwal — semua rombel mengikuti
                 pola bawaan. Buat model pertama di bawah ini.</td>
             </tr>
           @endforelse
@@ -100,22 +99,12 @@
       <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.model.tambah') }}">
         @csrf
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-5">
+          <div class="col-12 col-md-8">
             <label class="form-label" for="nama-model-baru">Nama Model</label>
             <input type="text" id="nama-model-baru" class="form-control" name="nama" value="{{ old('nama') }}"
               maxlength="50" placeholder="mis. Kelas Bawah" required>
           </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="dari-baru">Tingkat Dari</label>
-            <input type="number" id="dari-baru" class="form-control" name="tingkat_dari"
-              value="{{ old('tingkat_dari') }}" min="1" max="12" placeholder="Semua">
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="sampai-baru">Tingkat Sampai</label>
-            <input type="number" id="sampai-baru" class="form-control" name="tingkat_sampai"
-              value="{{ old('tingkat_sampai') }}" min="1" max="12" placeholder="Semua">
-          </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-4">
             <button type="submit" class="btn btn-primary">
               <i class="ri ri-add-line me-1"></i> Buat Model
             </button>

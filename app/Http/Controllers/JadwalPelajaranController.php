@@ -97,10 +97,9 @@ class JadwalPelajaranController extends Controller
     // Model jadwal + total kotak per rombel menurut tingkatnya.
     $modelPerRombel = [];
     foreach ($rombels as $r) {
-      $k = $this->kerangka($sekolah, $semesterId, (int) $r->tingkat);
+      $k = $this->kerangka($sekolah, $semesterId, $r);
       $modelPerRombel[$r->id] = [
         'nama' => $k['model']?->nama ?? 'Pola bawaan',
-        'rentang' => $k['model']?->labelRentang(),
         'total' => array_sum(array_map(
           fn($f) => (int) ($f['jumlah_jam'] ?? 0),
           $k['hari']
@@ -143,17 +142,13 @@ class JadwalPelajaranController extends Controller
     $semesterId = $this->semesterId();
     $models = $this->daftarModel($sekolahId, $semesterId);
 
-    // Hitung rombel pemakai tiap model menurut resolusi tingkat.
-    $pemakai = [];
-    $rombels = Rombel::where('sekolah_id', $sekolahId)
+    // Pemakai = rombel yang secara eksplisit memilih model ini.
+    $pemakai = Rombel::where('sekolah_id', $sekolahId)
       ->where('semester_id', $semesterId)
-      ->get(['id', 'tingkat']);
-    foreach ($rombels as $r) {
-      $m = $this->modelUntuk($sekolahId, $semesterId, (int) $r->tingkat);
-      if ($m) {
-        $pemakai[$m->id] = ($pemakai[$m->id] ?? 0) + 1;
-      }
-    }
+      ->whereNotNull('jadwal_pengaturan_id')
+      ->selectRaw('jadwal_pengaturan_id, COUNT(*) AS c')
+      ->groupBy('jadwal_pengaturan_id')
+      ->pluck('c', 'jadwal_pengaturan_id');
 
     return view('content.jadwal-pelajaran.pengaturan', [
       'sekolah' => $sekolah,
@@ -168,29 +163,16 @@ class JadwalPelajaranController extends Controller
   {
     $data = $request->validate([
       'nama' => 'required|string|max:50',
-      'tingkat_dari' => 'nullable|integer|min:1|max:12',
-      'tingkat_sampai' => 'nullable|integer|min:1|max:12',
     ]);
 
     $sekolahId = $this->sekolahKonteksIdNullable();
     $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
     $semesterId = $this->semesterId();
 
-    $dari = $data['tingkat_dari'] ?? null;
-    $sampai = $data['tingkat_sampai'] ?? null;
-    if ($dari !== null && $sampai !== null && $dari > $sampai) {
-      return back()->with('error', 'Rentang tingkat terbalik: tingkat dari tidak boleh lebih besar dari tingkat sampai.')->withInput();
-    }
-    if ($tabrakan = $this->rentangBentrok($sekolahId, $semesterId, $dari, $sampai, null)) {
-      return back()->with('error', "Rentang tingkat bertumpuk dengan model \"{$tabrakan->nama}\" ({$tabrakan->labelRentang()}). Sesuaikan salah satunya.")->withInput();
-    }
-
     $model = JadwalPengaturan::create([
       'sekolah_id' => $sekolahId,
       'semester_id' => $semesterId,
       'nama' => $data['nama'],
-      'tingkat_dari' => $dari,
-      'tingkat_sampai' => $sampai,
       'kerangka' => $this->kerangkaBawaan($sekolah),
     ]);
     $this->memoModel = [];
@@ -225,7 +207,7 @@ class JadwalPelajaranController extends Controller
 
     return redirect()
       ->route('jadwal-pelajaran.pengaturan')
-      ->with('success', "Model \"{$nama}\" dihapus. Rombel yang tadinya memakai model ini kini mengikuti model lain yang mencakup tingkatnya, model umum, atau pola bawaan.");
+      ->with('success', "Model \"{$nama}\" dihapus. Rombel yang tadinya memilih model ini kini mengikuti model pertama dalam daftar atau pola bawaan; jadwalnya tidak ikut terhapus.");
   }
 
   public function simpanPengaturan(Request $request, $id)
@@ -234,8 +216,6 @@ class JadwalPelajaranController extends Controller
 
     $data = $request->validate([
       'nama' => 'required|string|max:50',
-      'tingkat_dari' => 'nullable|integer|min:1|max:12',
-      'tingkat_sampai' => 'nullable|integer|min:1|max:12',
       'hari' => 'required|array',
       'hari.*.jumlah_jam' => 'nullable|integer|min:0|max:12',
       'hari.*.mulai' => 'nullable|date_format:H:i',
@@ -295,19 +275,8 @@ class JadwalPelajaranController extends Controller
       ];
     }
 
-    $dari = $data['tingkat_dari'] ?? null;
-    $sampai = $data['tingkat_sampai'] ?? null;
-    if ($dari !== null && $sampai !== null && $dari > $sampai) {
-      return back()->with('error', 'Rentang tingkat terbalik: tingkat dari tidak boleh lebih besar dari tingkat sampai.')->withInput();
-    }
-    if ($tabrakan = $this->rentangBentrok($sekolahId, $semesterId, $dari, $sampai, (int) $model->id)) {
-      return back()->with('error', "Rentang tingkat bertumpuk dengan model \"{$tabrakan->nama}\" ({$tabrakan->labelRentang()}). Sesuaikan salah satunya.")->withInput();
-    }
-
     $model->update([
       'nama' => $data['nama'],
-      'tingkat_dari' => $dari,
-      'tingkat_sampai' => $sampai,
       'kerangka' => $kerangka,
     ]);
     $this->memoModel = [];
@@ -315,6 +284,45 @@ class JadwalPelajaranController extends Controller
     return redirect()
       ->route('jadwal-pelajaran.pengaturan.model', $model->id)
       ->with('success', "Model \"{$model->nama}\" tersimpan. Jadwal yang sudah terisi di luar kerangka baru akan ditandai di editor.");
+  }
+
+  /**
+   * Operator memilih model jadwal untuk satu rombel (dari
+   * kepala editor). Jadwal yang sudah terisi TIDAK dihapus:
+   * kotak yang masih masuk kerangka baru tetap berlaku, kotak
+   * yang jatuh di luar kerangka baru ditandai di editor
+   * (daftar "di luar kerangka") untuk ditinjau Operator.
+   */
+  public function pilihModel(Request $request, Rombel $rombel)
+  {
+    $sekolahId = $this->jagaRombel($rombel);
+    $sekolah = Sekolah::findOrFail($sekolahId);
+    $semesterId = $this->semesterId();
+
+    $data = $request->validate([
+      'pengaturan_id' => 'required|integer',
+    ]);
+
+    $modelBaru = $this->daftarModel($sekolahId, $semesterId)
+      ->firstWhere('id', (int) $data['pengaturan_id']);
+    if (!$modelBaru) {
+      return back()->with('error', 'Model jadwal tidak ditemukan untuk sekolah/semester ini.');
+    }
+
+    $rombel->update(['jadwal_pengaturan_id' => $modelBaru->id]);
+
+    $hari = $this->kerangka($sekolah, $semesterId, $rombel)['hari'];
+    $luar = JadwalPelajaran::where('rombel_id', $rombel->id)
+      ->where('semester_id', $semesterId)
+      ->get(['hari', 'jam_ke'])
+      ->filter(fn($b) => !isset($hari[$b->hari])
+        || $b->jam_ke > (int) ($hari[$b->hari]['jumlah_jam'] ?? 0))
+      ->count();
+
+    return back()->with('success', "Model jadwal diganti ke \"{$modelBaru->nama}\"."
+      . ($luar
+        ? " {$luar} kotak berada di luar kerangka baru — lihat daftar peringatan di editor untuk meninjaunya."
+        : ' Jadwal yang sudah terisi tetap berlaku mengikuti kerangka baru.'));
   }
 
   // ── Pengampu per rombel ───────────────────────────────────────
@@ -412,7 +420,7 @@ class JadwalPelajaranController extends Controller
     $sekolahId = $this->jagaRombel($rombel);
     $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
     $semesterId = $this->semesterId();
-    $kerangka = $this->kerangka($sekolah, $semesterId, (int) $rombel->tingkat);
+    $kerangka = $this->kerangka($sekolah, $semesterId, $rombel);
     $hariFrame = $kerangka['hari'];
     $hariAktif = array_keys($hariFrame);
     sort($hariAktif);
@@ -502,6 +510,8 @@ class JadwalPelajaranController extends Controller
       'sibuk' => $sibuk,
       'tersimpan' => $kerangka['tersimpan'],
       'modelJadwal' => $kerangka['model'],
+      'daftarModel' => $this->daftarModel($sekolahId, $semesterId),
+      'totalBaris' => $baris->count(),
       'bolehEdit' => $user->hasRole('Operator Sekolah'),
     ]);
   }
@@ -530,7 +540,7 @@ class JadwalPelajaranController extends Controller
     }
 
     $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
-    $frame = $this->kerangka($sekolah, $semesterId, (int) $rombel->tingkat)['hari'][$data['hari']] ?? null;
+    $frame = $this->kerangka($sekolah, $semesterId, $rombel)['hari'][$data['hari']] ?? null;
     if (!$frame || $data['jam_ke'] > (int) $frame['jumlah_jam']) {
       return response()->json(['message' => 'Kotak itu di luar kerangka jam hari tersebut.'], 422);
     }
@@ -756,37 +766,27 @@ class JadwalPelajaranController extends Controller
   }
 
   /**
-   * Model yang berlaku untuk satu tingkat rombel: model
-   * berentang yang mencakup tingkat itu didahulukan; selain
-   * itu model umum (tanpa rentang); selain itu model pertama
-   * apa pun; null bila sekolah belum punya model sama sekali.
+   * Model yang berlaku untuk satu rombel: model yang DIPILIH
+   * rombel itu (tabel_rombel.jadwal_pengaturan_id) bila masih
+   * ada; selain itu model pertama; null bila sekolah belum
+   * punya model sama sekali. (Keputusan Mark: model dipilih
+   * saat menyusun jadwal, bukan menurut tingkat.)
    */
-  private function modelUntuk(int $sekolahId, int $semesterId, ?int $tingkat): ?JadwalPengaturan
+  private function modelUntuk(int $sekolahId, int $semesterId, ?Rombel $rombel = null): ?JadwalPengaturan
   {
     $models = $this->daftarModel($sekolahId, $semesterId);
     if ($models->isEmpty()) {
       return null;
     }
 
-    if ($tingkat !== null) {
-      $spesifik = $models->first(function ($m) use ($tingkat) {
-        if ($m->tingkat_dari === null && $m->tingkat_sampai === null) {
-          return false;
-        }
-
-        return ($m->tingkat_dari === null || $tingkat >= $m->tingkat_dari)
-          && ($m->tingkat_sampai === null || $tingkat <= $m->tingkat_sampai);
-      });
-      if ($spesifik) {
-        return $spesifik;
+    if ($rombel && $rombel->jadwal_pengaturan_id) {
+      $pilihan = $models->firstWhere('id', (int) $rombel->jadwal_pengaturan_id);
+      if ($pilihan) {
+        return $pilihan;
       }
     }
 
-    $umum = $models->first(
-      fn($m) => $m->tingkat_dari === null && $m->tingkat_sampai === null
-    );
-
-    return $umum ?? $models->first();
+    return $models->first();
   }
 
   /** Kerangka dari satu model; bawaan bila model/kerangka kosong. */
@@ -814,10 +814,10 @@ class JadwalPelajaranController extends Controller
    * pola bawaan bila belum ada model. Bentuk: ['tersimpan',
    * 'hari' => [...], 'model' => ?JadwalPengaturan].
    */
-  private function kerangka(Sekolah $sekolah, int $semesterId, ?int $tingkat = null): array
+  private function kerangka(Sekolah $sekolah, int $semesterId, ?Rombel $rombel = null): array
   {
     return $this->kerangkaModel(
-      $this->modelUntuk($sekolah->id, $semesterId, $tingkat),
+      $this->modelUntuk($sekolah->id, $semesterId, $rombel),
       $sekolah
     );
   }
@@ -829,36 +829,6 @@ class JadwalPelajaranController extends Controller
       ->where('sekolah_id', $this->sekolahKonteksIdNullable())
       ->where('semester_id', $this->semesterId())
       ->firstOrFail();
-  }
-
-  /**
-   * Model berentang lain yang rentangnya bertumpuk dengan
-   * rentang ini (model umum tidak pernah dianggap bentrok —
-   * ia memang jaring pengaman semua tingkat).
-   */
-  private function rentangBentrok(int $sekolahId, int $semesterId, ?int $dari, ?int $sampai, ?int $kecualiId): ?JadwalPengaturan
-  {
-    if ($dari === null && $sampai === null) {
-      return null;
-    }
-    $a1 = $dari ?? 1;
-    $a2 = $sampai ?? 12;
-
-    foreach ($this->daftarModel($sekolahId, $semesterId) as $m) {
-      if ($kecualiId && (int) $m->id === (int) $kecualiId) {
-        continue;
-      }
-      if ($m->tingkat_dari === null && $m->tingkat_sampai === null) {
-        continue;
-      }
-      $b1 = $m->tingkat_dari ?? 1;
-      $b2 = $m->tingkat_sampai ?? 12;
-      if ($a1 <= $b2 && $b1 <= $a2) {
-        return $m;
-      }
-    }
-
-    return null;
   }
 
   /**

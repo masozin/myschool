@@ -611,6 +611,8 @@ Route::controller(JadwalPelajaranController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
     Route::get('/editor/{rombel}', 'editor')->name('editor')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
+    Route::post('/editor/{rombel}/model', 'pilihModel')->name('rombel.model')
+      ->middleware('role:Operator Sekolah');
     Route::get('/pengaturan', 'pengaturan')->name('pengaturan')
       ->middleware('role:Operator Sekolah');
     Route::post('/pengaturan/model', 'tambahModel')->name('pengaturan.model.tambah')

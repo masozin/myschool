@@ -115,7 +115,21 @@
             <span class="mx-1">•</span> Semester {{ $semester->semester }} {{ $semester->tahun_pelajaran }}
           @endif
           <span class="mx-1">•</span> Model:
-          {{ $modelJadwal ? $modelJadwal->nama . ' (' . $modelJadwal->labelRentang() . ')' : 'Pola bawaan' }}
+          @if ($bolehEdit && $daftarModel->isNotEmpty())
+            <form method="POST" action="{{ route('jadwal-pelajaran.rombel.model', $rombel) }}"
+              class="d-inline-block ms-1" id="form-pilih-model">
+              @csrf
+              <select name="pengaturan_id" class="form-select form-select-sm d-inline-block w-auto"
+                onchange="this.form.submit()">
+                @foreach ($daftarModel as $m)
+                  <option value="{{ $m->id }}" {{ $modelJadwal && $modelJadwal->id === $m->id ? 'selected' : '' }}>
+                    {{ $m->nama }}</option>
+                @endforeach
+              </select>
+            </form>
+          @else
+            {{ $modelJadwal ? $modelJadwal->nama : 'Pola bawaan' }}
+          @endif
           @unless ($bolehEdit)
             <span class="mx-1">•</span> Mode lihat saja
           @endunless

@@ -14,7 +14,7 @@ class Rombel extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_rombel';
-  protected $fillable = ['nama_rombel', 'tingkat', 'kurikulum_id', 'semester_id', 'ptk_id', 'sekolah_id'];
+  protected $fillable = ['nama_rombel', 'tingkat', 'kurikulum_id', 'jadwal_pengaturan_id', 'semester_id', 'ptk_id', 'sekolah_id'];
 
   public function semester(): BelongsTo
   {
@@ -44,6 +44,12 @@ class Rombel extends Model
   public function kurikulum(): BelongsTo
   {
     return $this->belongsTo(Kurikulum::class);
+  }
+
+  /** Model jadwal yang dipilih untuk rombel ini (boleh kosong). */
+  public function jadwalPengaturan(): BelongsTo
+  {
+    return $this->belongsTo(JadwalPengaturan::class, 'jadwal_pengaturan_id');
   }
 
   protected static function booted()

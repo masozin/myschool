@@ -21,8 +21,7 @@
       <div class="flex-grow-1">
         <h4 class="mb-1">Model Jadwal: {{ $model->nama }}</h4>
         <div class="text-muted small">
-          {{ $model->labelRentang() }}
-          <span class="mx-1">•</span> Kerangka waktu {{ $sekolah->detailTerbaru->nama_sekolah ?? '-' }}
+          Kerangka waktu {{ $sekolah->detailTerbaru->nama_sekolah ?? '-' }}
           @if ($semester)
             <span class="mx-1">•</span> Semester {{ $semester->semester }} {{ $semester->tahun_pelajaran }}
           @endif
@@ -49,19 +48,9 @@
             <input type="text" id="nama-model" class="form-control" name="nama"
               value="{{ old('nama', $model->nama) }}" maxlength="50" required>
           </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="tingkat-dari">Tingkat Dari</label>
-            <input type="number" id="tingkat-dari" class="form-control" name="tingkat_dari"
-              value="{{ old('tingkat_dari', $model->tingkat_dari) }}" min="1" max="12" placeholder="Semua">
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label" for="tingkat-sampai">Tingkat Sampai</label>
-            <input type="number" id="tingkat-sampai" class="form-control" name="tingkat_sampai"
-              value="{{ old('tingkat_sampai', $model->tingkat_sampai) }}" min="1" max="12" placeholder="Semua">
-          </div>
-          <div class="col-12 col-md-3">
-            <small class="text-muted">Kosongkan kedua tingkat untuk model umum (berlaku bagi tingkat yang tidak
-              tercakup model lain). Rentang antar-model tidak boleh bertumpuk.</small>
+          <div class="col-12 col-md-7">
+            <small class="text-muted">Model dipakai per rombel — dipilih dari pemilih di kepala editor rombel,
+              bukan menurut tingkat. Mengganti model rombel tidak menghapus jadwalnya yang sudah terisi.</small>
           </div>
         </div>
       </div>
