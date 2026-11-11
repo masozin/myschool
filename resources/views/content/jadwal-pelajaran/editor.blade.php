@@ -6,10 +6,50 @@
   @vite(['resources/assets/vendor/libs/sweetalert2/sweetalert2.scss'])
   <style>
     .sel-jadwal {
+      position: relative;
       border: 1px dashed #cfd4da;
-      border-radius: 6px;
-      padding: 4px 6px;
-      min-height: 54px;
+      border-radius: 4px;
+      padding: 6px 6px 6px 28px;
+      overflow: hidden;
+    }
+
+    .nomor-jam {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+      border-radius: 50%;
+      background: #7367f0;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .blok-waktu {
+      border: 1px solid #e3e6ea;
+      border-radius: 4px;
+      padding: 1px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .blok-istirahat {
+      background: #f3f4f6;
+      border-style: dashed;
+      color: #6b7280;
+    }
+
+    .blok-kegiatan {
+      background: #fff9ec;
+      border-color: #ffd88a;
     }
 
     .sel-terisi {
@@ -125,79 +165,69 @@
   <div class="row g-4">
     <div class="col-12 col-xl-9">
       <div class="card">
-        <div class="table-responsive">
-          <table class="table mb-0">
-            <thead class="table-light">
-              <tr>
-                <th style="width: 64px;">Jam</th>
-                @foreach ($hariAktif as $hari)
-                  <th class="text-center">{{ $namaHari[$hari] }}</th>
-                @endforeach
-              </tr>
-            </thead>
-            <tbody>
-              @for ($jam = 1; $jam <= $maxJam + 1; $jam++)
-                @if (in_array($jam - 1, $jangkarKegiatan))
-                  <tr class="table-warning">
-                    <td></td>
-                    @foreach ($hariAktif as $hari)
-                      <td class="p-1">
-                        @foreach ($kegiatanWaktu[$hari][$jam - 1] ?? [] as $keg)
-                          <div style="font-size: 12px;">
-                            <span class="fw-semibold">{{ $keg['nama'] }}</span>
-                            <span class="text-muted"
-                              style="font-size: 10px;">{{ $keg['waktu'][0] }}–{{ $keg['waktu'][1] }}</span>
-                          </div>
-                        @endforeach
-                      </td>
+        <div class="card-body">
+          @php $skala = 2; @endphp
+          <div style="overflow-x: auto;">
+            <div class="d-flex gap-2" style="min-width: 760px;">
+              @foreach ($hariAktif as $hari)
+                @php
+                  $frame = $hariFrame[$hari];
+                  $jumlah = (int) $frame['jumlah_jam'];
+                @endphp
+                <div style="flex: 1 1 0;">
+                  <div class="text-center fw-semibold mb-2">{{ $namaHari[$hari] }}</div>
+                  @if ($jumlah === 0)
+                    <div class="sel-nonaktif">Tidak ada pelajaran</div>
+                  @endif
+                  @for ($anchor = 0; $anchor <= $jumlah; $anchor++)
+                    @foreach ($lainnya[$hari][$anchor] ?? [] as $ev)
+                      <div class="blok-waktu blok-{{ $ev['jenis'] }}"
+                        style="height: {{ $ev['menit'] * $skala }}px; {{ $ev['menit'] * $skala < 16 ? 'font-size: 9px; line-height: 1;' : '' }}"
+                        title="{{ $ev['nama'] }} — {{ $ev['menit'] }} menit ({{ $ev['waktu'][0] }}–{{ $ev['waktu'][1] }})">
+                        <span>{{ $ev['nama'] }} <span class="text-muted"
+                            style="font-size: 10px;">{{ $ev['menit'] }} mnt ·
+                            {{ $ev['waktu'][0] }}–{{ $ev['waktu'][1] }}</span></span>
+                      </div>
                     @endforeach
-                  </tr>
-                @endif
-                @if ($jam <= $maxJam)
-                  <tr>
-                    <td class="fw-semibold text-center align-middle">{{ $jam }}</td>
-                    @foreach ($hariAktif as $hari)
+                    @if ($anchor < $jumlah)
                       @php
-                        $frame = $hariFrame[$hari];
+                        $jam = $anchor + 1;
                         $isi = $sel[$hari][$jam] ?? null;
                       @endphp
-                      <td class="p-1">
-                        @if ($jam <= (int) $frame['jumlah_jam'])
-                          <div
-                            class="sel-jadwal {{ $isi ? 'sel-terisi' : '' }} {{ $isi && !$isi->pengampu_id ? 'sel-kegiatan' : '' }}"
-                            data-hari="{{ $hari }}" data-jam="{{ $jam }}"
-                            data-pengampu="{{ $isi?->pengampu_id ?? '' }}"
-                            data-tipe="{{ $isi ? ($isi->pengampu_id ? 'pelajaran' : 'kegiatan') : '' }}"
-                            data-nama="{{ $isi?->nama_kegiatan ?? '' }}"
-                            data-pembina="{{ $isi?->pembina_id ?? '' }}"
-                            data-waktu="{{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}">
-                            @if ($isi && $isi->pengampu_id)
-                              <div class="fw-semibold" style="font-size: 12px;">
-                                {{ $isi->pengampu->mapping->masterMapel->nama_singkat ?: $isi->pengampu->mapping->masterMapel->nama }}
-                              </div>
-                              <div class="text-muted" style="font-size: 11px;">{{ $isi->pengampu->ptk->nama_ptk }}
-                              </div>
-                            @elseif ($isi)
-                              <div class="fw-semibold" style="font-size: 12px;">{{ $isi->nama_kegiatan }}</div>
-                              @if ($isi->pembina)
-                                <div class="text-muted" style="font-size: 11px;">{{ $isi->pembina->nama_ptk }}</div>
-                              @endif
-                            @else
-                              <div class="text-muted" style="font-size: 12px;">{{ $bolehEdit ? '+ Isi' : '—' }}</div>
-                            @endif
-                            <div class="text-muted" style="font-size: 10px;">
-                              {{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}</div>
+                      <div
+                        class="sel-jadwal {{ $isi ? 'sel-terisi' : '' }} {{ $isi && !$isi->pengampu_id ? 'sel-kegiatan' : '' }}"
+                        style="height: {{ (int) $frame['menit'] * $skala }}px;" data-hari="{{ $hari }}"
+                        data-jam="{{ $jam }}" data-pengampu="{{ $isi?->pengampu_id ?? '' }}"
+                        data-tipe="{{ $isi ? ($isi->pengampu_id ? 'pelajaran' : 'kegiatan') : '' }}"
+                        data-nama="{{ $isi?->nama_kegiatan ?? '' }}"
+                        data-pembina="{{ $isi?->pembina_id ?? '' }}"
+                        data-waktu="{{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}">
+                        <span class="nomor-jam">{{ $jam }}</span>
+                        @if ($isi && $isi->pengampu_id)
+                          <div class="fw-semibold" style="font-size: 12px;">
+                            {{ $isi->pengampu->mapping->masterMapel->nama_singkat ?: $isi->pengampu->mapping->masterMapel->nama }}
                           </div>
+                          <div class="text-muted" style="font-size: 11px;">{{ $isi->pengampu->ptk->nama_ptk }}
+                          </div>
+                        @elseif ($isi)
+                          <div class="fw-semibold" style="font-size: 12px;">{{ $isi->nama_kegiatan }}</div>
+                          @if ($isi->pembina)
+                            <div class="text-muted" style="font-size: 11px;">{{ $isi->pembina->nama_ptk }}</div>
+                          @endif
                         @else
-                          <div class="sel-nonaktif">—</div>
+                          <div class="text-muted" style="font-size: 12px;">{{ $bolehEdit ? '+ Isi' : '—' }}</div>
                         @endif
-                      </td>
-                    @endforeach
-                  </tr>
-                @endif
-              @endfor
-            </tbody>
-          </table>
+                        <div class="text-muted" style="font-size: 10px;">
+                          {{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}</div>
+                      </div>
+                    @endif
+                  @endfor
+                </div>
+              @endforeach
+            </div>
+          </div>
+          <small class="text-muted">Tinggi setiap kotak sebanding dengan durasinya — dua hari yang berakhir pada
+            jam yang sama tingginya sama.</small>
         </div>
       </div>
     </div>
@@ -356,27 +386,28 @@
 
         function gambarSel(el, data) {
           const waktu = el.dataset.waktu;
+          const lencana = `<span class="nomor-jam">${el.dataset.jam}</span>`;
           el.dataset.pengampu = '';
           el.dataset.tipe = '';
           el.dataset.nama = '';
           el.dataset.pembina = '';
           el.classList.remove('sel-terisi', 'sel-kegiatan');
           if (!data) {
-            el.innerHTML = `<div class="text-muted" style="font-size: 12px;">+ Isi</div>
+            el.innerHTML = `${lencana}<div class="text-muted" style="font-size: 12px;">+ Isi</div>
               <div class="text-muted" style="font-size: 10px;">${waktu}</div>`;
           } else if (data.tipe === 'kegiatan') {
             el.dataset.tipe = 'kegiatan';
             el.dataset.nama = data.nama_kegiatan;
             el.dataset.pembina = data.pembina_id || '';
             el.classList.add('sel-terisi', 'sel-kegiatan');
-            el.innerHTML = `<div class="fw-semibold" style="font-size: 12px;">${data.nama_kegiatan}</div>
+            el.innerHTML = `${lencana}<div class="fw-semibold" style="font-size: 12px;">${data.nama_kegiatan}</div>
               ${data.pembina ? `<div class="text-muted" style="font-size: 11px;">${data.pembina}</div>` : ''}
               <div class="text-muted" style="font-size: 10px;">${waktu}</div>`;
           } else {
             el.dataset.tipe = 'pelajaran';
             el.dataset.pengampu = data.pengampu_id;
             el.classList.add('sel-terisi');
-            el.innerHTML = `<div class="fw-semibold" style="font-size: 12px;">${data.singkat}</div>
+            el.innerHTML = `${lencana}<div class="fw-semibold" style="font-size: 12px;">${data.singkat}</div>
               <div class="text-muted" style="font-size: 11px;">${data.guru}</div>
               <div class="text-muted" style="font-size: 10px;">${waktu}</div>`;
           }

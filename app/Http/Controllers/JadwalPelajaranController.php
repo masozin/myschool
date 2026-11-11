@@ -312,25 +312,17 @@ class JadwalPelajaranController extends Controller
       : 0;
 
     // Garis waktu per hari dari kerangka: jam tampil pelajaran
-    // plus posisi & jam tampil kegiatan tetap (Upacara, Senam,
-    // ...) dan istirahat yang menggesernya.
+    // plus SEMUA kejadian non-pelajaran (kegiatan tetap seperti
+    // Upacara/Senam DAN istirahat) per jangkar — editor menggambar
+    // kolom hari sebagai tumpukan blok yang tingginya sebanding
+    // dengan durasi masing-masing.
     $waktu = [];
-    $kegiatanWaktu = [];
-    $jangkarKegiatan = [];
+    $lainnya = [];
     foreach ($hariFrame as $hari => $frame) {
       $gw = $this->garisWaktu($frame);
       $waktu[$hari] = $gw['pelajaran'];
-      foreach ($gw['lainnya'] as $anchor => $items) {
-        foreach ($items as $it) {
-          if ($it['jenis'] === 'kegiatan') {
-            $kegiatanWaktu[$hari][$anchor][] = $it;
-            $jangkarKegiatan[$anchor] = true;
-          }
-        }
-      }
+      $lainnya[$hari] = $gw['lainnya'];
     }
-    $jangkarKegiatan = array_keys($jangkarKegiatan);
-    sort($jangkarKegiatan);
 
     $baris = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk', 'pembina'])
       ->where('rombel_id', $rombel->id)
@@ -393,8 +385,7 @@ class JadwalPelajaranController extends Controller
       'maxJam' => $maxJam,
       'waktu' => $waktu,
       'sel' => $sel,
-      'kegiatanWaktu' => $kegiatanWaktu,
-      'jangkarKegiatan' => $jangkarKegiatan,
+      'lainnya' => $lainnya,
       'guruList' => $guruList,
       'pengampuList' => $pengampuList,
       'terplot' => $terplot,
@@ -708,7 +699,7 @@ class JadwalPelajaranController extends Controller
    * "sesudah jam N" berjangkar N.
    *
    * Hasil: ['pelajaran' => [jamKe => [mulai, selesai]],
-   *         'lainnya'   => [anchor => [['nama','jenis','waktu']]]]
+   *         'lainnya'   => [anchor => [['nama','jenis','menit','waktu']]]]
    */
   private function garisWaktu(array $frame): array
   {
@@ -744,6 +735,7 @@ class JadwalPelajaranController extends Controller
         $lainnya[$anchor][] = [
           'nama' => $ev['nama'],
           'jenis' => $ev['jenis'],
+          'menit' => $ev['menit'],
           'waktu' => [$fmt($t), $fmt($t + $ev['menit'])],
         ];
         $t += $ev['menit'];
