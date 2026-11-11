@@ -329,18 +329,24 @@ class JadwalPelajaranController extends Controller
   }
 
   /**
-   * Unduh template Excel impor jadwal untuk satu model:
-   * semua rombel pemakai model menjadi kolom; baris mengikuti
-   * garis waktu model (kegiatan tetap & istirahat tercetak,
-   * kotak pelajaran kosong untuk diisi kode mapel). Kolom
-   * HARI di-merge per blok hari; baris kegiatan/istirahat
-   * di-merge selebar kolom kelas. Di sampingnya ada blok
-   * KODE GURU yang terisi OTOMATIS dari lookup pengampu
-   * (sheet Pengampu). Format bersyarat pada sel mapel
-   * (mengikuti lembar kerja Mark): MERAH bila kode gurunya
-   * muncul dua kali dalam satu baris (bentrok), ABU bila
-   * kode yang diketik tidak ada di pengampu kelas itu.
-   * Kegiatan non-mapel ditulis berawalan "*" (mis. *Pramuka).
+   * Unduh template Excel impor jadwal untuk satu model.
+   *
+   * Tata letaknya MENYAMAI lembar kerja Mark ("JADWAL SD
+   * NEGERI 01 TOTOREJO KELAS 3-6.FIX"): judul tiga baris,
+   * baris catatan bantu, baris ID_ROMBEL, kepala dua baris
+   * (HARI | WAKTU | JP | KELAS ... | KODE GURU ...), kolom
+   * WAKTU satu kolom berisi rentang, kepala rombel berulang
+   * di setiap blok hari, kolom HARI dan baris kegiatan
+   * di-merge, serta kolom bantu daftar kode mapel di kanan.
+   * Sheet Pengampu berbentuk MATRIKS mapel x rombel berisi
+   * kode guru; kolom kode guru terisi rumus INDEX/MATCH dua
+   * arah dari matriks itu.
+   *
+   * Format bersyarat pada sel mapel: MERAH bila kode guru
+   * baris itu ganda (bentrok), ABU bila kode tidak ada di
+   * daftar bantu. PENTING: rumus format bersyarat ekspresi
+   * wajib dipasang lewat setConditions() — setText() tidak
+   * ditulis penulis Xlsx sehingga aturannya kosong.
    */
   public function templateImpor($id)
   {
@@ -362,82 +368,175 @@ class JadwalPelajaranController extends Controller
       ->get();
 
     $n = $rombels->count();
-    $kolJadwalAwal = 5;                       // kolom E
-    $kolJadwalAkhir = $kolJadwalAwal + $n - 1;
-    $kolCelah = $kolJadwalAkhir + 1;
-    $kolGuruAwal = $kolCelah + 1;
+    $kolKelasAwal = 4;                        // kolom D
+    $kolKelasAkhir = $kolKelasAwal + $n - 1;
+    $kolGuruAwal = $kolKelasAkhir + 2;        // satu kolom celah
     $kolGuruAkhir = $kolGuruAwal + $n - 1;
+    $kolBantu = $kolGuruAkhir + 2;            // satu kolom celah
     $huruf = fn(int $i) => Coordinate::stringFromColumnIndex($i);
+    $awalK = $huruf($kolKelasAwal);
+    $akhirK = $huruf($kolKelasAkhir);
+    $awalT = $huruf($kolGuruAwal);
+    $akhirT = $huruf($kolGuruAkhir);
+    $hurufBantu = $huruf($kolBantu);
+
+    // Matriks pengampu: baris mapel (gabungan semua rombel),
+    // kolom rombel, isi kode guru.
+    $mapelBaris = [];
+    foreach ($pengampus as $p) {
+      $mid = $p->mapping->master_mapel_id;
+      if (!isset($mapelBaris[$mid])) {
+        $mapelBaris[$mid] = [
+          'nama' => $p->mapping->masterMapel->nama ?? '-',
+          'kode' => $this->kodeMapel($p->mapping),
+          'perRombel' => [],
+        ];
+      }
+      $mapelBaris[$mid]['perRombel'][$p->rombel_id] = $p->ptk->kodeGuru();
+    }
+    $mapelBaris = collect($mapelBaris)->sortBy('kode')->values();
+    $barisMatriksAkhir = 2 + $mapelBaris->count();
+    $matAwal = $huruf(3);                     // kolom C di sheet Pengampu
+    $matAkhir = $huruf(3 + $n - 1);
+
+    // Daftar kode untuk kolom bantu (urut, unik).
+    $daftarKode = $mapelBaris->pluck('kode')->unique()->sort()->values();
+    $barisKodeAkhir = 7 + max(1, $daftarKode->count());
 
     $ss = new Spreadsheet();
     $sheet = $ss->getActiveSheet();
     $sheet->setTitle('Jadwal');
+    $rentangJudul = 'A1:' . $hurufBantu . '1';
 
-    $garis = [
-      'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'BFC9D4']]],
-    ];
+    // ── Judul tiga baris (baris 1-3), baris 4 kosong ──
+    $romawi = [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'];
+    $tingkatMin = (int) $rombels->min('tingkat');
+    $tingkatMax = (int) $rombels->max('tingkat');
+    $judulKelas = 'KELAS ' . ($romawi[$tingkatMin] ?? $tingkatMin);
+    if ($tingkatMax !== $tingkatMin) {
+      $judulKelas .= ' SAMPAI ' . ($romawi[$tingkatMax] ?? $tingkatMax);
+    }
+    $sheet->mergeCells($rentangJudul);
+    $sheet->setCellValue('A1', 'JADWAL PEMBELAJARAN ' . $judulKelas);
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+    $sheet->mergeCells('A2:' . $hurufBantu . '2');
+    $sheet->setCellValue('A2', Str::upper($sekolah->detailTerbaru->nama_sekolah ?? ''));
+    $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
+    $sheet->mergeCells('A3:' . $hurufBantu . '3');
+    $labelSemester = $semester
+      ? 'SEMESTER ' . ($semester->semester === 'Genap' ? 'II' : 'I') . ' TAHUN PELAJARAN '
+        . str_replace('/', '-', (string) $semester->tahun_pelajaran)
+      : '';
+    $sheet->setCellValue('A3', $labelSemester . ' — Model "' . $model->nama . '"');
+    $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(11);
+    $sheet->getStyle('A1:' . $hurufBantu . '3')->getAlignment()
+      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-    // Judul
-    $sheet->mergeCells('A1:' . $huruf($kolGuruAkhir) . '1');
-    $sheet->setCellValue('A1', 'JADWAL PELAJARAN — Model "' . $model->nama . '" — '
-      . ($sekolah->detailTerbaru->nama_sekolah ?? '')
-      . ($semester ? ' — Semester ' . $semester->semester . ' ' . $semester->tahun_pelajaran : ''));
-    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(12);
+    // ── Baris 5: catatan bantu ──
+    $sheet->mergeCells($awalT . '5:' . $akhirT . '5');
+    $sheet->setCellValue(
+      $awalT . '5',
+      'kolom bantu untuk format bersyarat, jika dalam 1 baris di tabel ini yang isi cellnya sama maka cell di tabel jadwal berwarna merah'
+    );
+    $sheet->setCellValue($hurufBantu . '5', 'Tabel Bantu untuk mengisi mapel');
+    $sheet->getStyle('A5:' . $hurufBantu . '5')->applyFromArray([
+      'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '808080']],
+      'alignment' => ['wrapText' => true, 'vertical' => Alignment::VERTICAL_CENTER],
+    ]);
+    $sheet->getRowDimension(5)->setRowHeight(26);
 
-    // Baris 2 (tersembunyi): ID rombel per kolom.
-    $sheet->getRowDimension(2)->setVisible(false);
-    $sheet->setCellValue('A2', 'ROMBEL_ID');
+    // ── Baris 6: ID rombel ──
+    $sheet->setCellValue('C6', 'ID_ROMBEL');
     foreach ($rombels as $i => $r) {
-      $sheet->setCellValueByColumnAndRow($kolJadwalAwal + $i, 2, $r->id);
-      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 2, $r->id);
+      $sheet->setCellValueByColumnAndRow($kolKelasAwal + $i, 6, $r->id);
+      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 6, $r->id);
     }
+    $sheet->setCellValue($hurufBantu . '6', 'Tabel Bantu Daftar Nama Mapel');
+    $sheet->getStyle('A6:' . $hurufBantu . '6')->applyFromArray([
+      'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '808080']],
+      'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
 
-    // Baris 3: kepala kolom.
-    $kepala = [1 => 'HARI', 2 => 'MULAI', 3 => 'SELESAI', 4 => 'JAM KE'];
-    foreach ($kepala as $c => $teks) {
-      $sheet->setCellValueByColumnAndRow($c, 3, $teks);
-    }
-    foreach ($rombels as $i => $r) {
-      $sheet->setCellValueByColumnAndRow($kolJadwalAwal + $i, 3, $r->nama_rombel);
-      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 3, $r->nama_rombel);
-    }
-    $sheet->getStyle('A3:' . $huruf($kolJadwalAkhir) . '3')->applyFromArray([
+    // ── Baris 7: kepala kolom ──
+    $sheet->setCellValue('A7', 'HARI');
+    $sheet->setCellValue('B7', 'WAKTU');
+    $sheet->setCellValue('C7', 'JP');
+    $sheet->mergeCells($awalK . '7:' . $akhirK . '7');
+    $sheet->setCellValue($awalK . '7', 'KELAS');
+    $sheet->mergeCells($awalT . '7:' . $akhirT . '7');
+    $sheet->setCellValue($awalT . '7', 'KODE GURU');
+    $sheet->setCellValue($hurufBantu . '7', 'Kode Mapel');
+    $sheet->getStyle('A7:' . $akhirK . '7')->applyFromArray([
       'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
       'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '7367F0']],
       'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
-    $sheet->getStyle($huruf($kolGuruAwal) . '3:' . $huruf($kolGuruAkhir) . '3')->applyFromArray([
+    $sheet->getStyle($awalT . '7:' . $akhirT . '7')->applyFromArray([
       'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
       'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F59E0B']],
       'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
-    // Baris-baris garis waktu per hari.
-    $baris = 4;
-    $awalJ = $huruf($kolJadwalAwal);
-    $akhirJ = $huruf($kolJadwalAkhir);
-    $awalT = $huruf($kolGuruAwal);
-    $akhirT = $huruf($kolGuruAkhir);
+    $sheet->getStyle($hurufBantu . '7')->getFont()->setBold(true);
+
+    // ── Baris 8: nama rombel + awal daftar kode bantu ──
+    foreach ($rombels as $i => $r) {
+      $sheet->setCellValueByColumnAndRow($kolKelasAwal + $i, 8, $r->nama_rombel);
+      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 8, $r->nama_rombel);
+    }
+    $sheet->getStyle($awalK . '8:' . $akhirT . '8')->applyFromArray([
+      'font' => ['bold' => true],
+      'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+    foreach ($daftarKode as $i => $kode) {
+      $sheet->setCellValue($hurufBantu . (8 + $i), $kode);
+    }
+    $barisNamaRombel = $barisKodeAkhir + 2;
+    $sheet->setCellValue($hurufBantu . $barisNamaRombel, 'Nama Rombel');
+    $sheet->getStyle($hurufBantu . $barisNamaRombel)->getFont()->setBold(true);
+    foreach ($rombels as $i => $r) {
+      $sheet->setCellValue($hurufBantu . ($barisNamaRombel + 1 + $i), $r->nama_rombel);
+    }
+
+    // ── Baris data mulai baris 9 ──
+    $baris = 9;
     $hariUrut = array_keys($kerangkaHari);
     sort($hariUrut);
+    $blokPertama = true;
     foreach ($hariUrut as $hari) {
       $frame = $kerangkaHari[$hari];
       $gw = $this->garisWaktu($frame);
       $jumlah = (int) $frame['jumlah_jam'];
+
+      // Kepala rombel berulang di setiap blok hari berikutnya.
+      if (!$blokPertama) {
+        $sheet->setCellValueByColumnAndRow(1, $baris, 'HARI');
+        $sheet->setCellValueByColumnAndRow(2, $baris, 'WAKTU');
+        $sheet->setCellValueByColumnAndRow(3, $baris, 'JP');
+        foreach ($rombels as $i => $r) {
+          $sheet->setCellValueByColumnAndRow($kolKelasAwal + $i, $baris, $r->nama_rombel);
+          $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, $baris, $r->nama_rombel);
+        }
+        $sheet->getStyle('A' . $baris . ':' . $akhirT . $baris)->applyFromArray([
+          'font' => ['bold' => true, 'size' => 10],
+          'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E7E6F5']],
+          'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $baris++;
+      }
+      $blokPertama = false;
       $barisAwalHari = $baris;
 
       for ($anchor = 0; $anchor <= $jumlah; $anchor++) {
         foreach ($gw['lainnya'][$anchor] ?? [] as $ev) {
-          // Baris kegiatan tetap / istirahat: nama kegiatan di
-          // sel pertama, lalu kolom kelas DI-MERGE selebarnya.
-          $sheet->setCellValueByColumnAndRow(1, $baris, Str::upper(self::HARI[$hari]));
-          $sheet->setCellValueByColumnAndRow(2, $baris, $ev['waktu'][0]);
-          $sheet->setCellValueByColumnAndRow(3, $baris, $ev['waktu'][1]);
-          $sheet->setCellValueByColumnAndRow($kolJadwalAwal, $baris, Str::upper($ev['nama']));
-          if ($kolJadwalAkhir > $kolJadwalAwal) {
-            $sheet->mergeCells($awalJ . $baris . ':' . $akhirJ . $baris);
+          // Kegiatan tetap / istirahat: nama di sel pertama,
+          // kolom kelas DI-MERGE selebarnya.
+          $sheet->setCellValueByColumnAndRow(2, $baris, str_replace(':', '.', $ev['waktu'][0]) . ' - ' . str_replace(':', '.', $ev['waktu'][1]));
+          $sheet->setCellValueByColumnAndRow($kolKelasAwal, $baris, Str::upper($ev['nama']));
+          if ($kolKelasAkhir > $kolKelasAwal) {
+            $sheet->mergeCells($awalK . $baris . ':' . $akhirK . $baris);
           }
           $warna = $ev['jenis'] === 'kegiatan' ? 'FFF3D9' : 'ECEFF1';
-          $sheet->getStyle('A' . $baris . ':' . $akhirJ . $baris)->applyFromArray([
+          $sheet->getStyle('A' . $baris . ':' . $akhirK . $baris)->applyFromArray([
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $warna]],
             'font' => ['bold' => $ev['jenis'] === 'kegiatan', 'size' => 10],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -448,50 +547,50 @@ class JadwalPelajaranController extends Controller
         if ($anchor < $jumlah) {
           $jam = $anchor + 1;
           $w = $gw['pelajaran'][$jam];
-          $sheet->setCellValueByColumnAndRow(1, $baris, Str::upper(self::HARI[$hari]));
-          $sheet->setCellValueByColumnAndRow(2, $baris, $w[0]);
-          $sheet->setCellValueByColumnAndRow(3, $baris, $w[1]);
-          $sheet->setCellValueByColumnAndRow(4, $baris, $jam);
+          $sheet->setCellValueByColumnAndRow(2, $baris, str_replace(':', '.', $w[0]) . ' - ' . str_replace(':', '.', $w[1]));
+          $sheet->setCellValueByColumnAndRow(3, $baris, $jam);
           foreach ($rombels as $i => $r) {
-            $kolJ = $huruf($kolJadwalAwal + $i);
+            $kolJ = $huruf($kolKelasAwal + $i);
             $kolT = $huruf($kolGuruAwal + $i);
             $sheet->getStyle($kolJ . $baris)->applyFromArray([
               'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF8E1']],
               'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ]);
-            // Kode guru OTOMATIS: lookup (rombel, kode mapel) ke
-            // sheet Pengampu; "*Kegiatan" tidak berkode guru;
-            // tidak ketemu -> "??".
+            // Kode guru OTOMATIS dari matriks Pengampu:
+            // INDEX dua arah (baris kode mapel x kolom rombel).
+            $lookup = 'INDEX(Pengampu!$' . $matAwal . '$3:$' . $matAkhir . '$' . $barisMatriksAkhir
+              . ',MATCH(UPPER(' . $kolJ . $baris . '),Pengampu!$B$3:$B$' . $barisMatriksAkhir
+              . ',0),MATCH(' . $kolJ . '$6,Pengampu!$' . $matAwal . '$1:$' . $matAkhir . '$1,0))';
             $sheet->setCellValue(
               $kolT . $baris,
-              '=IF(' . $kolJ . $baris . '="","",IF(LEFT(' . $kolJ . $baris . ',1)="*","",IFERROR(INDEX(Pengampu!$E:$E,MATCH('
-                . $kolJ . '$2&"|"&UPPER(' . $kolJ . $baris . '),Pengampu!$G:$G,0)),"??")))'
+              '=IF(' . $kolJ . $baris . '="","",IF(LEFT(' . $kolJ . $baris . ',1)="*","",IF(IFERROR('
+                . $lookup . ',"")="","??",' . $lookup . ')))'
             );
             $sheet->getStyle($kolT . $baris)->getAlignment()
               ->setHorizontal(Alignment::HORIZONTAL_CENTER);
           }
 
-          // Format bersyarat pada SEL MAPEL baris ini (mengikuti
-          // lembar kerja Mark):
-          // - MERAH bila kode guru sel ini muncul >1x sebaris.
-          // - ABU bila kode yang diketik tidak ada di daftar
-          //   pengampu kelas itu (dan bukan "*kegiatan").
+          // Format bersyarat pada SEL MAPEL baris ini:
+          // MERAH bila kode guru muncul >1x sebaris (bentrok);
+          // ABU bila kode tidak ada di daftar bantu. Rumus
+          // dipasang lewat setConditions() — BUKAN setText().
           $cfMerah = new Conditional();
           $cfMerah->setConditionType(Conditional::CONDITION_EXPRESSION);
-          $cfMerah->setText('AND(' . $awalT . $baris . '<>"",' . $awalT . $baris . '<>"??",COUNTIF($'
-            . $awalT . $baris . ':$' . $akhirT . $baris . ',' . $awalT . $baris . ')>1)');
+          $cfMerah->setConditions(['AND(' . $awalT . $baris . '<>"",COUNTIF($'
+            . $awalT . $baris . ':$' . $akhirT . $baris . ',' . $awalT . $baris . ')>1)']);
           $cfMerah->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('FF0000');
           $cfMerah->getStyle()->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
 
           $cfAbu = new Conditional();
           $cfAbu->setConditionType(Conditional::CONDITION_EXPRESSION);
-          $cfAbu->setText('AND(' . $awalJ . $baris . '<>"",LEFT(' . $awalJ . $baris . ',1)<>"*",ISERROR(MATCH('
-            . $awalJ . '$2&"|"&UPPER(' . $awalJ . $baris . '),Pengampu!$G:$G,0)))');
+          $cfAbu->setConditions(['AND(' . $awalK . $baris . '<>"",COUNTIF($' . $hurufBantu
+            . '$8:$' . $hurufBantu . '$' . $barisKodeAkhir . ',' . $awalK . $baris
+            . ')=0,LEFT(' . $awalK . $baris . ',1)<>"*")']);
           $cfAbu->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setRGB('B7B7B7');
 
-          $sheet->getStyle($awalJ . $baris . ':' . $akhirJ . $baris)
+          $sheet->getStyle($awalK . $baris . ':' . $akhirK . $baris)
             ->setConditionalStyles([$cfMerah, $cfAbu]);
 
           $baris++;
@@ -499,6 +598,7 @@ class JadwalPelajaranController extends Controller
       }
 
       // Kolom HARI di-merge sepanjang blok hari ini.
+      $sheet->setCellValueByColumnAndRow(1, $barisAwalHari, Str::upper(self::HARI[$hari]));
       if ($baris - 1 > $barisAwalHari) {
         $sheet->mergeCells('A' . $barisAwalHari . ':A' . ($baris - 1));
       }
@@ -507,52 +607,57 @@ class JadwalPelajaranController extends Controller
     }
     $barisAkhir = $baris - 1;
 
-    // Bingkai seluruh tabel + lebar kolom + bekukan panel.
-    $sheet->getStyle('A3:' . $huruf($kolGuruAkhir) . $barisAkhir)->applyFromArray($garis);
-    $sheet->getStyle('A4:A' . $barisAkhir)->getFont()->setBold(true);
-    $sheet->getStyle('A4:D' . $barisAkhir)->getAlignment()
-      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    // Bingkai + lebar kolom + bekukan panel.
+    $garis = [
+      'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'BFC9D4']]],
+    ];
+    $sheet->getStyle('A7:' . $akhirT . $barisAkhir)->applyFromArray($garis);
+    $sheet->getStyle('B9:B' . $barisAkhir)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getStyle('C9:C' . $barisAkhir)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getStyle('A9:A' . $barisAkhir)->getFont()->setBold(true);
     $sheet->getColumnDimension('A')->setWidth(11);
-    $sheet->getColumnDimension('B')->setWidth(8);
-    $sheet->getColumnDimension('C')->setWidth(8);
-    $sheet->getColumnDimension('D')->setWidth(7);
-    for ($c = $kolJadwalAwal; $c <= $kolJadwalAkhir; $c++) {
+    $sheet->getColumnDimension('B')->setWidth(15);
+    $sheet->getColumnDimension('C')->setWidth(6);
+    for ($c = $kolKelasAwal; $c <= $kolKelasAkhir; $c++) {
       $sheet->getColumnDimension($huruf($c))->setWidth(13);
     }
-    $sheet->getColumnDimension($huruf($kolCelah))->setWidth(3);
+    $sheet->getColumnDimension($huruf($kolKelasAkhir + 1))->setWidth(3);
     for ($c = $kolGuruAwal; $c <= $kolGuruAkhir; $c++) {
       $sheet->getColumnDimension($huruf($c))->setWidth(10);
     }
-    $sheet->freezePane($huruf($kolJadwalAwal) . '4');
+    $sheet->getColumnDimension($huruf($kolGuruAkhir + 1))->setWidth(3);
+    $sheet->getColumnDimension($hurufBantu)->setWidth(16);
+    $sheet->freezePane($huruf($kolKelasAwal) . '9');
 
-    // ── Sheet Pengampu: referensi lookup kode guru ──
+    // ── Sheet Pengampu: MATRIKS mapel x rombel ──
     $ref = $ss->createSheet();
     $ref->setTitle('Pengampu');
-    $ref->fromArray(
-      ['ID Rombel', 'Rombel', 'Kode Mapel', 'Mapel', 'Kode Guru', 'Nama Guru', 'Kunci'],
-      null,
-      'A1'
-    );
-    $ref->getStyle('A1:G1')->getFont()->setBold(true);
-    $rb = 2;
-    foreach ($rombels as $r) {
-      foreach ($pengampus->where('rombel_id', $r->id) as $p) {
-        $kodeMapel = $this->kodeMapel($p->mapping);
-        $ref->fromArray([
-          $r->id,
-          $r->nama_rombel,
-          $kodeMapel,
-          $p->mapping->masterMapel->nama ?? '-',
-          $p->ptk->kodeGuru(),
-          $p->ptk->nama_ptk,
-          $r->id . '|' . Str::upper($kodeMapel),
-        ], null, 'A' . $rb);
-        $rb++;
+    $ref->setCellValue('B1', 'ID_Rombel');
+    foreach ($rombels as $i => $r) {
+      $ref->setCellValueByColumnAndRow(3 + $i, 1, $r->id);
+      $ref->setCellValueByColumnAndRow(3 + $i, 2, $r->nama_rombel);
+    }
+    $ref->setCellValue('A2', 'Nama Mapel');
+    $ref->setCellValue('B2', 'Kode Mapel');
+    $ref->getStyle('A1:' . $matAkhir . '2')->getFont()->setBold(true);
+    $rb = 3;
+    foreach ($mapelBaris as $mb) {
+      $ref->setCellValue('A' . $rb, $mb['nama']);
+      $ref->setCellValue('B' . $rb, $mb['kode']);
+      foreach ($rombels as $i => $r) {
+        $kg = $mb['perRombel'][$r->id] ?? null;
+        if ($kg !== null && $kg !== '') {
+          $ref->setCellValueByColumnAndRow(3 + $i, $rb, $kg);
+        }
       }
+      $rb++;
     }
-    foreach (['A' => 10, 'B' => 16, 'C' => 13, 'D' => 26, 'E' => 11, 'F' => 28, 'G' => 16] as $kol => $lebar) {
-      $ref->getColumnDimension($kol)->setWidth($lebar);
+    $ref->getColumnDimension('A')->setWidth(28);
+    $ref->getColumnDimension('B')->setWidth(13);
+    for ($c = 3; $c < 3 + $n; $c++) {
+      $ref->getColumnDimension($huruf($c))->setWidth(11);
     }
+    $ref->getStyle('A1:' . $matAkhir . ($rb - 1))->applyFromArray($garis);
 
     // ── Sheet Petunjuk ──
     $petunjuk = $ss->createSheet();
@@ -561,12 +666,12 @@ class JadwalPelajaranController extends Controller
     $barisPetunjuk = [
       'PETUNJUK IMPOR JADWAL PELAJARAN',
       '',
-      '1. Isi HANYA kotak kuning pada kolom kelas: ketik KODE MAPEL persis seperti kolom "Kode Mapel" di sheet Pengampu (mis. MTK, PKN, PJOK). Huruf besar/kecil tidak masalah.',
+      '1. Isi HANYA kotak kuning pada kolom kelas: ketik KODE MAPEL persis seperti kolom "Kode Mapel" di sheet Pengampu / daftar bantu di kanan (mis. MTK, PKN, PJOK). Huruf besar/kecil tidak masalah.',
       '2. Untuk kegiatan non-mapel (Pramuka, Kokurikuler, ...), awali dengan tanda bintang: *Pramuka.',
       '3. Kotak yang dikosongkan berarti jam itu kosong — jadwal lama pada jam tersebut akan dihapus saat impor.',
-      '4. Kolom KODE GURU di sebelah kanan terisi otomatis. Sel mapel berwarna MERAH bila guru yang sama mengajar di dua kelas pada jam yang sama (bentrok) — perbaiki sebelum mengimpor. Sel mapel berwarna ABU bila kode yang diketik tidak ada di daftar pengampu kelas itu. Tanda "??" pada kode guru juga berarti kode mapel tidak ditemukan.',
+      '4. Kolom KODE GURU terisi otomatis dari sheet Pengampu. Sel mapel berwarna MERAH bila guru yang sama mengajar di dua kelas pada jam yang sama (bentrok) — perbaiki sebelum mengimpor. Sel mapel berwarna ABU bila kode yang diketik tidak ada di daftar bantu. Tanda "??" pada kode guru berarti mapel itu tidak diajarkan guru mana pun di kelas tersebut.',
       '5. Baris berwarna (UPACARA, LITERASI, ISTIRAHAT, ...) berasal dari kerangka model dan tidak perlu diubah; baris itu dilewati saat impor.',
-      '6. Jangan mengubah baris 1–3, nama sheet, atau urutan kolom. Simpan tetap sebagai .xlsx, lalu unggah lewat tombol Impor pada model ini di halaman Model Jadwal.',
+      '6. Jangan mengubah baris 1-8, nama sheet, atau urutan kolom. Simpan tetap sebagai .xlsx, lalu unggah lewat tombol Impor pada model ini di halaman Model Jadwal.',
       '7. Bila ada kesalahan saat impor, TIDAK ada data yang ditulis — semua diperbaiki dulu, baru impor ulang.',
     ];
     foreach ($barisPetunjuk as $i => $teks) {
@@ -609,11 +714,12 @@ class JadwalPelajaranController extends Controller
       return back()->with('error', 'Sheet "Jadwal" tidak ditemukan — pakai template hasil unduhan dari halaman ini.');
     }
 
-    // Peta kolom -> rombel dari baris ID (baris 2), mulai kolom E.
+    // Peta kolom -> rombel dari baris ID_ROMBEL (baris 6),
+    // blok kelas mulai kolom D.
     $petaKolom = [];
     $kolMaks = Coordinate::columnIndexFromString($sheet->getHighestColumn());
-    for ($c = 5; $c <= $kolMaks; $c++) {
-      $v = trim((string) $sheet->getCellByColumnAndRow($c, 2)->getValue());
+    for ($c = 4; $c <= $kolMaks; $c++) {
+      $v = trim((string) $sheet->getCellByColumnAndRow($c, 6)->getValue());
       if ($v === '' || !is_numeric($v)) {
         break;
       }
@@ -669,15 +775,17 @@ class JadwalPelajaranController extends Controller
     $ops = [];
     $barisMaks = $sheet->getHighestRow();
     $hariAktif = null;
-    for ($row = 4; $row <= $barisMaks; $row++) {
+    for ($row = 9; $row <= $barisMaks; $row++) {
       // Kolom HARI di-merge per blok hari: nilai hanya ada di
-      // baris pertama blok, baris berikutnya meneruskan hari itu.
+      // baris pertama blok, baris berikutnya meneruskan hari
+      // itu. Baris kepala berulang ("HARI") diabaikan karena
+      // bukan nama hari.
       $namaHari = Str::upper(trim((string) $sheet->getCellByColumnAndRow(1, $row)->getValue()));
       if ($namaHari !== '' && isset($petaHari[$namaHari])) {
         $hariAktif = $petaHari[$namaHari];
       }
       $hari = $hariAktif;
-      $jamMentah = $sheet->getCellByColumnAndRow(4, $row)->getValue();
+      $jamMentah = $sheet->getCellByColumnAndRow(3, $row)->getValue();
       if (!$hari || !is_numeric($jamMentah) || (int) $jamMentah < 1) {
         continue;
       }
