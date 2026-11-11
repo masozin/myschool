@@ -8,17 +8,65 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Ptk extends Model
 {
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_ptk';
-  protected $fillable = ['nama_ptk', 'nip', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
 
   protected $casts = [
     'tanggal_keluar' => 'date',
   ];
+
+  protected $appends = ['nama_lengkap'];
+
+  /**
+   * Nama resmi lengkap, dirangkai dari gelar depan + nama +
+   * gelar belakang: "Drs. Budi Santoso, S.Pd., M.Pd".
+   * Gelar ditulis persis seperti tersimpan (kapitalisasi gelar
+   * seperti "S.Pd.SD" tidak diubah).
+   */
+  public function getNamaLengkapAttribute(): string
+  {
+    $nama = trim((string) $this->nama_ptk);
+    $depan = trim((string) ($this->gelar_depan ?? ''));
+    $belakang = trim((string) ($this->gelar_belakang ?? ''));
+
+    $hasil = $depan !== '' ? $depan . ' ' . $nama : $nama;
+    if ($belakang !== '') {
+      $hasil .= ', ' . $belakang;
+    }
+
+    return $hasil;
+  }
+
+  /** Nama lengkap huruf besar semua, mis. untuk kop dokumen. */
+  public function getNamaUpperAttribute(): string
+  {
+    return Str::upper($this->nama_lengkap);
+  }
+
+  /**
+   * Nama lengkap dengan nama diri ditulis Proper Case
+   * ("budi santoso" → "Budi Santoso"); gelar tetap persis
+   * seperti tersimpan agar "S.Pd.SD" tidak berubah.
+   */
+  public function getNamaProperAttribute(): string
+  {
+    $nama = Str::title(Str::lower(trim((string) $this->nama_ptk)));
+    $depan = trim((string) ($this->gelar_depan ?? ''));
+    $belakang = trim((string) ($this->gelar_belakang ?? ''));
+
+    $hasil = $depan !== '' ? $depan . ' ' . $nama : $nama;
+    if ($belakang !== '') {
+      $hasil .= ', ' . $belakang;
+    }
+
+    return $hasil;
+  }
 
   public function user(): BelongsTo
   {

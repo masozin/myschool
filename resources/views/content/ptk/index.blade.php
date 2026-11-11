@@ -48,8 +48,25 @@
         <input type="hidden" name="id" id="ptk-id">
 
         <div class="form-floating form-floating-outline mb-5">
-          <input type="text" class="form-control" id="nama_ptk" name="nama_ptk" placeholder="Nama Lengkap" />
-          <label for="nama_ptk">Nama Lengkap</label>
+          <input type="text" class="form-control" id="nama_ptk" name="nama_ptk" placeholder="Nama (tanpa gelar)" />
+          <label for="nama_ptk">Nama (tanpa gelar)</label>
+        </div>
+
+        <div class="row">
+          <div class="col-5">
+            <div class="form-floating form-floating-outline mb-5">
+              <input type="text" class="form-control" id="gelar_depan" name="gelar_depan"
+                placeholder="Gelar Depan" />
+              <label for="gelar_depan">Gelar Depan</label>
+            </div>
+          </div>
+          <div class="col-7">
+            <div class="form-floating form-floating-outline mb-5">
+              <input type="text" class="form-control" id="gelar_belakang" name="gelar_belakang"
+                placeholder="Gelar Belakang" />
+              <label for="gelar_belakang">Gelar Belakang</label>
+            </div>
+          </div>
         </div>
 
         <div class="form-floating form-floating-outline mb-5">
@@ -239,7 +256,7 @@
             {
               targets: 1, // Gabungkan Nama & NIP
               render: function(data, type, full) {
-                return `<div><span class="fw-medium text-uppercase">${full.nama_ptk}</span><br><small class="text-muted">${full.nip ||
+                return `<div><span class="fw-medium">${full.nama_lengkap || full.nama_ptk}</span><br><small class="text-muted">${full.nip ||
       '-'}</small></div>`;
               }
             },
@@ -552,6 +569,8 @@
 
             document.getElementById('ptk-id').value = data.id;
             document.getElementById('nama_ptk').value = data.nama_ptk;
+            document.getElementById('gelar_depan').value = data.gelar_depan || '';
+            document.getElementById('gelar_belakang').value = data.gelar_belakang || '';
             document.getElementById('nip').value = data.nip || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';
             document.getElementById('jabatan').value = data.jabatan || '';
