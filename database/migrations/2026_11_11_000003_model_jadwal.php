@@ -56,15 +56,19 @@ return new class extends Migration
       ->pluck('name')
       ->all();
 
-    if (in_array('uniq_jadwal_pengaturan', $namaIndeks, true)) {
-      Schema::table('tabel_jadwal_pengaturan', function (Blueprint $table) {
-        $table->dropUnique('uniq_jadwal_pengaturan');
-      });
-    }
-
+    // URUTAN PENTING: index pengganti dibuat DULU, baru unique
+    // dihapus. Unique lama menopang foreign key sekolah_id,
+    // sehingga MySQL menolak menghapusnya (error 1553) selama
+    // belum ada index lain yang kolom pertamanya sekolah_id.
     if (!in_array('idx_jadwal_pengaturan_sekolah_semester', $namaIndeks, true)) {
       Schema::table('tabel_jadwal_pengaturan', function (Blueprint $table) {
         $table->index(['sekolah_id', 'semester_id'], 'idx_jadwal_pengaturan_sekolah_semester');
+      });
+    }
+
+    if (in_array('uniq_jadwal_pengaturan', $namaIndeks, true)) {
+      Schema::table('tabel_jadwal_pengaturan', function (Blueprint $table) {
+        $table->dropUnique('uniq_jadwal_pengaturan');
       });
     }
 
