@@ -11,7 +11,17 @@ use App\Models\Rombel;
 use App\Models\Sekolah;
 use App\Models\Semester;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Conditional;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 
 /**
  * Jadwal Pelajaran (fase 1: fondasi & penyusunan).
@@ -284,6 +294,473 @@ class JadwalPelajaranController extends Controller
     return redirect()
       ->route('jadwal-pelajaran.pengaturan.model', $model->id)
       ->with('success', "Model \"{$model->nama}\" tersimpan. Jadwal yang sudah terisi di luar kerangka baru akan ditandai di editor.");
+  }
+
+  /** Kode mapel untuk kertas kerja: kode, lalu nama_singkat, lalu nama. */
+  private function kodeMapel(MapelMapping $mapping): string
+  {
+    $master = $mapping->masterMapel;
+    $kode = trim((string) ($master->kode ?? ''));
+    if ($kode === '') {
+      $kode = trim((string) ($master->nama_singkat ?? ''));
+    }
+    if ($kode === '') {
+      $kode = trim((string) ($master->nama ?? '-'));
+    }
+
+    return $kode;
+  }
+
+  /** Rombel-rombel yang model efektifnya adalah model ini. */
+  private function rombelPemakaiModel(JadwalPengaturan $model, int $sekolahId, int $semesterId)
+  {
+    return Rombel::with('ptk')
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->orderBy('tingkat')
+      ->orderBy('nama_rombel')
+      ->get()
+      ->filter(function ($r) use ($model, $sekolahId, $semesterId) {
+        $m = $this->modelUntuk($sekolahId, $semesterId, $r);
+
+        return $m && $m->id === $model->id;
+      })
+      ->values();
+  }
+
+  /**
+   * Unduh template Excel impor jadwal untuk satu model:
+   * semua rombel pemakai model menjadi kolom; baris mengikuti
+   * garis waktu model (kegiatan tetap & istirahat tercetak,
+   * kotak pelajaran kosong untuk diisi kode mapel). Di
+   * sampingnya ada blok KODE GURU yang terisi OTOMATIS dari
+   * lookup pengampu (sheet Pengampu) dan memerah bila satu
+   * kode guru muncul dua kali dalam satu baris (bentrok).
+   */
+  public function templateImpor($id)
+  {
+    $model = $this->cariModel($id);
+    $sekolahId = (int) $model->sekolah_id;
+    $semesterId = (int) $model->semester_id;
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+    $semester = Semester::find($semesterId);
+
+    $rombels = $this->rombelPemakaiModel($model, $sekolahId, $semesterId);
+    if ($rombels->isEmpty()) {
+      return back()->with('error', 'Belum ada rombel yang memakai model ini — pilih dulu modelnya dari editor rombel.');
+    }
+
+    $kerangkaHari = $this->kerangkaModel($model, $sekolah)['hari'];
+    $pengampus = Pengampu::with(['mapping.masterMapel', 'ptk'])
+      ->whereIn('rombel_id', $rombels->pluck('id'))
+      ->where('semester_id', $semesterId)
+      ->get();
+
+    $n = $rombels->count();
+    $kolJadwalAwal = 5;                       // kolom E
+    $kolJadwalAkhir = $kolJadwalAwal + $n - 1;
+    $kolCelah = $kolJadwalAkhir + 1;
+    $kolGuruAwal = $kolCelah + 1;
+    $kolGuruAkhir = $kolGuruAwal + $n - 1;
+    $huruf = fn(int $i) => Coordinate::stringFromColumnIndex($i);
+
+    $ss = new Spreadsheet();
+    $sheet = $ss->getActiveSheet();
+    $sheet->setTitle('Jadwal');
+
+    $garis = [
+      'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'BFC9D4']]],
+    ];
+
+    // Judul
+    $sheet->mergeCells('A1:' . $huruf($kolGuruAkhir) . '1');
+    $sheet->setCellValue('A1', 'JADWAL PELAJARAN — Model "' . $model->nama . '" — '
+      . ($sekolah->detailTerbaru->nama_sekolah ?? '')
+      . ($semester ? ' — Semester ' . $semester->semester . ' ' . $semester->tahun_pelajaran : ''));
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(12);
+
+    // Baris 2 (tersembunyi): ID rombel per kolom.
+    $sheet->getRowDimension(2)->setVisible(false);
+    $sheet->setCellValue('A2', 'ROMBEL_ID');
+    foreach ($rombels as $i => $r) {
+      $sheet->setCellValueByColumnAndRow($kolJadwalAwal + $i, 2, $r->id);
+      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 2, $r->id);
+    }
+
+    // Baris 3: kepala kolom.
+    $kepala = [1 => 'HARI', 2 => 'MULAI', 3 => 'SELESAI', 4 => 'JAM KE'];
+    foreach ($kepala as $c => $teks) {
+      $sheet->setCellValueByColumnAndRow($c, 3, $teks);
+    }
+    foreach ($rombels as $i => $r) {
+      $sheet->setCellValueByColumnAndRow($kolJadwalAwal + $i, 3, $r->nama_rombel);
+      $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 3, $r->nama_rombel);
+    }
+    $sheet->getStyle('A3:' . $huruf($kolJadwalAkhir) . '3')->applyFromArray([
+      'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+      'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '7367F0']],
+      'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+    $sheet->getStyle($huruf($kolGuruAwal) . '3:' . $huruf($kolGuruAkhir) . '3')->applyFromArray([
+      'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+      'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F59E0B']],
+      'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+    ]);
+    // Baris-baris garis waktu per hari.
+    $baris = 4;
+    $hariUrut = array_keys($kerangkaHari);
+    sort($hariUrut);
+    foreach ($hariUrut as $hari) {
+      $frame = $kerangkaHari[$hari];
+      $gw = $this->garisWaktu($frame);
+      $jumlah = (int) $frame['jumlah_jam'];
+
+      for ($anchor = 0; $anchor <= $jumlah; $anchor++) {
+        foreach ($gw['lainnya'][$anchor] ?? [] as $ev) {
+          $sheet->setCellValueByColumnAndRow(1, $baris, Str::upper(self::HARI[$hari]));
+          $sheet->setCellValueByColumnAndRow(2, $baris, $ev['waktu'][0]);
+          $sheet->setCellValueByColumnAndRow(3, $baris, $ev['waktu'][1]);
+          foreach ($rombels as $i => $r) {
+            $sheet->setCellValueByColumnAndRow($kolJadwalAwal + $i, $baris, Str::upper($ev['nama']));
+          }
+          $warna = $ev['jenis'] === 'kegiatan' ? 'FFF3D9' : 'ECEFF1';
+          $sheet->getStyle('A' . $baris . ':' . $huruf($kolJadwalAkhir) . $baris)->applyFromArray([
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $warna]],
+            'font' => ['bold' => $ev['jenis'] === 'kegiatan', 'size' => 10],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+          ]);
+          $baris++;
+        }
+
+        if ($anchor < $jumlah) {
+          $jam = $anchor + 1;
+          $w = $gw['pelajaran'][$jam];
+          $sheet->setCellValueByColumnAndRow(1, $baris, Str::upper(self::HARI[$hari]));
+          $sheet->setCellValueByColumnAndRow(2, $baris, $w[0]);
+          $sheet->setCellValueByColumnAndRow(3, $baris, $w[1]);
+          $sheet->setCellValueByColumnAndRow(4, $baris, $jam);
+          foreach ($rombels as $i => $r) {
+            $kolJ = $huruf($kolJadwalAwal + $i);
+            $kolT = $huruf($kolGuruAwal + $i);
+            $sheet->getStyle($kolJ . $baris)->applyFromArray([
+              'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF8E1']],
+              'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            ]);
+            // Kode guru OTOMATIS: lookup (rombel, kode mapel) ke
+            // sheet Pengampu; "+Kegiatan" tidak berkode guru;
+            // tidak ketemu -> "??".
+            $sheet->setCellValue(
+              $kolT . $baris,
+              '=IF(' . $kolJ . $baris . '="","",IF(LEFT(' . $kolJ . $baris . ',1)="+","",IFERROR(INDEX(Pengampu!$E:$E,MATCH('
+                . $kolJ . '$2&"|"&UPPER(' . $kolJ . $baris . '),Pengampu!$G:$G,0)),"??")))'
+            );
+            $sheet->getStyle($kolT . $baris)->getAlignment()
+              ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+          }
+          $baris++;
+        }
+      }
+    }
+    $barisAkhir = $baris - 1;
+
+    // Bingkai seluruh tabel + lebar kolom + bekukan panel.
+    $sheet->getStyle('A3:' . $huruf($kolGuruAkhir) . $barisAkhir)->applyFromArray($garis);
+    $sheet->getStyle('A4:A' . $barisAkhir)->getFont()->setBold(true);
+    $sheet->getStyle('A4:D' . $barisAkhir)->getAlignment()
+      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet->getColumnDimension('A')->setWidth(11);
+    $sheet->getColumnDimension('B')->setWidth(8);
+    $sheet->getColumnDimension('C')->setWidth(8);
+    $sheet->getColumnDimension('D')->setWidth(7);
+    for ($c = $kolJadwalAwal; $c <= $kolJadwalAkhir; $c++) {
+      $sheet->getColumnDimension($huruf($c))->setWidth(13);
+    }
+    $sheet->getColumnDimension($huruf($kolCelah))->setWidth(3);
+    for ($c = $kolGuruAwal; $c <= $kolGuruAkhir; $c++) {
+      $sheet->getColumnDimension($huruf($c))->setWidth(10);
+    }
+    $sheet->freezePane($huruf($kolJadwalAwal) . '4');
+
+    // Blok kode guru memerah bila satu kode muncul >1x sebaris.
+    $awalT = $huruf($kolGuruAwal);
+    $akhirT = $huruf($kolGuruAkhir);
+    $kondisi = new Conditional();
+    $kondisi->setConditionType(Conditional::CONDITION_EXPRESSION);
+    $kondisi->setText('AND(' . $awalT . '4<>"",' . $awalT . '4<>"??",COUNTIF($' . $awalT . '4:$' . $akhirT . '4,' . $awalT . '4)>1)');
+    $kondisi->getStyle()->getFill()->setFillType(Fill::FILL_SOLID)
+      ->getStartColor()->setRGB('FFC7CE');
+    $kondisi->getStyle()->getFont()->getColor()->setRGB('9C0006');
+    $sheet->getStyle($awalT . '4:' . $akhirT . $barisAkhir)
+      ->setConditionalStyles([$kondisi]);
+
+    // ── Sheet Pengampu: referensi lookup kode guru ──
+    $ref = $ss->createSheet();
+    $ref->setTitle('Pengampu');
+    $ref->fromArray(
+      ['ID Rombel', 'Rombel', 'Kode Mapel', 'Mapel', 'Kode Guru', 'Nama Guru', 'Kunci'],
+      null,
+      'A1'
+    );
+    $ref->getStyle('A1:G1')->getFont()->setBold(true);
+    $rb = 2;
+    foreach ($rombels as $r) {
+      foreach ($pengampus->where('rombel_id', $r->id) as $p) {
+        $kodeMapel = $this->kodeMapel($p->mapping);
+        $ref->fromArray([
+          $r->id,
+          $r->nama_rombel,
+          $kodeMapel,
+          $p->mapping->masterMapel->nama ?? '-',
+          $p->ptk->kodeGuru(),
+          $p->ptk->nama_ptk,
+          $r->id . '|' . Str::upper($kodeMapel),
+        ], null, 'A' . $rb);
+        $rb++;
+      }
+    }
+    foreach (['A' => 10, 'B' => 16, 'C' => 13, 'D' => 26, 'E' => 11, 'F' => 28, 'G' => 16] as $kol => $lebar) {
+      $ref->getColumnDimension($kol)->setWidth($lebar);
+    }
+
+    // ── Sheet Petunjuk ──
+    $petunjuk = $ss->createSheet();
+    $petunjuk->setTitle('Petunjuk');
+    $petunjuk->getColumnDimension('A')->setWidth(115);
+    $barisPetunjuk = [
+      'PETUNJUK IMPOR JADWAL PELAJARAN',
+      '',
+      '1. Isi HANYA kotak kuning pada kolom kelas: ketik KODE MAPEL persis seperti kolom "Kode Mapel" di sheet Pengampu (mis. MTK, PKN, PJOK). Huruf besar/kecil tidak masalah.',
+      '2. Untuk kegiatan non-mapel (Pramuka, Kokurikuler, ...), awali dengan tanda tambah: +Pramuka.',
+      '3. Kotak yang dikosongkan berarti jam itu kosong — jadwal lama pada jam tersebut akan dihapus saat impor.',
+      '4. Kolom KODE GURU di sebelah kanan terisi otomatis. Bila berwarna MERAH, guru yang sama mengajar di dua kelas pada jam yang sama (bentrok) — perbaiki sebelum mengimpor. Tanda "??" berarti kode mapel tidak ditemukan di pengampu kelas itu.',
+      '5. Baris berwarna (UPACARA, LITERASI, ISTIRAHAT, ...) berasal dari kerangka model dan tidak perlu diubah; baris itu dilewati saat impor.',
+      '6. Jangan mengubah baris 1–3, nama sheet, atau urutan kolom. Simpan tetap sebagai .xlsx, lalu unggah lewat tombol Impor pada model ini di halaman Model Jadwal.',
+      '7. Bila ada kesalahan saat impor, TIDAK ada data yang ditulis — semua diperbaiki dulu, baru impor ulang.',
+    ];
+    foreach ($barisPetunjuk as $i => $teks) {
+      $petunjuk->setCellValue('A' . ($i + 1), $teks);
+    }
+    $petunjuk->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+    $petunjuk->getStyle('A1:A' . count($barisPetunjuk))->getAlignment()->setWrapText(true);
+
+    $ss->setActiveSheetIndex(0);
+    $namaFile = 'template-jadwal-' . Str::slug($model->nama) . '.xlsx';
+    $path = tempnam(sys_get_temp_dir(), 'tpl-jadwal-') . '.xlsx';
+    (new XlsxWriter($ss))->save($path);
+
+    return response()->download($path, $namaFile)->deleteFileAfterSend(true);
+  }
+
+  /**
+   * Impor jadwal dari template Excel model ini. Semantiknya
+   * MENGGANTI isi kotak dalam kerangka untuk rombel-rombel di
+   * template: kotak kosong = dikosongkan. Semua divalidasi
+   * dulu (kode mapel dikenal & berpengampu, guru tidak
+   * bentrok di dalam berkas maupun dengan rombel lain); satu
+   * kesalahan saja membatalkan seluruh impor.
+   */
+  public function imporJadwal(Request $request, $id)
+  {
+    $model = $this->cariModel($id);
+    $request->validate(['file' => 'required|file|mimes:xlsx|max:5120']);
+    $sekolahId = (int) $model->sekolah_id;
+    $semesterId = (int) $model->semester_id;
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+
+    try {
+      $wb = IOFactory::load($request->file('file')->getRealPath());
+    } catch (\Throwable $e) {
+      return back()->with('error', 'Berkas tidak bisa dibaca sebagai Excel (.xlsx).');
+    }
+    $sheet = $wb->getSheetByName('Jadwal');
+    if (!$sheet) {
+      return back()->with('error', 'Sheet "Jadwal" tidak ditemukan — pakai template hasil unduhan dari halaman ini.');
+    }
+
+    // Peta kolom -> rombel dari baris ID (baris 2), mulai kolom E.
+    $petaKolom = [];
+    $kolMaks = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+    for ($c = 5; $c <= $kolMaks; $c++) {
+      $v = trim((string) $sheet->getCellByColumnAndRow($c, 2)->getValue());
+      if ($v === '' || !is_numeric($v)) {
+        break;
+      }
+      $petaKolom[$c] = (int) $v;
+    }
+    if ($petaKolom === []) {
+      return back()->with('error', 'Struktur template tidak dikenal (baris ID rombel kosong). Unduh template baru.');
+    }
+
+    $rombelIds = array_values(array_unique(array_values($petaKolom)));
+    $rombels = Rombel::whereIn('id', $rombelIds)->get()->keyBy('id');
+    $kesalahan = [];
+    foreach ($rombelIds as $rid) {
+      $r = $rombels->get($rid);
+      if (!$r || (int) $r->sekolah_id !== $sekolahId || (int) $r->semester_id !== $semesterId) {
+        $kesalahan[] = "Rombel ID {$rid} di template tidak termasuk sekolah/semester ini.";
+        continue;
+      }
+      $m = $this->modelUntuk($sekolahId, $semesterId, $r);
+      if (!$m || $m->id !== $model->id) {
+        $kesalahan[] = "Rombel {$r->nama_rombel} tidak lagi memakai model \"{$model->nama}\" — unduh template baru.";
+      }
+    }
+    if ($kesalahan) {
+      return back()->with('impor_errors', $kesalahan)
+        ->with('error', 'Impor dibatalkan — tidak ada data yang ditulis.');
+    }
+
+    // Peta kode mapel per rombel dari pengampu.
+    $pengampus = Pengampu::with(['mapping.masterMapel', 'ptk'])
+      ->whereIn('rombel_id', $rombelIds)
+      ->where('semester_id', $semesterId)
+      ->get();
+    $petaKode = [];
+    foreach ($pengampus as $p) {
+      $kandidat = [
+        Str::upper($this->kodeMapel($p->mapping)),
+        Str::upper((string) ($p->mapping->masterMapel->nama_singkat ?? '')),
+        Str::upper((string) ($p->mapping->masterMapel->nama ?? '')),
+      ];
+      foreach ($kandidat as $kunciKode) {
+        if ($kunciKode !== '' && !isset($petaKode[$p->rombel_id][$kunciKode])) {
+          $petaKode[$p->rombel_id][$kunciKode] = $p;
+        }
+      }
+    }
+
+    // Baca kotak-kotak dari sheet.
+    $petaHari = [];
+    foreach (self::HARI as $no => $namaH) {
+      $petaHari[Str::upper($namaH)] = $no;
+    }
+    $ops = [];
+    $barisMaks = $sheet->getHighestRow();
+    for ($row = 4; $row <= $barisMaks; $row++) {
+      $namaHari = Str::upper(trim((string) $sheet->getCellByColumnAndRow(1, $row)->getValue()));
+      $hari = $petaHari[$namaHari] ?? null;
+      $jamMentah = $sheet->getCellByColumnAndRow(4, $row)->getValue();
+      if (!$hari || !is_numeric($jamMentah) || (int) $jamMentah < 1) {
+        continue;
+      }
+      $jam = (int) $jamMentah;
+      foreach ($petaKolom as $c => $rid) {
+        $mentah = trim((string) $sheet->getCellByColumnAndRow($c, $row)->getValue());
+        if ($mentah === '') {
+          continue;
+        }
+        if (Str::startsWith($mentah, '+')) {
+          $namaK = trim(Str::substr($mentah, 1));
+          if ($namaK !== '') {
+            $ops[$rid][$hari][$jam] = ['tipe' => 'kegiatan', 'nama' => Str::limit($namaK, 100, '')];
+          }
+          continue;
+        }
+        $p = $petaKode[$rid][Str::upper($mentah)] ?? null;
+        if (!$p) {
+          $kesalahan[] = "{$namaHari} jam {$jam}, rombel {$rombels[$rid]->nama_rombel}: kode \"{$mentah}\" tidak dikenal / mapelnya belum ada pengampu.";
+          continue;
+        }
+        $ops[$rid][$hari][$jam] = ['tipe' => 'pelajaran', 'pengampu' => $p];
+      }
+    }
+
+    // Bentrok guru di dalam berkas ini.
+    $slot = [];
+    foreach ($ops as $rid => $perHari) {
+      foreach ($perHari as $hari => $perJam) {
+        foreach ($perJam as $jam => $op) {
+          if ($op['tipe'] !== 'pelajaran') {
+            continue;
+          }
+          $ptkId = $op['pengampu']->ptk_id;
+          $k = $hari . '-' . $jam;
+          if (isset($slot[$k][$ptkId])) {
+            $kesalahan[] = self::HARI[$hari] . " jam {$jam}: guru {$op['pengampu']->ptk->nama_ptk} bentrok — mengajar di {$slot[$k][$ptkId]} dan {$rombels[$rid]->nama_rombel}.";
+          } else {
+            $slot[$k][$ptkId] = $rombels[$rid]->nama_rombel;
+          }
+        }
+      }
+    }
+
+    // Bentrok dengan jadwal rombel lain di sekolah ini.
+    if ($kesalahan === []) {
+      $rombelLainIds = Rombel::where('sekolah_id', $sekolahId)
+        ->where('semester_id', $semesterId)
+        ->whereNotIn('id', $rombelIds)
+        ->pluck('id');
+      $lain = JadwalPelajaran::with(['pengampu.ptk', 'rombel'])
+        ->whereIn('rombel_id', $rombelLainIds)
+        ->whereNotNull('pengampu_id')
+        ->get();
+      $slotLain = [];
+      foreach ($lain as $j) {
+        $slotLain[$j->hari . '-' . $j->jam_ke][$j->pengampu->ptk_id] = $j->rombel->nama_rombel;
+      }
+      foreach ($ops as $rid => $perHari) {
+        foreach ($perHari as $hari => $perJam) {
+          foreach ($perJam as $jam => $op) {
+            if ($op['tipe'] !== 'pelajaran') {
+              continue;
+            }
+            $ptkId = $op['pengampu']->ptk_id;
+            $k = $hari . '-' . $jam;
+            if (isset($slotLain[$k][$ptkId])) {
+              $kesalahan[] = self::HARI[$hari] . " jam {$jam}, rombel {$rombels[$rid]->nama_rombel}: guru {$op['pengampu']->ptk->nama_ptk} sudah mengajar di rombel {$slotLain[$k][$ptkId]} pada jam yang sama.";
+            }
+          }
+        }
+      }
+    }
+
+    if ($kesalahan) {
+      return back()->with('impor_errors', array_slice($kesalahan, 0, 30))
+        ->with('error', 'Impor dibatalkan — tidak ada data yang ditulis. Perbaiki dulu:');
+    }
+
+    $kerangkaHari = $this->kerangkaModel($model, $sekolah)['hari'];
+    $terisi = 0;
+    $kegiatan = 0;
+    $dikosongkan = 0;
+    DB::transaction(function () use ($ops, $rombelIds, $kerangkaHari, $semesterId, $sekolahId, &$terisi, &$kegiatan, &$dikosongkan) {
+      foreach ($rombelIds as $rid) {
+        foreach ($kerangkaHari as $hari => $frame) {
+          for ($jam = 1; $jam <= (int) $frame['jumlah_jam']; $jam++) {
+            $op = $ops[$rid][$hari][$jam] ?? null;
+            $kunci = [
+              'rombel_id' => $rid,
+              'semester_id' => $semesterId,
+              'hari' => $hari,
+              'jam_ke' => $jam,
+            ];
+            if (!$op) {
+              $dikosongkan += JadwalPelajaran::where($kunci)->delete();
+              continue;
+            }
+            if ($op['tipe'] === 'pelajaran') {
+              JadwalPelajaran::updateOrCreate($kunci, [
+                'sekolah_id' => $sekolahId,
+                'pengampu_id' => $op['pengampu']->id,
+                'nama_kegiatan' => null,
+                'pembina_id' => null,
+              ]);
+              $terisi++;
+            } else {
+              JadwalPelajaran::updateOrCreate($kunci, [
+                'sekolah_id' => $sekolahId,
+                'pengampu_id' => null,
+                'nama_kegiatan' => $op['nama'],
+                'pembina_id' => null,
+              ]);
+              $kegiatan++;
+            }
+          }
+        }
+      }
+    });
+
+    return back()->with('success', "Impor jadwal model \"{$model->nama}\" berhasil: {$terisi} kotak pelajaran terisi, {$kegiatan} kegiatan, {$dikosongkan} kotak dikosongkan.");
   }
 
   /**

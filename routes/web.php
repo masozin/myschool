@@ -623,6 +623,10 @@ Route::controller(JadwalPelajaranController::class)
       ->middleware('role:Operator Sekolah');
     Route::post('/pengaturan/{id}/hapus', 'hapusModel')->name('pengaturan.model.hapus')
       ->middleware('role:Operator Sekolah');
+    Route::get('/pengaturan/{id}/template-impor', 'templateImpor')->name('pengaturan.model.template-impor')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/pengaturan/{id}/impor', 'imporJadwal')->name('pengaturan.model.impor')
+      ->middleware('role:Operator Sekolah');
     Route::get('/pengampu/{rombel}', 'pengampu')->name('pengampu')
       ->middleware('role:Operator Sekolah');
     Route::post('/pengampu/{rombel}', 'simpanPengampu')->name('pengampu.simpan')

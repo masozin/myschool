@@ -15,7 +15,22 @@ class Ptk extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_ptk';
-  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'kode', 'jenis_kelamin', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+
+  /** Kode singkat guru: kolom kode bila diisi, selain itu inisial nama. */
+  public function kodeGuru(): string
+  {
+    $kode = trim((string) ($this->kode ?? ''));
+    if ($kode !== '') {
+      return $kode;
+    }
+    $inisial = collect(explode(' ', trim((string) $this->nama_ptk)))
+      ->filter()
+      ->map(fn($kata) => Str::upper(Str::substr($kata, 0, 1)))
+      ->implode('');
+
+    return $inisial !== '' ? $inisial : '-';
+  }
 
   protected $casts = [
     'tanggal_keluar' => 'date',

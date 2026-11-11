@@ -53,6 +53,7 @@ class PtkController extends Controller
       'nama_ptk'      => 'required|string|max:255',
       'gelar_depan'   => 'nullable|string|max:50',
       'gelar_belakang' => 'nullable|string|max:100',
+      'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip',
       'jenis_kelamin' => 'required|in:L,P',
       'jabatan'       => [
@@ -89,6 +90,7 @@ class PtkController extends Controller
       'nama_ptk'      => $validated['nama_ptk'],
       'gelar_depan'   => $validated['gelar_depan'] ?? null,
       'gelar_belakang' => $validated['gelar_belakang'] ?? null,
+      'kode'          => $validated['kode'] ?? null,
       'nip'           => $validated['nip'],
       'jenis_kelamin' => $validated['jenis_kelamin'],
       'jabatan'       => $validated['jabatan'],
@@ -117,6 +119,7 @@ class PtkController extends Controller
       'nama_ptk'      => 'required|string|max:255',
       'gelar_depan'   => 'nullable|string|max:50',
       'gelar_belakang' => 'nullable|string|max:100',
+      'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip,' . $id,
       'jenis_kelamin' => 'required|in:L,P',
       'jabatan'       => [

@@ -76,6 +76,12 @@
         </div>
 
         <div class="form-floating form-floating-outline mb-5">
+          <input type="text" class="form-control" id="kode" name="kode"
+            placeholder="Kode Guru (mis. GR-01)" maxlength="20" />
+          <label for="kode">Kode Guru (untuk jadwal, opsional)</label>
+        </div>
+
+        <div class="form-floating form-floating-outline mb-5">
           <select id="jenis_kelamin" name="jenis_kelamin" class="form-select">
             <option value="">Pilih Jenis Kelamin</option>
             <option value="L">Laki-laki</option>
@@ -572,6 +578,7 @@
             document.getElementById('gelar_depan').value = data.gelar_depan || '';
             document.getElementById('gelar_belakang').value = data.gelar_belakang || '';
             document.getElementById('nip').value = data.nip || '';
+            document.getElementById('kode').value = data.kode || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';
             document.getElementById('jabatan').value = data.jabatan || '';
             document.getElementById('jenis_kepegawaian').value = data.jenis_kepegawaian || '';

@@ -10,6 +10,15 @@
   @if (session('error'))
     <div class="alert alert-danger">{{ session('error') }}</div>
   @endif
+  @if (session('impor_errors'))
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        @foreach (session('impor_errors') as $err)
+          <li>{{ $err }}</li>
+        @endforeach
+      </ul>
+    </div>
+  @endif
   @if ($errors->any())
     <div class="alert alert-danger">{{ $errors->first() }}</div>
   @endif
@@ -76,6 +85,20 @@
                     <i class="ri ri-delete-bin-line"></i>
                   </button>
                 </form>
+                <div class="d-flex gap-1 mt-1">
+                  <a href="{{ route('jadwal-pelajaran.pengaturan.model.template-impor', $m->id) }}"
+                    class="btn btn-sm btn-outline-success">
+                    <i class="ri ri-file-excel-2-line me-1"></i>Template
+                  </a>
+                  <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.model.impor', $m->id) }}"
+                    enctype="multipart/form-data" class="d-inline">
+                    @csrf
+                    <label class="btn btn-sm btn-outline-primary mb-0">
+                      <i class="ri ri-upload-2-line me-1"></i>Impor
+                      <input type="file" name="file" accept=".xlsx" class="d-none" onchange="this.form.submit()">
+                    </label>
+                  </form>
+                </div>
               </td>
             </tr>
           @empty
