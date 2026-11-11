@@ -14,6 +14,8 @@ class JadwalPelajaran extends Model
     'semester_id',
     'rombel_id',
     'pengampu_id',
+    'nama_kegiatan',
+    'pembina_id',
     'hari',
     'jam_ke',
   ];
@@ -36,5 +38,11 @@ class JadwalPelajaran extends Model
   public function pengampu(): BelongsTo
   {
     return $this->belongsTo(Pengampu::class, 'pengampu_id');
+  }
+
+  /** Pembina bila kotak berisi kegiatan (bukan pelajaran). */
+  public function pembina(): BelongsTo
+  {
+    return $this->belongsTo(Ptk::class, 'pembina_id');
   }
 }

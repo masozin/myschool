@@ -103,6 +103,57 @@
           menghapus jadwal yang sudah terisi; kotak yang jatuh di luar kerangka baru akan ditandai di editor.</small>
       </div>
     </div>
+
+    <div class="card mt-4">
+      <div class="card-header pb-3">
+        <h5 class="mb-1">Kegiatan Tetap dalam Sehari</h5>
+        <small class="text-muted">Kegiatan satu sekolah yang waktunya tetap dan durasinya tidak mengikuti jam
+          pelajaran — misalnya Upacara 40 menit sebelum jam ke-1 hari Senin, Senam 30 menit sebelum jam ke-1 hari
+          Jumat, atau Literasi 5 menit sebelum jam ke-1 setiap hari. Kegiatan ini menggeser jam mulai pelajaran
+          sesudahnya secara otomatis. Kosongkan nama untuk menghapus kegiatan.</small>
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <tbody>
+            @foreach ($namaHari as $hari => $nama)
+              <tr>
+                <td class="fw-semibold" style="width: 90px;">{{ $nama }}</td>
+                <td>
+                  @for ($i = 0; $i < 3; $i++)
+                    @php
+                      $keg = $kerangka[$hari]['kegiatan'][$i] ?? null;
+                    @endphp
+                    <div class="d-flex gap-2 {{ $i < 2 ? 'mb-2' : '' }} flex-wrap">
+                      <input type="text" class="form-control" style="width: 200px;"
+                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][nama]"
+                        value="{{ $keg['nama'] ?? '' }}" placeholder="Nama kegiatan (mis. Upacara)" maxlength="100">
+                      <select class="form-select" style="width: 150px;"
+                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][posisi]">
+                        <option value="sebelum" {{ ($keg['posisi'] ?? 'sebelum') === 'sebelum' ? 'selected' : '' }}>
+                          Sebelum jam ke-</option>
+                        <option value="sesudah" {{ ($keg['posisi'] ?? '') === 'sesudah' ? 'selected' : '' }}>
+                          Sesudah jam ke-</option>
+                      </select>
+                      <input type="number" class="form-control" style="width: 90px;"
+                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][jam]" value="{{ $keg['jam'] ?? '' }}"
+                        min="1" max="12" placeholder="Jam">
+                      <input type="number" class="form-control" style="width: 100px;"
+                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][menit]"
+                        value="{{ $keg['menit'] ?? '' }}" min="1" max="180" placeholder="Menit">
+                    </div>
+                  @endfor
+                </td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+      <div class="card-body border-top">
+        <button type="submit" class="btn btn-primary">
+          <i class="ri ri-save-line me-1"></i> Simpan Kerangka
+        </button>
+      </div>
+    </div>
   </form>
 
 @endsection

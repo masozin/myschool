@@ -24,6 +24,12 @@
       padding: 10px 0;
     }
 
+    .sel-kegiatan {
+      border-style: solid;
+      border-color: #ffd88a;
+      background: #fff9ec;
+    }
+
     @if ($bolehEdit)
       .sel-jadwal {
         cursor: pointer;
@@ -95,8 +101,13 @@
             <li class="d-flex align-items-center gap-2 py-1 item-luar" data-hari="{{ $lk->hari }}"
               data-jam="{{ $lk->jam_ke }}">
               <span>{{ $namaHari[$lk->hari] ?? '?' }}, jam ke-{{ $lk->jam_ke }} —
-                {{ $lk->pengampu->mapping->masterMapel->nama ?? '-' }}
-                ({{ $lk->pengampu->ptk->nama_ptk ?? '-' }})</span>
+                @if ($lk->pengampu)
+                  {{ $lk->pengampu->mapping->masterMapel->nama ?? '-' }}
+                  ({{ $lk->pengampu->ptk->nama_ptk ?? '-' }})
+                @else
+                  {{ $lk->nama_kegiatan }}{{ $lk->pembina ? ' (' . $lk->pembina->nama_ptk . ')' : '' }}
+                @endif
+              </span>
               @if ($bolehEdit)
                 <button type="button" class="btn btn-sm btn-outline-danger py-0 btn-hapus-luar">
                   <i class="ri ri-delete-bin-line"></i> Hapus
@@ -125,37 +136,65 @@
               </tr>
             </thead>
             <tbody>
-              @for ($jam = 1; $jam <= $maxJam; $jam++)
-                <tr>
-                  <td class="fw-semibold text-center align-middle">{{ $jam }}</td>
-                  @foreach ($hariAktif as $hari)
-                    @php
-                      $frame = $hariFrame[$hari];
-                      $isi = $sel[$hari][$jam] ?? null;
-                    @endphp
-                    <td class="p-1">
-                      @if ($jam <= (int) $frame['jumlah_jam'])
-                        <div class="sel-jadwal {{ $isi ? 'sel-terisi' : '' }}" data-hari="{{ $hari }}"
-                          data-jam="{{ $jam }}" data-pengampu="{{ $isi?->pengampu_id ?? '' }}"
-                          data-waktu="{{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}">
-                          @if ($isi)
-                            <div class="fw-semibold" style="font-size: 12px;">
-                              {{ $isi->pengampu->mapping->masterMapel->nama_singkat ?: $isi->pengampu->mapping->masterMapel->nama }}
-                            </div>
-                            <div class="text-muted" style="font-size: 11px;">{{ $isi->pengampu->ptk->nama_ptk }}
-                            </div>
-                          @else
-                            <div class="text-muted" style="font-size: 12px;">{{ $bolehEdit ? '+ Isi' : '—' }}</div>
-                          @endif
-                          <div class="text-muted" style="font-size: 10px;">
-                            {{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}</div>
-                        </div>
-                      @else
-                        <div class="sel-nonaktif">—</div>
-                      @endif
-                    </td>
-                  @endforeach
-                </tr>
+              @for ($jam = 1; $jam <= $maxJam + 1; $jam++)
+                @if (in_array($jam - 1, $jangkarKegiatan))
+                  <tr class="table-warning">
+                    <td></td>
+                    @foreach ($hariAktif as $hari)
+                      <td class="p-1">
+                        @foreach ($kegiatanWaktu[$hari][$jam - 1] ?? [] as $keg)
+                          <div style="font-size: 12px;">
+                            <span class="fw-semibold">{{ $keg['nama'] }}</span>
+                            <span class="text-muted"
+                              style="font-size: 10px;">{{ $keg['waktu'][0] }}–{{ $keg['waktu'][1] }}</span>
+                          </div>
+                        @endforeach
+                      </td>
+                    @endforeach
+                  </tr>
+                @endif
+                @if ($jam <= $maxJam)
+                  <tr>
+                    <td class="fw-semibold text-center align-middle">{{ $jam }}</td>
+                    @foreach ($hariAktif as $hari)
+                      @php
+                        $frame = $hariFrame[$hari];
+                        $isi = $sel[$hari][$jam] ?? null;
+                      @endphp
+                      <td class="p-1">
+                        @if ($jam <= (int) $frame['jumlah_jam'])
+                          <div
+                            class="sel-jadwal {{ $isi ? 'sel-terisi' : '' }} {{ $isi && !$isi->pengampu_id ? 'sel-kegiatan' : '' }}"
+                            data-hari="{{ $hari }}" data-jam="{{ $jam }}"
+                            data-pengampu="{{ $isi?->pengampu_id ?? '' }}"
+                            data-tipe="{{ $isi ? ($isi->pengampu_id ? 'pelajaran' : 'kegiatan') : '' }}"
+                            data-nama="{{ $isi?->nama_kegiatan ?? '' }}"
+                            data-pembina="{{ $isi?->pembina_id ?? '' }}"
+                            data-waktu="{{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}">
+                            @if ($isi && $isi->pengampu_id)
+                              <div class="fw-semibold" style="font-size: 12px;">
+                                {{ $isi->pengampu->mapping->masterMapel->nama_singkat ?: $isi->pengampu->mapping->masterMapel->nama }}
+                              </div>
+                              <div class="text-muted" style="font-size: 11px;">{{ $isi->pengampu->ptk->nama_ptk }}
+                              </div>
+                            @elseif ($isi)
+                              <div class="fw-semibold" style="font-size: 12px;">{{ $isi->nama_kegiatan }}</div>
+                              @if ($isi->pembina)
+                                <div class="text-muted" style="font-size: 11px;">{{ $isi->pembina->nama_ptk }}</div>
+                              @endif
+                            @else
+                              <div class="text-muted" style="font-size: 12px;">{{ $bolehEdit ? '+ Isi' : '—' }}</div>
+                            @endif
+                            <div class="text-muted" style="font-size: 10px;">
+                              {{ $waktu[$hari][$jam][0] }}–{{ $waktu[$hari][$jam][1] }}</div>
+                          </div>
+                        @else
+                          <div class="sel-nonaktif">—</div>
+                        @endif
+                      </td>
+                    @endforeach
+                  </tr>
+                @endif
               @endfor
             </tbody>
           </table>
@@ -206,17 +245,52 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label" for="sel-pengampu">Pelajaran / Pengampu</label>
-            <select id="sel-pengampu" class="form-select">
-              @foreach ($pengampuList as $p)
-                <option value="{{ $p->id }}" data-ptk="{{ $p->ptk_id }}"
-                  data-teks="{{ $p->mapping->masterMapel->nama ?? '-' }} — {{ $p->ptk->nama_ptk ?? '-' }}">
-                  {{ $p->mapping->masterMapel->nama ?? '-' }} — {{ $p->ptk->nama_ptk ?? '-' }}
-                </option>
-              @endforeach
-            </select>
-            <small class="text-muted d-block mt-2">Pilihan yang bertanda bentrok sedang mengajar di rombel lain pada
-              waktu ini dan tidak bisa dipilih.</small>
+            <div class="btn-group w-100 mb-3" role="group" aria-label="Jenis isi kotak">
+              <input type="radio" class="btn-check" name="mode-sel" id="mode-pelajaran" value="pelajaran" checked>
+              <label class="btn btn-outline-primary" for="mode-pelajaran">Pelajaran</label>
+              <input type="radio" class="btn-check" name="mode-sel" id="mode-kegiatan" value="kegiatan">
+              <label class="btn btn-outline-primary" for="mode-kegiatan">Kegiatan</label>
+            </div>
+
+            <div id="panel-pelajaran">
+              <label class="form-label" for="sel-pengampu">Pelajaran / Pengampu</label>
+              <select id="sel-pengampu" class="form-select">
+                @foreach ($pengampuList as $p)
+                  <option value="{{ $p->id }}" data-ptk="{{ $p->ptk_id }}"
+                    data-teks="{{ $p->mapping->masterMapel->nama ?? '-' }} — {{ $p->ptk->nama_ptk ?? '-' }}">
+                    {{ $p->mapping->masterMapel->nama ?? '-' }} — {{ $p->ptk->nama_ptk ?? '-' }}
+                  </option>
+                @endforeach
+              </select>
+              <small class="text-muted d-block mt-2">Pilihan yang bertanda bentrok sedang bertugas di rombel lain
+                pada waktu ini dan tidak bisa dipilih.</small>
+            </div>
+
+            <div id="panel-kegiatan" class="d-none">
+              <label class="form-label" for="sel-nama-kegiatan">Nama kegiatan</label>
+              <input type="text" id="sel-nama-kegiatan" class="form-control" list="usul-kegiatan" maxlength="100"
+                placeholder="mis. Pramuka">
+              <datalist id="usul-kegiatan">
+                <option value="Pramuka"></option>
+                <option value="Kokurikuler"></option>
+                <option value="Literasi"></option>
+                <option value="Upacara"></option>
+                <option value="Senam"></option>
+                <option value="Kamis Ceria"></option>
+                <option value="Ekstrakurikuler"></option>
+                <option value="Apel"></option>
+              </datalist>
+              <label class="form-label mt-3" for="sel-pembina">Pembina (boleh kosong)</label>
+              <select id="sel-pembina" class="form-select">
+                <option value="" data-teks="— Tanpa pembina —">— Tanpa pembina —</option>
+                @foreach ($guruList as $g)
+                  <option value="{{ $g->id }}" data-ptk="{{ $g->id }}" data-teks="{{ $g->nama_ptk }}">
+                    {{ $g->nama_ptk }}</option>
+                @endforeach
+              </select>
+              <small class="text-muted d-block mt-2">Bila pembina diisi, ia juga dijaga dari bentrok dengan rombel
+                lain pada waktu yang sama.</small>
+            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-danger me-auto d-none" id="btn-hapus-sel">
@@ -244,7 +318,30 @@
         const NAMA_HARI = @json($namaHari);
         const modal = new bootstrap.Modal(document.getElementById('modalSel'));
         const select = document.getElementById('sel-pengampu');
+        const selectPembina = document.getElementById('sel-pembina');
+        const inputNama = document.getElementById('sel-nama-kegiatan');
+        const radioPelajaran = document.getElementById('mode-pelajaran');
+        const radioKegiatan = document.getElementById('mode-kegiatan');
+        const panelPelajaran = document.getElementById('panel-pelajaran');
+        const panelKegiatan = document.getElementById('panel-kegiatan');
         let aktif = null;
+
+        function aturMode(mode) {
+          const kegiatan = mode === 'kegiatan';
+          if (kegiatan) {
+            radioKegiatan.checked = true;
+          } else {
+            radioPelajaran.checked = true;
+          }
+          panelPelajaran.classList.toggle('d-none', kegiatan);
+          panelKegiatan.classList.toggle('d-none', !kegiatan);
+        }
+
+        [radioPelajaran, radioKegiatan].forEach(r => {
+          r.addEventListener('change', function() {
+            aturMode(this.value);
+          });
+        });
 
         function segarkanHitungan() {
           const hitung = {};
@@ -259,12 +356,24 @@
 
         function gambarSel(el, data) {
           const waktu = el.dataset.waktu;
+          el.dataset.pengampu = '';
+          el.dataset.tipe = '';
+          el.dataset.nama = '';
+          el.dataset.pembina = '';
+          el.classList.remove('sel-terisi', 'sel-kegiatan');
           if (!data) {
-            el.dataset.pengampu = '';
-            el.classList.remove('sel-terisi');
             el.innerHTML = `<div class="text-muted" style="font-size: 12px;">+ Isi</div>
               <div class="text-muted" style="font-size: 10px;">${waktu}</div>`;
+          } else if (data.tipe === 'kegiatan') {
+            el.dataset.tipe = 'kegiatan';
+            el.dataset.nama = data.nama_kegiatan;
+            el.dataset.pembina = data.pembina_id || '';
+            el.classList.add('sel-terisi', 'sel-kegiatan');
+            el.innerHTML = `<div class="fw-semibold" style="font-size: 12px;">${data.nama_kegiatan}</div>
+              ${data.pembina ? `<div class="text-muted" style="font-size: 11px;">${data.pembina}</div>` : ''}
+              <div class="text-muted" style="font-size: 10px;">${waktu}</div>`;
           } else {
+            el.dataset.tipe = 'pelajaran';
             el.dataset.pengampu = data.pengampu_id;
             el.classList.add('sel-terisi');
             el.innerHTML = `<div class="fw-semibold" style="font-size: 12px;">${data.singkat}</div>
@@ -288,16 +397,31 @@
           return json;
         }
 
+        // Tandai pilihan yang gurunya sibuk di rombel lain pada slot
+        // aktif. kunciOpt mengambil identitas yang dibandingkan
+        // dengan isi kotak ini sendiri (pengampu: nilai option;
+        // pembina: data-ptk option) supaya isi sekarang tidak ikut
+        // terlarang.
+        function tandaiBentrok(selEl, kunciOpt, milikIni) {
+          const sibukDiSlot = (SIBUK[aktif.hari] || {})[aktif.jam] || [];
+          const petaSibuk = {};
+          sibukDiSlot.forEach(s => {
+            petaSibuk[s.ptk_id] = s.rombel;
+          });
+          [...selEl.options].forEach(opt => {
+            opt.disabled = false;
+            if (opt.dataset.teks) opt.textContent = opt.dataset.teks;
+            const bentrokDi = petaSibuk[opt.dataset.ptk];
+            if (bentrokDi && String(kunciOpt(opt)) !== String(milikIni)) {
+              opt.disabled = true;
+              opt.textContent = opt.dataset.teks + ` — bentrok (bertugas di ${bentrokDi})`;
+            }
+          });
+        }
+
         document.querySelectorAll('.sel-jadwal').forEach(el => {
           el.addEventListener('click', function() {
-            if (!select.options.length) {
-              Swal.fire({
-                icon: 'info',
-                title: 'Belum Ada Pengampu',
-                text: 'Tetapkan pengampu rombel ini dulu sebelum mengisi jadwal.'
-              });
-              return;
-            }
+            const adaPengampu = select.options.length > 0;
             aktif = {
               hari: this.dataset.hari,
               jam: this.dataset.jam,
@@ -306,35 +430,46 @@
             document.getElementById('modal-sel-judul').textContent =
               `${NAMA_HARI[this.dataset.hari]}, Jam ke-${this.dataset.jam} (${this.dataset.waktu})`;
 
-            const sibukDiSlot = (SIBUK[this.dataset.hari] || {})[this.dataset.jam] || [];
-            const petaSibuk = {};
-            sibukDiSlot.forEach(s => {
-              petaSibuk[s.ptk_id] = s.rombel;
-            });
-            [...select.options].forEach(opt => {
-              opt.disabled = false;
-              opt.textContent = opt.dataset.teks;
-              const bentrokDi = petaSibuk[opt.dataset.ptk];
-              if (bentrokDi && String(opt.value) !== String(this.dataset.pengampu)) {
-                opt.disabled = true;
-                opt.textContent = opt.dataset.teks + ` — bentrok (mengajar di ${bentrokDi})`;
-              }
-            });
-            select.value = this.dataset.pengampu || select.options[0].value;
-            document.getElementById('btn-hapus-sel').classList.toggle('d-none', !this.dataset.pengampu);
+            radioPelajaran.disabled = !adaPengampu;
+            aturMode(this.dataset.tipe === 'kegiatan' || !adaPengampu ? 'kegiatan' : 'pelajaran');
+
+            tandaiBentrok(select, opt => opt.value, this.dataset.pengampu || '');
+            tandaiBentrok(selectPembina, opt => opt.dataset.ptk, this.dataset.pembina || '');
+            if (adaPengampu) {
+              select.value = this.dataset.pengampu || select.options[0].value;
+            }
+            inputNama.value = this.dataset.nama || '';
+            selectPembina.value = this.dataset.pembina || '';
+            const terisi = !!(this.dataset.pengampu || this.dataset.nama);
+            document.getElementById('btn-hapus-sel').classList.toggle('d-none', !terisi);
             modal.show();
           });
         });
 
         document.getElementById('btn-simpan-sel').addEventListener('click', async function() {
           if (!aktif) return;
+          const body = {
+            rombel_id: ROMBEL_ID,
+            hari: aktif.hari,
+            jam_ke: aktif.jam
+          };
+          if (radioKegiatan.checked) {
+            const nama = inputNama.value.trim();
+            if (!nama) {
+              Swal.fire({
+                icon: 'warning',
+                title: 'Nama Kegiatan Kosong',
+                text: 'Isi nama kegiatannya dulu, atau beralih ke mode Pelajaran.'
+              });
+              return;
+            }
+            body.nama_kegiatan = nama;
+            body.pembina_id = selectPembina.value || null;
+          } else {
+            body.pengampu_id = select.value;
+          }
           try {
-            const hasil = await kirim('{{ route('jadwal-pelajaran.sel.simpan') }}', {
-              rombel_id: ROMBEL_ID,
-              pengampu_id: select.value,
-              hari: aktif.hari,
-              jam_ke: aktif.jam
-            });
+            const hasil = await kirim('{{ route('jadwal-pelajaran.sel.simpan') }}', body);
             gambarSel(aktif.el, hasil);
             segarkanHitungan();
             modal.hide();

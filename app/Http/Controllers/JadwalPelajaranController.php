@@ -145,6 +145,10 @@ class JadwalPelajaranController extends Controller
       'hari.*.menit' => 'nullable|integer|min:15|max:90',
       'hari.*.istirahat.*.setelah' => 'nullable|integer|min:1|max:11',
       'hari.*.istirahat.*.menit' => 'nullable|integer|min:5|max:90',
+      'hari.*.kegiatan.*.nama' => 'nullable|string|max:100',
+      'hari.*.kegiatan.*.posisi' => 'nullable|in:sebelum,sesudah',
+      'hari.*.kegiatan.*.jam' => 'nullable|integer|min:1|max:12',
+      'hari.*.kegiatan.*.menit' => 'nullable|integer|min:1|max:180',
     ]);
 
     $sekolahId = $this->sekolahKonteksIdNullable();
@@ -168,11 +172,29 @@ class JadwalPelajaranController extends Controller
       }
       ksort($istirahat);
 
+      // Kegiatan tetap hari itu (Upacara, Senam, Literasi, ...):
+      // nama + posisi relatif ke jam pelajaran + durasi bebas.
+      $kegiatan = [];
+      foreach ($in['kegiatan'] ?? [] as $keg) {
+        $namaK = trim((string) ($keg['nama'] ?? ''));
+        $jamK = (int) ($keg['jam'] ?? 0);
+        $menitK = (int) ($keg['menit'] ?? 0);
+        if ($namaK !== '' && $menitK >= 1 && $jamK >= 1 && $jamK <= $jumlah) {
+          $kegiatan[] = [
+            'nama' => $namaK,
+            'posisi' => ($keg['posisi'] ?? 'sebelum') === 'sesudah' ? 'sesudah' : 'sebelum',
+            'jam' => $jamK,
+            'menit' => $menitK,
+          ];
+        }
+      }
+
       $kerangka[$hari] = [
         'jumlah_jam' => $jumlah,
         'mulai' => $in['mulai'] ?? '07:00',
         'menit' => (int) ($in['menit'] ?? 35),
         'istirahat' => array_values($istirahat),
+        'kegiatan' => $kegiatan,
       ];
     }
 
@@ -289,15 +311,28 @@ class JadwalPelajaranController extends Controller
       ? max(array_map(fn($f) => (int) $f['jumlah_jam'], $hariFrame))
       : 0;
 
-    // Jam tampil per hari per jam-ke, dihitung dari kerangka.
+    // Garis waktu per hari dari kerangka: jam tampil pelajaran
+    // plus posisi & jam tampil kegiatan tetap (Upacara, Senam,
+    // ...) dan istirahat yang menggesernya.
     $waktu = [];
+    $kegiatanWaktu = [];
+    $jangkarKegiatan = [];
     foreach ($hariFrame as $hari => $frame) {
-      for ($jam = 1; $jam <= (int) $frame['jumlah_jam']; $jam++) {
-        $waktu[$hari][$jam] = $this->waktuSlot($frame, $jam);
+      $gw = $this->garisWaktu($frame);
+      $waktu[$hari] = $gw['pelajaran'];
+      foreach ($gw['lainnya'] as $anchor => $items) {
+        foreach ($items as $it) {
+          if ($it['jenis'] === 'kegiatan') {
+            $kegiatanWaktu[$hari][$anchor][] = $it;
+            $jangkarKegiatan[$anchor] = true;
+          }
+        }
       }
     }
+    $jangkarKegiatan = array_keys($jangkarKegiatan);
+    sort($jangkarKegiatan);
 
-    $baris = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk'])
+    $baris = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk', 'pembina'])
       ->where('rombel_id', $rombel->id)
       ->where('semester_id', $semesterId)
       ->get();
@@ -329,11 +364,24 @@ class JadwalPelajaranController extends Controller
       ->where('rombel_id', '!=', $rombel->id)
       ->get();
     foreach ($jadwalLain as $j) {
-      $sibuk[$j->hari][$j->jam_ke][] = [
-        'ptk_id' => $j->pengampu->ptk_id,
-        'rombel' => $j->rombel->nama_rombel,
-      ];
+      if ($j->pengampu) {
+        $sibuk[$j->hari][$j->jam_ke][] = [
+          'ptk_id' => $j->pengampu->ptk_id,
+          'rombel' => $j->rombel->nama_rombel,
+        ];
+      }
+      if ($j->pembina_id) {
+        $sibuk[$j->hari][$j->jam_ke][] = [
+          'ptk_id' => $j->pembina_id,
+          'rombel' => $j->rombel->nama_rombel,
+        ];
+      }
     }
+
+    $guruList = Ptk::where('sekolah_id', $sekolahId)
+      ->where('status', 'aktif')
+      ->orderBy('nama_ptk')
+      ->get();
 
     return view('content.jadwal-pelajaran.editor', [
       'sekolah' => $sekolah,
@@ -345,6 +393,9 @@ class JadwalPelajaranController extends Controller
       'maxJam' => $maxJam,
       'waktu' => $waktu,
       'sel' => $sel,
+      'kegiatanWaktu' => $kegiatanWaktu,
+      'jangkarKegiatan' => $jangkarKegiatan,
+      'guruList' => $guruList,
       'pengampuList' => $pengampuList,
       'terplot' => $terplot,
       'luarKerangka' => $luarKerangka,
@@ -359,7 +410,9 @@ class JadwalPelajaranController extends Controller
   {
     $data = $request->validate([
       'rombel_id' => 'required|integer',
-      'pengampu_id' => 'required|integer',
+      'pengampu_id' => 'nullable|integer',
+      'nama_kegiatan' => 'nullable|string|max:100',
+      'pembina_id' => 'nullable|integer',
       'hari' => 'required|integer|min:1|max:6',
       'jam_ke' => 'required|integer|min:1|max:12',
     ]);
@@ -375,6 +428,22 @@ class JadwalPelajaranController extends Controller
       return response()->json(['message' => 'Rombel tidak ditemukan di sekolah/semester ini.'], 422);
     }
 
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+    $frame = $this->kerangka($sekolah, $semesterId)['hari'][$data['hari']] ?? null;
+    if (!$frame || $data['jam_ke'] > (int) $frame['jumlah_jam']) {
+      return response()->json(['message' => 'Kotak itu di luar kerangka jam hari tersebut.'], 422);
+    }
+
+    $modeKegiatan = !empty($data['nama_kegiatan']);
+
+    if ($modeKegiatan) {
+      return $this->simpanSelKegiatan($data, $rombel, $sekolahId, $semesterId);
+    }
+
+    if (empty($data['pengampu_id'])) {
+      return response()->json(['message' => 'Pilih pelajaran atau isi nama kegiatan dulu.'], 422);
+    }
+
     $pengampu = Pengampu::with(['mapping.masterMapel', 'ptk'])
       ->where('id', $data['pengampu_id'])
       ->where('rombel_id', $rombel->id)
@@ -384,24 +453,11 @@ class JadwalPelajaranController extends Controller
       return response()->json(['message' => 'Pengampu tidak berlaku untuk rombel ini. Tetapkan dulu pengampunya.'], 422);
     }
 
-    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
-    $frame = $this->kerangka($sekolah, $semesterId)['hari'][$data['hari']] ?? null;
-    if (!$frame || $data['jam_ke'] > (int) $frame['jumlah_jam']) {
-      return response()->json(['message' => 'Kotak itu di luar kerangka jam hari tersebut.'], 422);
-    }
-
     // Penjaga bentrok guru: guru yang sama tidak boleh mengajar di
     // dua rombel pada hari+jam yang sama (keputusan: BLOKIR).
-    $bentrok = JadwalPelajaran::with('rombel')
-      ->where('semester_id', $semesterId)
-      ->where('hari', $data['hari'])
-      ->where('jam_ke', $data['jam_ke'])
-      ->where('rombel_id', '!=', $rombel->id)
-      ->whereHas('pengampu', fn($q) => $q->where('ptk_id', $pengampu->ptk_id))
-      ->first();
-    if ($bentrok) {
+    if ($tabrakan = $this->cariTabrakanPtk($pengampu->ptk_id, $data, $rombel, $semesterId)) {
       return response()->json([
-        'message' => "Bentrok: {$pengampu->ptk->nama_ptk} sedang mengajar di {$bentrok->rombel->nama_rombel} pada waktu yang sama.",
+        'message' => "Bentrok: {$pengampu->ptk->nama_ptk} sedang bertugas di {$tabrakan->rombel->nama_rombel} pada waktu yang sama.",
       ], 422);
     }
 
@@ -412,16 +468,84 @@ class JadwalPelajaranController extends Controller
         'hari' => $data['hari'],
         'jam_ke' => $data['jam_ke'],
       ],
-      ['sekolah_id' => $sekolahId, 'pengampu_id' => $pengampu->id]
+      [
+        'sekolah_id' => $sekolahId,
+        'pengampu_id' => $pengampu->id,
+        'nama_kegiatan' => null,
+        'pembina_id' => null,
+      ]
     );
 
     return response()->json([
       'ok' => true,
+      'tipe' => 'pelajaran',
       'pengampu_id' => $pengampu->id,
       'mapel' => $pengampu->mapping->masterMapel->nama ?? '-',
       'singkat' => $pengampu->mapping->masterMapel->nama_singkat ?: ($pengampu->mapping->masterMapel->nama ?? '-'),
       'guru' => $pengampu->ptk->nama_ptk ?? '-',
     ]);
+  }
+
+  /** Simpan kotak berisi KEGIATAN (Pramuka, Kokurikuler, ...). */
+  private function simpanSelKegiatan(array $data, Rombel $rombel, int $sekolahId, int $semesterId)
+  {
+    $pembina = null;
+    if (!empty($data['pembina_id'])) {
+      $pembina = Ptk::where('id', $data['pembina_id'])
+        ->where('sekolah_id', $sekolahId)
+        ->where('status', 'aktif')
+        ->first();
+      if (!$pembina) {
+        return response()->json(['message' => 'Pembina bukan PTK aktif sekolah ini.'], 422);
+      }
+      if ($tabrakan = $this->cariTabrakanPtk($pembina->id, $data, $rombel, $semesterId)) {
+        return response()->json([
+          'message' => "Bentrok: {$pembina->nama_ptk} sedang bertugas di {$tabrakan->rombel->nama_rombel} pada waktu yang sama.",
+        ], 422);
+      }
+    }
+
+    JadwalPelajaran::updateOrCreate(
+      [
+        'rombel_id' => $rombel->id,
+        'semester_id' => $semesterId,
+        'hari' => $data['hari'],
+        'jam_ke' => $data['jam_ke'],
+      ],
+      [
+        'sekolah_id' => $sekolahId,
+        'pengampu_id' => null,
+        'nama_kegiatan' => trim($data['nama_kegiatan']),
+        'pembina_id' => $pembina?->id,
+      ]
+    );
+
+    return response()->json([
+      'ok' => true,
+      'tipe' => 'kegiatan',
+      'nama_kegiatan' => trim($data['nama_kegiatan']),
+      'pembina_id' => $pembina?->id,
+      'pembina' => $pembina?->nama_ptk ?? '',
+    ]);
+  }
+
+  /**
+   * Cari jadwal di rombel LAIN pada semester+hari+jam yang sama
+   * yang memakai PTK ini — sebagai guru pengampu ATAU pembina
+   * kegiatan. Mengembalikan baris jadwal penabrak atau null.
+   */
+  private function cariTabrakanPtk(int $ptkId, array $data, Rombel $rombel, int $semesterId)
+  {
+    return JadwalPelajaran::with('rombel')
+      ->where('semester_id', $semesterId)
+      ->where('hari', $data['hari'])
+      ->where('jam_ke', $data['jam_ke'])
+      ->where('rombel_id', '!=', $rombel->id)
+      ->where(function ($q) use ($ptkId) {
+        $q->where('pembina_id', $ptkId)
+          ->orWhereHas('pengampu', fn($q2) => $q2->where('ptk_id', $ptkId));
+      })
+      ->first();
   }
 
   public function hapusSel(Request $request)
@@ -573,21 +697,64 @@ class JadwalPelajaranController extends Controller
     return $kerangka;
   }
 
-  /** Rentang jam tampil satu kotak, mis. ['07.00', '07.35']. */
-  private function waktuSlot(array $frameHari, int $jamKe): array
+  /**
+   * Garis waktu satu hari dari kerangkanya. Semua kejadian hari
+   * itu — pelajaran, istirahat, dan kegiatan tetap — diurutkan
+   * pada satu jam berjalan: setiap kejadian non-pelajaran
+   * menempati durasinya sendiri lalu menggeser pelajaran
+   * sesudahnya. Jangkar (anchor) = jumlah pelajaran yang sudah
+   * selesai sebelum kejadian dimulai; istirahat "sesudah jam N"
+   * berjangkar N, kegiatan "sebelum jam N" berjangkar N-1 dan
+   * "sesudah jam N" berjangkar N.
+   *
+   * Hasil: ['pelajaran' => [jamKe => [mulai, selesai]],
+   *         'lainnya'   => [anchor => [['nama','jenis','waktu']]]]
+   */
+  private function garisWaktu(array $frame): array
   {
-    [$jh, $jm] = array_map('intval', explode(':', $frameHari['mulai'] ?? '07:00'));
-    $mulai = $jh * 60 + $jm + ($jamKe - 1) * (int) $frameHari['menit'];
+    [$jh, $jm] = array_map('intval', explode(':', $frame['mulai'] ?? '07:00'));
+    $t = $jh * 60 + $jm;
+    $menit = (int) ($frame['menit'] ?? 35);
+    $jumlah = (int) ($frame['jumlah_jam'] ?? 0);
+    $fmt = fn(int $m) => sprintf('%02d.%02d', intdiv($m, 60), $m % 60);
 
-    foreach ($frameHari['istirahat'] ?? [] as $jeda) {
-      if ((int) $jeda['setelah'] < $jamKe) {
-        $mulai += (int) $jeda['menit'];
+    $kejadian = [];
+    foreach ($frame['istirahat'] ?? [] as $jeda) {
+      $kejadian[(int) $jeda['setelah']][] = [
+        'jenis' => 'istirahat',
+        'nama' => 'Istirahat',
+        'menit' => (int) $jeda['menit'],
+      ];
+    }
+    foreach ($frame['kegiatan'] ?? [] as $keg) {
+      $anchor = ($keg['posisi'] ?? 'sebelum') === 'sesudah'
+        ? (int) $keg['jam']
+        : (int) $keg['jam'] - 1;
+      $kejadian[$anchor][] = [
+        'jenis' => 'kegiatan',
+        'nama' => $keg['nama'],
+        'menit' => (int) $keg['menit'],
+      ];
+    }
+
+    $pelajaran = [];
+    $lainnya = [];
+    for ($anchor = 0; $anchor <= $jumlah; $anchor++) {
+      foreach ($kejadian[$anchor] ?? [] as $ev) {
+        $lainnya[$anchor][] = [
+          'nama' => $ev['nama'],
+          'jenis' => $ev['jenis'],
+          'waktu' => [$fmt($t), $fmt($t + $ev['menit'])],
+        ];
+        $t += $ev['menit'];
+      }
+      if ($anchor < $jumlah) {
+        $jam = $anchor + 1;
+        $pelajaran[$jam] = [$fmt($t), $fmt($t + $menit)];
+        $t += $menit;
       }
     }
 
-    $selesai = $mulai + (int) $frameHari['menit'];
-    $fmt = fn(int $m) => sprintf('%02d.%02d', intdiv($m, 60), $m % 60);
-
-    return [$fmt($mulai), $fmt($selesai)];
+    return ['pelajaran' => $pelajaran, 'lainnya' => $lainnya];
   }
 }
