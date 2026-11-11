@@ -49,6 +49,131 @@ class JadwalPelajaranController extends Controller
     6 => 'Sabtu',
   ];
 
+  /**
+   * Panel guru di halaman Jadwal Pelajaran: apa yang sedang
+   * berlangsung SAAT INI (berdasarkan jam sekarang) dan daftar
+   * jadwal mengajar guru hari ini, dari kerangka tiap rombel.
+   * Hari mengikuti nomor hari ISO (1=Senin .. 7=Minggu).
+   */
+  private function panelGuruHariIni(Sekolah $sekolah, int $semesterId, int $ptkId, ?Rombel $rombelWali): array
+  {
+    $sekarang = now();
+    $hariIni = (int) $sekarang->dayOfWeekIso; // 1=Senin .. 7=Minggu
+    $jamMenit = $sekarang->hour * 60 + $sekarang->minute;
+    $keMenit = function (string $w): int {
+      [$j, $m] = array_map('intval', explode('.', str_replace(':', '.', $w)));
+      return $j * 60 + $m;
+    };
+    $bulan = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Garis waktu hari ini per rombel (model rombel bisa berbeda).
+    $waktuRombel = [];
+    $waktuUntuk = function (Rombel $r) use (&$waktuRombel, $sekolah, $semesterId, $hariIni) {
+      if (!array_key_exists($r->id, $waktuRombel)) {
+        $frame = $this->kerangka($sekolah, $semesterId, $r)['hari'][$hariIni] ?? null;
+        $waktuRombel[$r->id] = $frame ? $this->garisWaktu($frame) : null;
+      }
+      return $waktuRombel[$r->id];
+    };
+
+    // Semua kotak mengajar guru ini hari ini (lintas rombel).
+    $barisSaya = JadwalPelajaran::with(['rombel', 'pengampu.mapping.masterMapel', 'pembina'])
+      ->where('sekolah_id', $sekolah->id)
+      ->where('semester_id', $semesterId)
+      ->where('hari', $hariIni)
+      ->where(function ($q) use ($ptkId) {
+        $q->whereHas('pengampu', fn($qq) => $qq->where('ptk_id', $ptkId))
+          ->orWhere('pembina_id', $ptkId);
+      })
+      ->get();
+
+    $daftar = [];
+    foreach ($barisSaya as $b) {
+      if (!$b->rombel) {
+        continue;
+      }
+      $rentang = $waktuUntuk($b->rombel)['pelajaran'][$b->jam_ke] ?? null;
+      if (!$rentang) {
+        continue;
+      }
+      $daftar[] = [
+        'mulai' => $rentang[0],
+        'selesai' => $rentang[1],
+        'mulai_menit' => $keMenit($rentang[0]),
+        'selesai_menit' => $keMenit($rentang[1]),
+        'rombel' => $b->rombel->nama_rombel,
+        'keterangan' => $b->pengampu
+          ? ($b->pengampu->mapping?->masterMapel?->nama ?? 'Pelajaran')
+          : ('Kegiatan: ' . ($b->nama_kegiatan ?? '-')),
+        'jam_ke' => $b->jam_ke,
+      ];
+    }
+    usort($daftar, fn($a, $b) => $a['mulai_menit'] <=> $b['mulai_menit']);
+
+    $sedang = null;
+    $berikutnya = null;
+    foreach ($daftar as $d) {
+      if ($d['mulai_menit'] <= $jamMenit && $jamMenit < $d['selesai_menit']) {
+        $sedang = $d;
+      }
+      if ($berikutnya === null && $d['mulai_menit'] > $jamMenit) {
+        $berikutnya = $d;
+      }
+    }
+
+    // Bila guru ini wali kelas: apa yang sedang berlangsung di kelasnya.
+    $kelasSekarang = null;
+    if ($rombelWali && ($w = $waktuUntuk($rombelWali))) {
+      $selWali = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk', 'pembina'])
+        ->where('rombel_id', $rombelWali->id)
+        ->where('semester_id', $semesterId)
+        ->where('hari', $hariIni)
+        ->get()
+        ->keyBy('jam_ke');
+      foreach ($w['pelajaran'] as $jamKe => $rentang) {
+        if ($keMenit($rentang[0]) <= $jamMenit && $jamMenit < $keMenit($rentang[1])) {
+          $sel = $selWali->get($jamKe);
+          $kelasSekarang = [
+            'rombel' => $rombelWali->nama_rombel,
+            'mulai' => $rentang[0],
+            'selesai' => $rentang[1],
+            'keterangan' => $sel?->pengampu
+              ? ($sel->pengampu->mapping?->masterMapel?->nama ?? 'Pelajaran')
+              : ($sel?->nama_kegiatan ?? 'Belum diisi'),
+            'guru' => $sel?->pengampu?->ptk?->nama_ptk ?? $sel?->pembina?->nama_ptk,
+          ];
+          break;
+        }
+      }
+      if (!$kelasSekarang) {
+        foreach ($w['lainnya'] as $evs) {
+          foreach ($evs as $ev) {
+            if ($keMenit($ev['waktu'][0]) <= $jamMenit && $jamMenit < $keMenit($ev['waktu'][1])) {
+              $kelasSekarang = [
+                'rombel' => $rombelWali->nama_rombel,
+                'mulai' => $ev['waktu'][0],
+                'selesai' => $ev['waktu'][1],
+                'keterangan' => $ev['nama'],
+                'guru' => null,
+              ];
+              break 2;
+            }
+          }
+        }
+      }
+    }
+
+    return [
+      'hari_nama' => self::HARI[$hariIni] ?? 'Minggu',
+      'tanggal' => $sekarang->format('d') . ' ' . $bulan[(int) $sekarang->format('n')] . ' ' . $sekarang->format('Y'),
+      'jam' => $sekarang->format('H.i'),
+      'daftar' => $daftar,
+      'sedang' => $sedang,
+      'berikutnya' => $berikutnya,
+      'kelas_sekarang' => $kelasSekarang,
+    ];
+  }
+
   // ── Ringkasan per rombel ──────────────────────────────────────
   public function index()
   {
@@ -74,6 +199,7 @@ class JadwalPelajaranController extends Controller
         'pengaturanAda' => false,
         'bolehSusun' => $bolehSusun,
         'daftarModel' => collect(),
+        'panelGuru' => null,
       ]);
     }
 
@@ -124,6 +250,18 @@ class JadwalPelajaranController extends Controller
       ];
     }
 
+    // Panel guru: jadwal saat ini + jadwal mengajar hari ini.
+    $panelGuru = null;
+    if ($user->hasRole('Guru') && $user->ptk) {
+      $rombelWali = $rombels->firstWhere('ptk_id', (int) $user->ptk->id);
+      $panelGuru = $this->panelGuruHariIni(
+        $sekolah,
+        $semesterId,
+        (int) $user->ptk->id,
+        $rombelWali
+      );
+    }
+
     $ids = $rombels->pluck('id');
     $pengampuPerRombel = Pengampu::where('semester_id', $semesterId)
       ->whereIn('rombel_id', $ids)
@@ -149,6 +287,7 @@ class JadwalPelajaranController extends Controller
       'pengaturanAda' => $kerangka['tersimpan'],
       'bolehSusun' => $bolehSusun,
       'daftarModel' => $daftarModel,
+      'panelGuru' => $panelGuru,
     ]);
   }
 

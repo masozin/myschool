@@ -72,6 +72,75 @@
       </div>
     @endif
 
+    @if ($panelGuru)
+      <div class="card mb-4">
+        <div class="card-body py-4">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-primary"><i class="ri ri-time-line me-1"></i>Sekarang {{ $panelGuru['jam'] }}</span>
+            <span class="text-muted small">{{ $panelGuru['hari_nama'] }}, {{ $panelGuru['tanggal'] }}</span>
+          </div>
+          @if ($panelGuru['sedang'])
+            <h5 class="mb-1">Anda sedang mengajar: {{ $panelGuru['sedang']['keterangan'] }}</h5>
+            <div class="text-muted">Kelas {{ $panelGuru['sedang']['rombel'] }} <span class="mx-1">•</span> Jam
+              ke-{{ $panelGuru['sedang']['jam_ke'] }} <span class="mx-1">•</span>
+              {{ $panelGuru['sedang']['mulai'] }}–{{ $panelGuru['sedang']['selesai'] }}</div>
+          @elseif ($panelGuru['kelas_sekarang'])
+            <h5 class="mb-1">Kelas Anda ({{ $panelGuru['kelas_sekarang']['rombel'] }}) sekarang:
+              {{ $panelGuru['kelas_sekarang']['keterangan'] }}</h5>
+            <div class="text-muted">{{ $panelGuru['kelas_sekarang']['mulai'] }}–{{ $panelGuru['kelas_sekarang']['selesai'] }}
+              @if ($panelGuru['kelas_sekarang']['guru'])
+                <span class="mx-1">•</span> {{ $panelGuru['kelas_sekarang']['guru'] }}
+              @endif
+            </div>
+            @if ($panelGuru['berikutnya'])
+              <div class="text-muted mt-1">Mengajar berikutnya hari ini:
+                {{ $panelGuru['berikutnya']['keterangan'] }} di {{ $panelGuru['berikutnya']['rombel'] }} pukul
+                {{ $panelGuru['berikutnya']['mulai'] }}.</div>
+            @endif
+          @else
+            <h5 class="mb-1">Tidak ada jadwal mengajar saat ini.</h5>
+            @if ($panelGuru['berikutnya'])
+              <div class="text-muted">Berikutnya hari ini: {{ $panelGuru['berikutnya']['keterangan'] }} di
+                {{ $panelGuru['berikutnya']['rombel'] }} pukul
+                {{ $panelGuru['berikutnya']['mulai'] }}–{{ $panelGuru['berikutnya']['selesai'] }}.</div>
+            @endif
+          @endif
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header pb-2">
+          <h5 class="mb-0">Jadwal Mengajar Hari Ini — {{ $panelGuru['hari_nama'] }}</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Waktu</th>
+                <th>Kelas</th>
+                <th>Mapel / Kegiatan</th>
+                <th class="text-center">Jam Ke</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse ($panelGuru['daftar'] as $d)
+                <tr class="{{ $panelGuru['sedang'] && $panelGuru['sedang']['rombel'] === $d['rombel'] && $panelGuru['sedang']['jam_ke'] === $d['jam_ke'] ? 'table-primary' : '' }}">
+                  <td class="fw-semibold">{{ $d['mulai'] }}–{{ $d['selesai'] }}</td>
+                  <td>{{ $d['rombel'] }}</td>
+                  <td>{{ $d['keterangan'] }}</td>
+                  <td class="text-center">{{ $d['jam_ke'] }}</td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">Tidak ada jadwal mengajar hari ini.</td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    @endif
+
     <div class="card">
       <div class="table-responsive">
         <table class="table table-hover mb-0">
