@@ -42,20 +42,21 @@
     }
 
     .blok-istirahat {
-      background: #f3f4f6;
+      background: #eceff1;
       border-style: dashed;
-      color: #6b7280;
+      border-color: #b0bec5;
+      color: #546e7a;
     }
 
     .blok-kegiatan {
-      background: #fff9ec;
-      border-color: #ffd88a;
+      background: #fff3d9;
+      border-color: #f59e0b;
     }
 
     .sel-terisi {
       border-style: solid;
-      border-color: #b9c2ff;
-      background: #f2f4ff;
+      border-color: #7367f0;
+      background: #e9ebff;
     }
 
     .sel-nonaktif {
@@ -66,8 +67,12 @@
 
     .sel-kegiatan {
       border-style: solid;
-      border-color: #ffd88a;
-      background: #fff9ec;
+      border-color: #f59e0b;
+      background: #fff3d9;
+    }
+
+    .sel-kegiatan .nomor-jam {
+      background: #f59e0b;
     }
 
     @if ($bolehEdit)
@@ -228,6 +233,14 @@
           </div>
           <small class="text-muted">Tinggi setiap kotak sebanding dengan durasinya — dua hari yang berakhir pada
             jam yang sama tingginya sama.</small>
+          <div class="mt-1" style="font-size: 12px;">
+            <span class="me-3"><span class="badge border"
+                style="background: #e9ebff; border-color: #7367f0 !important;">&nbsp;</span> Pelajaran</span>
+            <span class="me-3"><span class="badge border"
+                style="background: #fff3d9; border-color: #f59e0b !important;">&nbsp;</span> Kegiatan</span>
+            <span><span class="badge border"
+                style="background: #eceff1; border-color: #b0bec5 !important;">&nbsp;</span> Istirahat</span>
+          </div>
         </div>
       </div>
     </div>
