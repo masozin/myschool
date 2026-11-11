@@ -73,6 +73,7 @@ class JadwalPelajaranController extends Controller
         'totalKotak' => 0,
         'pengaturanAda' => false,
         'bolehSusun' => $bolehSusun,
+        'daftarModel' => collect(),
       ]);
     }
 
@@ -84,11 +85,16 @@ class JadwalPelajaranController extends Controller
       $kerangka['hari']
     ));
 
-    $rombels = Rombel::with('ptk')
+    $rombels = Rombel::with(['ptk', 'jadwalPengaturan'])
       ->where('sekolah_id', $sekolahId)
       ->where('semester_id', $semesterId)
       ->orderBy('tingkat')
       ->orderBy('nama_rombel')
+      ->get();
+
+    $daftarModel = JadwalPengaturan::where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->orderBy('id')
       ->get();
 
     // Guru murni hanya melihat rombel yang diwalikan / diajarnya.
@@ -142,6 +148,7 @@ class JadwalPelajaranController extends Controller
       'totalKotak' => $totalKotak,
       'pengaturanAda' => $kerangka['tersimpan'],
       'bolehSusun' => $bolehSusun,
+      'daftarModel' => $daftarModel,
     ]);
   }
 
@@ -221,11 +228,10 @@ class JadwalPelajaranController extends Controller
       ->with('success', "Model \"{$nama}\" dihapus. Rombel yang tadinya memilih model ini kini mengikuti model pertama dalam daftar atau pola bawaan; jadwalnya tidak ikut terhapus.");
   }
 
-  public function simpanPengaturan(Request $request, $id)
+  /** Validasi form model (dipakai simpan & buat baru). */
+  private function validasiModel(Request $request): array
   {
-    $model = $this->cariModel($id);
-
-    $data = $request->validate([
+    return $request->validate([
       'nama' => 'required|string|max:50',
       'hari' => 'required|array',
       'hari.*.jumlah_jam' => 'nullable|integer|min:0|max:12',
@@ -238,10 +244,11 @@ class JadwalPelajaranController extends Controller
       'hari.*.kegiatan.*.jam' => 'nullable|integer|min:1|max:12',
       'hari.*.kegiatan.*.menit' => 'nullable|integer|min:1|max:180',
     ]);
+  }
 
-    $sekolahId = $this->sekolahKonteksIdNullable();
-    $semesterId = $this->semesterId();
-
+  /** Rangkai array kerangka dari data form yang tervalidasi. */
+  private function kerangkaDariData(array $data): array
+  {
     $kerangka = [];
     foreach (self::HARI as $hari => $nama) {
       $in = $data['hari'][$hari] ?? [];
@@ -286,15 +293,71 @@ class JadwalPelajaranController extends Controller
       ];
     }
 
+    return $kerangka;
+  }
+
+  public function simpanPengaturan(Request $request, $id)
+  {
+    $model = $this->cariModel($id);
+    $data = $this->validasiModel($request);
+
     $model->update([
       'nama' => $data['nama'],
-      'kerangka' => $kerangka,
+      'kerangka' => $this->kerangkaDariData($data),
     ]);
     $this->memoModel = [];
 
     return redirect()
       ->route('jadwal-pelajaran.pengaturan.model', $model->id)
       ->with('success', "Model \"{$model->nama}\" tersimpan. Jadwal yang sudah terisi di luar kerangka baru akan ditandai di editor.");
+  }
+
+  /**
+   * Halaman tambah model: formulir kerangka yang sama dengan
+   * Atur Kerangka, tetapi untuk model BARU (nama + kerangka
+   * diisi sekaligus, lalu disimpan sebagai model baru).
+   */
+  public function buatModel()
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+    $semesterId = $this->semesterId();
+
+    $model = new JadwalPengaturan([
+      'sekolah_id' => $sekolahId,
+      'semester_id' => $semesterId,
+      'nama' => '',
+      'kerangka' => $this->kerangkaBawaan($sekolah),
+    ]);
+
+    return view('content.jadwal-pelajaran.pengaturan-model', [
+      'sekolah' => $sekolah,
+      'semester' => Semester::find($semesterId),
+      'model' => $model,
+      'kerangka' => $this->kerangkaModel($model, $sekolah)['hari'],
+      'tersimpan' => false,
+      'namaHari' => self::HARI,
+    ]);
+  }
+
+  public function simpanModelBaru(Request $request)
+  {
+    $data = $this->validasiModel($request);
+
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    $semesterId = $this->semesterId();
+
+    $model = JadwalPengaturan::create([
+      'sekolah_id' => $sekolahId,
+      'semester_id' => $semesterId,
+      'nama' => $data['nama'],
+      'kerangka' => $this->kerangkaDariData($data),
+    ]);
+    $this->memoModel = [];
+
+    return redirect()
+      ->route('jadwal-pelajaran.pengaturan')
+      ->with('success', "Model \"{$model->nama}\" dibuat. Pilih model ini untuk rombel dari daftar rombel atau kepala editor.");
   }
 
   /** Kode mapel untuk kertas kerja: kode, lalu nama_singkat, lalu nama. */
@@ -385,6 +448,7 @@ class JadwalPelajaranController extends Controller
     $awalT = $huruf($kolGuruAwal);
     $akhirT = $huruf($kolGuruAkhir);
     $hurufBantu = $huruf($kolBantu);
+    $hurufBantu2 = $huruf($kolBantu + 1);
 
     // Matriks pengampu: baris = SEMUA mapel hasil mapping
     // yang berlaku bagi rombel-rombel ini (sesuai kurikulum
@@ -416,13 +480,13 @@ class JadwalPelajaranController extends Controller
     $matAkhir = $huruf(3 + $n - 1);
 
     // Daftar kode untuk kolom bantu (urut, unik).
-    $daftarKode = $mapelBaris->pluck('kode')->unique()->sort()->values();
+    $daftarKode = $mapelBaris->map(fn($mb) => ['kode' => $mb['kode'], 'nama' => $mb['nama']])->unique('kode')->sortBy('kode')->values();
     $barisKodeAkhir = 7 + max(1, $daftarKode->count());
 
     $ss = new Spreadsheet();
     $sheet = $ss->getActiveSheet();
     $sheet->setTitle('Jadwal');
-    $rentangJudul = 'A1:' . $hurufBantu . '1';
+    $rentangJudul = 'A1:' . $akhirK . '1';
 
     // ── Judul tiga baris (baris 1-3), baris 4 kosong ──
     $romawi = [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'];
@@ -435,17 +499,17 @@ class JadwalPelajaranController extends Controller
     $sheet->mergeCells($rentangJudul);
     $sheet->setCellValue('A1', 'JADWAL PEMBELAJARAN ' . $judulKelas);
     $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-    $sheet->mergeCells('A2:' . $hurufBantu . '2');
+    $sheet->mergeCells('A2:' . $akhirK . '2');
     $sheet->setCellValue('A2', Str::upper($sekolah->detailTerbaru->nama_sekolah ?? ''));
     $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(12);
-    $sheet->mergeCells('A3:' . $hurufBantu . '3');
+    $sheet->mergeCells('A3:' . $akhirK . '3');
     $labelSemester = $semester
       ? 'SEMESTER ' . ($semester->semester === 'Genap' ? 'II' : 'I') . ' TAHUN PELAJARAN '
         . str_replace('/', '-', (string) $semester->tahun_pelajaran)
       : '';
     $sheet->setCellValue('A3', $labelSemester . ' — Model "' . $model->nama . '"');
     $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(11);
-    $sheet->getStyle('A1:' . $hurufBantu . '3')->getAlignment()
+    $sheet->getStyle('A1:' . $akhirK . '3')->getAlignment()
       ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
     // ── Baris 5: catatan bantu ──
@@ -454,6 +518,7 @@ class JadwalPelajaranController extends Controller
       $awalT . '5',
       'kolom bantu untuk format bersyarat, jika dalam 1 baris di tabel ini yang isi cellnya sama maka cell di tabel jadwal berwarna merah'
     );
+    $sheet->mergeCells($hurufBantu . '5:' . $hurufBantu2 . '5');
     $sheet->setCellValue($hurufBantu . '5', 'Tabel Bantu untuk mengisi mapel');
     $sheet->getStyle('A5:' . $hurufBantu . '5')->applyFromArray([
       'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '808080']],
@@ -467,6 +532,7 @@ class JadwalPelajaranController extends Controller
       $sheet->setCellValueByColumnAndRow($kolKelasAwal + $i, 6, $r->id);
       $sheet->setCellValueByColumnAndRow($kolGuruAwal + $i, 6, $r->id);
     }
+    $sheet->mergeCells($hurufBantu . '6:' . $hurufBantu2 . '6');
     $sheet->setCellValue($hurufBantu . '6', 'Tabel Bantu Daftar Nama Mapel');
     $sheet->getStyle('A6:' . $hurufBantu . '6')->applyFromArray([
       'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '808080']],
@@ -481,7 +547,8 @@ class JadwalPelajaranController extends Controller
     $sheet->setCellValue($awalK . '7', 'KELAS');
     $sheet->mergeCells($awalT . '7:' . $akhirT . '7');
     $sheet->setCellValue($awalT . '7', 'KODE GURU');
-    $sheet->setCellValue($hurufBantu . '7', 'Kode Mapel');
+    $sheet->setCellValue($hurufBantu . '7', 'Kode');
+    $sheet->setCellValue($hurufBantu2 . '7', 'Mapel');
     $sheet->getStyle('A7:' . $akhirK . '7')->applyFromArray([
       'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
       'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '7367F0']],
@@ -492,7 +559,11 @@ class JadwalPelajaranController extends Controller
       'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F59E0B']],
       'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
-    $sheet->getStyle($hurufBantu . '7')->getFont()->setBold(true);
+    $sheet->getStyle($hurufBantu . '7:' . $hurufBantu2 . '7')->getFont()->setBold(true);
+    $sheet->mergeCells('A7:A8');
+    $sheet->mergeCells('B7:B8');
+    $sheet->mergeCells('C7:C8');
+    $sheet->getStyle('A7:C8')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
     // ── Baris 8: nama rombel + awal daftar kode bantu ──
     foreach ($rombels as $i => $r) {
@@ -503,15 +574,24 @@ class JadwalPelajaranController extends Controller
       'font' => ['bold' => true],
       'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
     ]);
-    foreach ($daftarKode as $i => $kode) {
-      $sheet->setCellValue($hurufBantu . (8 + $i), $kode);
+    foreach ($daftarKode as $i => $pasangan) {
+      $sheet->setCellValue($hurufBantu . (8 + $i), $pasangan['kode']);
+      $sheet->setCellValue($hurufBantu2 . (8 + $i), $pasangan['nama']);
     }
-    $barisNamaRombel = $barisKodeAkhir + 2;
-    $sheet->setCellValue($hurufBantu . $barisNamaRombel, 'Nama Rombel');
-    $sheet->getStyle($hurufBantu . $barisNamaRombel)->getFont()->setBold(true);
-    foreach ($rombels as $i => $r) {
-      $sheet->setCellValue($hurufBantu . ($barisNamaRombel + 1 + $i), $r->nama_rombel);
-    }
+
+    // Legenda warna format bersyarat, di bawah daftar kode:
+    // contoh sel berwarna + keterangannya di kolom sebelah.
+    $barisLegenda = $barisKodeAkhir + 2;
+    $sheet->getStyle($hurufBantu . $barisLegenda)->applyFromArray([
+      'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'B7B7B7']],
+    ]);
+    $sheet->setCellValue($hurufBantu2 . $barisLegenda, 'Kode mapel tidak ada dalam daftar');
+    $sheet->getStyle($hurufBantu . ($barisLegenda + 1))->applyFromArray([
+      'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FF0000']],
+    ]);
+    $sheet->setCellValue($hurufBantu2 . ($barisLegenda + 1), 'Guru tabrakan jam (bentrok)');
+    $sheet->getStyle($hurufBantu2 . $barisLegenda . ':' . $hurufBantu2 . ($barisLegenda + 1))
+      ->getFont()->setSize(10);
 
     // ── Baris data mulai baris 9 ──
     $baris = 9;
@@ -646,7 +726,8 @@ class JadwalPelajaranController extends Controller
       $sheet->getColumnDimension($huruf($c))->setWidth(10);
     }
     $sheet->getColumnDimension($huruf($kolGuruAkhir + 1))->setWidth(3);
-    $sheet->getColumnDimension($hurufBantu)->setWidth(16);
+    $sheet->getColumnDimension($hurufBantu)->setWidth(13);
+    $sheet->getColumnDimension($hurufBantu2)->setWidth(26);
     $sheet->freezePane($huruf($kolKelasAwal) . '9');
 
     // Sembunyikan bagian bantu: kolom celah, blok kode guru,
@@ -654,7 +735,7 @@ class JadwalPelajaranController extends Controller
     // tetap terlihat sebagai referensi saat mengetik. Rumus
     // dan format bersyarat tetap bekerja dari balik sembunyi;
     // pengguna dapat memunculkannya lagi lewat Unhide.
-    foreach ([$kolKelasAkhir + 1, $kolGuruAkhir + 1] as $cSembunyi) {
+    foreach ([$kolKelasAkhir + 1] as $cSembunyi) {
       $sheet->getColumnDimension($huruf($cSembunyi))->setVisible(false);
     }
     for ($c = $kolGuruAwal; $c <= $kolGuruAkhir; $c++) {
@@ -790,7 +871,7 @@ class JadwalPelajaranController extends Controller
       }
     }
     if ($kesalahan) {
-      return back()->with('impor_errors', $kesalahan)
+      return back()->with('impor_errors', $kesalahan)->with('impor_model', $model->id)
         ->with('error', 'Impor dibatalkan — tidak ada data yang ditulis.');
     }
 
@@ -907,7 +988,7 @@ class JadwalPelajaranController extends Controller
     }
 
     if ($kesalahan) {
-      return back()->with('impor_errors', array_slice($kesalahan, 0, 30))
+      return back()->with('impor_errors', array_slice($kesalahan, 0, 30))->with('impor_model', $model->id)
         ->with('error', 'Impor dibatalkan — tidak ada data yang ditulis. Perbaiki dulu:');
     }
 

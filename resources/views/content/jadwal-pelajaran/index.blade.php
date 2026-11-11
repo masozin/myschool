@@ -50,6 +50,10 @@
           </div>
         </div>
         @if ($bolehSusun)
+          <button type="button" class="btn btn-outline-success" data-bs-toggle="modal"
+            data-bs-target="#modal-impor-jadwal">
+            <i class="ri ri-upload-2-line me-1"></i> Impor Jadwal
+          </button>
           <a href="{{ route('jadwal-pelajaran.pengaturan') }}" class="btn btn-outline-primary">
             <i class="ri ri-time-line me-1"></i> Model Jadwal
           </a>
@@ -85,13 +89,28 @@
               <tr>
                 <td class="fw-semibold">{{ $r->nama_rombel }}
                   <div class="text-muted fw-normal" style="font-size: 11px;">
-                    Model: {{ $modelPerRombel[$r->id]['nama'] ?? 'Pola bawaan' }}</div>
+                    Model: {{ $r->jadwalPengaturan?->nama ?? 'Belum dipilih' }}</div>
                 </td>
                 <td>{{ $r->ptk->nama_ptk ?? '-' }}</td>
                 <td class="text-center">{{ $pengampuPerRombel[$r->id] ?? 0 }} mapel</td>
                 <td class="text-center">{{ $jadwalPerRombel[$r->id] ?? 0 }} /
                   {{ $modelPerRombel[$r->id]['total'] ?? $totalKotak }} kotak</td>
                 <td class="text-end">
+                  @if ($bolehSusun && $daftarModel->isNotEmpty())
+                    <form method="POST" action="{{ route('jadwal-pelajaran.rombel.model', $r) }}"
+                      class="d-inline-block me-1">
+                      @csrf
+                      <select name="pengaturan_id" class="form-select form-select-sm d-inline-block w-auto"
+                        onchange="this.form.submit()" title="Pilih model jadwal rombel ini">
+                        <option value="" disabled {{ !$r->jadwal_pengaturan_id ? 'selected' : '' }}>Pilih Model…
+                        </option>
+                        @foreach ($daftarModel as $m)
+                          <option value="{{ $m->id }}" {{ $r->jadwal_pengaturan_id === $m->id ? 'selected' : '' }}>
+                            {{ $m->nama }}</option>
+                        @endforeach
+                      </select>
+                    </form>
+                  @endif
                   @if ($bolehSusun)
                     <a href="{{ route('jadwal-pelajaran.pengampu', $r) }}"
                       class="btn btn-sm btn-outline-secondary me-1">
@@ -117,4 +136,86 @@
     </div>
   @endif
 
+  @if ($bolehSusun)
+    <div class="modal fade" id="modal-impor-jadwal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Impor Jadwal dari Excel</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+          </div>
+          <div class="modal-body">
+            @if (session('impor_errors'))
+              <div class="alert alert-danger">
+                <div class="fw-semibold mb-1">{{ session('error') ?? 'Impor dibatalkan — tidak ada data yang ditulis.' }}
+                </div>
+                <ul class="mb-0">
+                  @foreach (session('impor_errors') as $err)
+                    <li>{{ $err }}</li>
+                  @endforeach
+                </ul>
+              </div>
+            @endif
+            @if ($daftarModel->isEmpty())
+              <div class="alert alert-warning mb-0">Belum ada model jadwal di semester ini — buat dulu lewat tombol
+                <strong>Model Jadwal</strong>, lalu pilih modelnya untuk rombel dari daftar atau editor.</div>
+            @else
+              <div class="mb-3">
+                <label class="form-label" for="impor-model">Model Jadwal</label>
+                <select id="impor-model" class="form-select">
+                  @foreach ($daftarModel as $m)
+                    <option value="{{ $m->id }}" {{ session('impor_model') == $m->id ? 'selected' : '' }}>
+                      {{ $m->nama }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <div class="mb-4">
+                <a href="#" id="impor-template" class="btn btn-outline-success w-100">
+                  <i class="ri ri-file-excel-2-line me-1"></i> Unduh Template
+                </a>
+                <small class="text-muted">Template berisi rombel-rombel yang sudah memilih model ini. Isi kode
+                  mapelnya, lalu unggah kembali berkasnya di bawah.</small>
+              </div>
+              <form method="POST" id="impor-form" enctype="multipart/form-data">
+                @csrf
+                <div class="mb-3">
+                  <label class="form-label" for="impor-file">Berkas hasil isian (.xlsx)</label>
+                  <input type="file" id="impor-file" name="file" class="form-control" accept=".xlsx" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                  <i class="ri ri-upload-2-line me-1"></i> Unggah &amp; Impor
+                </button>
+              </form>
+            @endif
+          </div>
+        </div>
+      </div>
+    </div>
+  @endif
+
+@endsection
+
+@section('page-script')
+  <script>
+    (function() {
+      const sel = document.getElementById('impor-model');
+      if (sel) {
+        const link = document.getElementById('impor-template');
+        const form = document.getElementById('impor-form');
+        const perbarui = () => {
+          const dasar = '{{ url('/jadwal-pelajaran/pengaturan') }}/' + sel.value;
+          link.href = dasar + '/template-impor';
+          form.action = dasar + '/impor';
+        };
+        sel.addEventListener('change', perbarui);
+        perbarui();
+      }
+      @if (session('impor_errors'))
+        const modalEl = document.getElementById('modal-impor-jadwal');
+        if (modalEl) {
+          new bootstrap.Modal(modalEl).show();
+        }
+      @endif
+    })();
+  </script>
 @endsection

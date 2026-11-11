@@ -1,6 +1,6 @@
 @extends('layouts/layoutMaster')
 
-@section('title', 'Model Jadwal — ' . $model->nama)
+@section('title', 'Model Jadwal — ' . ($model->exists ? $model->nama : 'Baru'))
 
 @section('content')
 
@@ -19,7 +19,7 @@
         </span>
       </div>
       <div class="flex-grow-1">
-        <h4 class="mb-1">Model Jadwal: {{ $model->nama }}</h4>
+        <h4 class="mb-1">{{ $model->exists ? 'Model Jadwal: ' . $model->nama : 'Tambah Model Jadwal' }}</h4>
         <div class="text-muted small">
           Kerangka waktu {{ $sekolah->detailTerbaru->nama_sekolah ?? '-' }}
           @if ($semester)
@@ -38,7 +38,8 @@
       Sesuaikan lalu simpan.</div>
   @endif
 
-  <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.model.simpan', $model->id) }}">
+  <form method="POST"
+    action="{{ $model->exists ? route('jadwal-pelajaran.pengaturan.model.simpan', $model->id) : route('jadwal-pelajaran.pengaturan.model.baru.simpan') }}">
     @csrf
     <div class="card mb-4">
       <div class="card-body">

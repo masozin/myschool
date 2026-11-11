@@ -121,14 +121,16 @@
               @csrf
               <select name="pengaturan_id" class="form-select form-select-sm d-inline-block w-auto"
                 onchange="this.form.submit()">
+                <option value="" disabled {{ !$rombel->jadwal_pengaturan_id ? 'selected' : '' }}>— Pilih Model —
+                </option>
                 @foreach ($daftarModel as $m)
-                  <option value="{{ $m->id }}" {{ $modelJadwal && $modelJadwal->id === $m->id ? 'selected' : '' }}>
+                  <option value="{{ $m->id }}" {{ $rombel->jadwal_pengaturan_id === $m->id ? 'selected' : '' }}>
                     {{ $m->nama }}</option>
                 @endforeach
               </select>
             </form>
           @else
-            {{ $modelJadwal ? $modelJadwal->nama : 'Pola bawaan' }}
+            {{ $rombel->jadwal_pengaturan_id && $modelJadwal ? $modelJadwal->nama : 'Belum ada model jadwal yang dipilih' }}
           @endif
           @unless ($bolehEdit)
             <span class="mx-1">•</span> Mode lihat saja
@@ -149,6 +151,13 @@
   @if (!$tersimpan)
     <div class="alert alert-info">Jadwal ini memakai kerangka jam bawaan karena Pengaturan Jam semester ini belum
       disimpan.</div>
+  @endif
+
+  @if ($daftarModel->isNotEmpty() && !$rombel->jadwal_pengaturan_id)
+    <div class="alert alert-warning">Rombel ini <strong>belum ada model jadwal yang dipilih</strong> — kerangka yang
+      tampil mengikuti {{ $modelJadwal ? 'model "' . $modelJadwal->nama . '"' : 'pola bawaan' }}. Pilih model lewat
+      pemilih di atas (atau dari daftar rombel) agar menetap dan rombel ini masuk ke template impor model tersebut.
+    </div>
   @endif
 
   @if ($luarKerangka->isNotEmpty())
