@@ -51,7 +51,7 @@
         </div>
         @if ($bolehSusun)
           <a href="{{ route('jadwal-pelajaran.pengaturan') }}" class="btn btn-outline-primary">
-            <i class="ri ri-time-line me-1"></i> Pengaturan Jam
+            <i class="ri ri-time-line me-1"></i> Model Jadwal
           </a>
         @endif
       </div>
@@ -59,10 +59,11 @@
 
     @if (!$pengaturanAda)
       <div class="alert alert-info">
-        Kerangka jam belum diatur untuk semester ini — jadwal memakai pola bawaan (Senin–Kamis 8 jam, Jumat 6, Sabtu 7,
+        Model jadwal belum dibuat untuk semester ini — jadwal memakai pola bawaan (Senin–Kamis 8 jam, Jumat 6, Sabtu 7,
         mulai 07.00, 35 menit per jam).
         @if ($bolehSusun)
-          Atur lewat tombol <strong>Pengaturan Jam</strong> di atas bila pola sekolah berbeda.
+          Buat lewat tombol <strong>Model Jadwal</strong> di atas bila pola sekolah berbeda, atau bila kelas bawah dan
+          kelas atas beda jamnya.
         @endif
       </div>
     @endif
@@ -82,10 +83,14 @@
           <tbody>
             @forelse ($rombels as $r)
               <tr>
-                <td class="fw-semibold">{{ $r->nama_rombel }}</td>
+                <td class="fw-semibold">{{ $r->nama_rombel }}
+                  <div class="text-muted fw-normal" style="font-size: 11px;">
+                    Model: {{ $modelPerRombel[$r->id]['nama'] ?? 'Pola bawaan' }}</div>
+                </td>
                 <td>{{ $r->ptk->nama_ptk ?? '-' }}</td>
                 <td class="text-center">{{ $pengampuPerRombel[$r->id] ?? 0 }} mapel</td>
-                <td class="text-center">{{ $jadwalPerRombel[$r->id] ?? 0 }} / {{ $totalKotak }} kotak</td>
+                <td class="text-center">{{ $jadwalPerRombel[$r->id] ?? 0 }} /
+                  {{ $modelPerRombel[$r->id]['total'] ?? $totalKotak }} kotak</td>
                 <td class="text-end">
                   @if ($bolehSusun)
                     <a href="{{ route('jadwal-pelajaran.pengampu', $r) }}"

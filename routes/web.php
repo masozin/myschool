@@ -613,7 +613,13 @@ Route::controller(JadwalPelajaranController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
     Route::get('/pengaturan', 'pengaturan')->name('pengaturan')
       ->middleware('role:Operator Sekolah');
-    Route::post('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')
+    Route::post('/pengaturan/model', 'tambahModel')->name('pengaturan.model.tambah')
+      ->middleware('role:Operator Sekolah');
+    Route::get('/pengaturan/{id}', 'pengaturanModel')->name('pengaturan.model')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/pengaturan/{id}', 'simpanPengaturan')->name('pengaturan.model.simpan')
+      ->middleware('role:Operator Sekolah');
+    Route::post('/pengaturan/{id}/hapus', 'hapusModel')->name('pengaturan.model.hapus')
       ->middleware('role:Operator Sekolah');
     Route::get('/pengampu/{rombel}', 'pengampu')->name('pengampu')
       ->middleware('role:Operator Sekolah');

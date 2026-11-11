@@ -114,6 +114,8 @@
           @if ($semester)
             <span class="mx-1">•</span> Semester {{ $semester->semester }} {{ $semester->tahun_pelajaran }}
           @endif
+          <span class="mx-1">•</span> Model:
+          {{ $modelJadwal ? $modelJadwal->nama . ' (' . $modelJadwal->labelRentang() . ')' : 'Pola bawaan' }}
           @unless ($bolehEdit)
             <span class="mx-1">•</span> Mode lihat saja
           @endunless

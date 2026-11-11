@@ -1,6 +1,6 @@
 @extends('layouts/layoutMaster')
 
-@section('title', 'Pengaturan Jam — Jadwal Pelajaran')
+@section('title', 'Model Jadwal — Jadwal Pelajaran')
 
 @section('content')
 
@@ -9,6 +9,9 @@
   @endif
   @if (session('error'))
     <div class="alert alert-danger">{{ session('error') }}</div>
+  @endif
+  @if ($errors->any())
+    <div class="alert alert-danger">{{ $errors->first() }}</div>
   @endif
 
   <div class="card mb-4">
@@ -19,7 +22,7 @@
         </span>
       </div>
       <div class="flex-grow-1">
-        <h4 class="mb-1">Pengaturan Jam</h4>
+        <h4 class="mb-1">Model Jadwal</h4>
         <div class="text-muted small">
           Kerangka waktu {{ $sekolah->detailTerbaru->nama_sekolah ?? '-' }}
           @if ($semester)
@@ -33,127 +36,93 @@
     </div>
   </div>
 
-  @if (!$tersimpan)
-    <div class="alert alert-info">Kerangka belum pernah disimpan — nilai di bawah ini pola bawaan. Sesuaikan lalu
-      simpan.</div>
-  @endif
+  <div class="alert alert-info">
+    Setiap rombel otomatis memakai model yang rentang tingkatnya mencakup tingkat rombel itu — misalnya model
+    <strong>Kelas Bawah</strong> untuk tingkat 1–3 dan <strong>Kelas Atas</strong> untuk tingkat 4–6, masing-masing
+    dengan durasi dan jumlah jamnya sendiri. Tingkat yang tidak tercakup model mana pun mengikuti model umum
+    (rentang tingkat kosong); bila belum ada model sama sekali, yang berlaku pola bawaan.
+  </div>
 
-  <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.simpan') }}">
-    @csrf
-    <div class="card">
-      <div class="table-responsive">
-        <table class="table mb-0 align-middle">
-          <thead class="table-light">
+  <div class="card mb-4">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Nama Model</th>
+            <th>Rentang Tingkat</th>
+            <th>Kerangka</th>
+            <th class="text-center">Dipakai</th>
+            <th class="text-end">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          @forelse ($models as $m)
+            @php
+              $hariModel = is_array($m->kerangka) ? $m->kerangka : [];
+              $totalJp = array_sum(array_map(fn($f) => (int) ($f['jumlah_jam'] ?? 0), $hariModel));
+            @endphp
             <tr>
-              <th>Hari</th>
-              <th style="width: 130px;">Jumlah Jam</th>
-              <th style="width: 140px;">Jam Mulai</th>
-              <th style="width: 130px;">Menit / Jam</th>
-              <th>Istirahat 1 (sesudah jam ke- …, … menit)</th>
-              <th>Istirahat 2 (sesudah jam ke- …, … menit)</th>
+              <td class="fw-semibold">{{ $m->nama }}</td>
+              <td>{{ $m->labelRentang() }}</td>
+              <td>{{ count($hariModel) }} hari aktif · {{ $totalJp }} jam/minggu</td>
+              <td class="text-center">{{ $pemakai[$m->id] ?? 0 }} rombel</td>
+              <td class="text-end">
+                <a href="{{ route('jadwal-pelajaran.pengaturan.model', $m->id) }}" class="btn btn-sm btn-primary">
+                  <i class="ri ri-settings-3-line me-1"></i> Atur Kerangka
+                </a>
+                <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.model.hapus', $m->id) }}"
+                  class="d-inline" onsubmit="return confirm('Hapus model &quot;{{ $m->nama }}&quot;? Rombel pemakainya akan mengikuti model lain / pola bawaan.');">
+                  @csrf
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="ri ri-delete-bin-line"></i>
+                  </button>
+                </form>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            @foreach ($namaHari as $hari => $nama)
-              @php
-                $f = $kerangka[$hari] ?? null;
-                $j1 = $f['istirahat'][0] ?? null;
-                $j2 = $f['istirahat'][1] ?? null;
-              @endphp
-              <tr>
-                <td class="fw-semibold">{{ $nama }}</td>
-                <td>
-                  <input type="number" class="form-control" name="hari[{{ $hari }}][jumlah_jam]"
-                    value="{{ $f['jumlah_jam'] ?? '' }}" min="0" max="12" placeholder="0">
-                </td>
-                <td>
-                  <input type="time" class="form-control" name="hari[{{ $hari }}][mulai]"
-                    value="{{ $f['mulai'] ?? '07:00' }}">
-                </td>
-                <td>
-                  <input type="number" class="form-control" name="hari[{{ $hari }}][menit]"
-                    value="{{ $f['menit'] ?? 35 }}" min="15" max="90">
-                </td>
-                <td>
-                  <div class="d-flex gap-2">
-                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][0][setelah]"
-                      value="{{ $j1['setelah'] ?? '' }}" min="1" max="11" placeholder="Jam ke-">
-                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][0][menit]"
-                      value="{{ $j1['menit'] ?? '' }}" min="5" max="90" placeholder="Menit">
-                  </div>
-                </td>
-                <td>
-                  <div class="d-flex gap-2">
-                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][1][setelah]"
-                      value="{{ $j2['setelah'] ?? '' }}" min="1" max="11" placeholder="Jam ke-">
-                    <input type="number" class="form-control" name="hari[{{ $hari }}][istirahat][1][menit]"
-                      value="{{ $j2['menit'] ?? '' }}" min="5" max="90" placeholder="Menit">
-                  </div>
-                </td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-      <div class="card-body border-top d-flex align-items-center gap-3 flex-wrap">
-        <button type="submit" class="btn btn-primary">
-          <i class="ri ri-save-line me-1"></i> Simpan Kerangka
-        </button>
-        <small class="text-muted">Jumlah jam 0 atau kosong = tidak ada pelajaran hari itu. Mengubah kerangka tidak
-          menghapus jadwal yang sudah terisi; kotak yang jatuh di luar kerangka baru akan ditandai di editor.</small>
-      </div>
+          @empty
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">Belum ada model jadwal — semua rombel mengikuti
+                pola bawaan. Buat model pertama di bawah ini.</td>
+            </tr>
+          @endforelse
+        </tbody>
+      </table>
     </div>
+  </div>
 
-    <div class="card mt-4">
-      <div class="card-header pb-3">
-        <h5 class="mb-1">Kegiatan Tetap dalam Sehari</h5>
-        <small class="text-muted">Kegiatan satu sekolah yang waktunya tetap dan durasinya tidak mengikuti jam
-          pelajaran — misalnya Upacara 40 menit sebelum jam ke-1 hari Senin, Senam 30 menit sebelum jam ke-1 hari
-          Jumat, atau Literasi 5 menit sebelum jam ke-1 setiap hari. Kegiatan ini menggeser jam mulai pelajaran
-          sesudahnya secara otomatis. Kosongkan nama untuk menghapus kegiatan.</small>
-      </div>
-      <div class="table-responsive">
-        <table class="table mb-0 align-middle">
-          <tbody>
-            @foreach ($namaHari as $hari => $nama)
-              <tr>
-                <td class="fw-semibold" style="width: 90px;">{{ $nama }}</td>
-                <td>
-                  @for ($i = 0; $i < 3; $i++)
-                    @php
-                      $keg = $kerangka[$hari]['kegiatan'][$i] ?? null;
-                    @endphp
-                    <div class="d-flex gap-2 {{ $i < 2 ? 'mb-2' : '' }} flex-wrap">
-                      <input type="text" class="form-control" style="width: 200px;"
-                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][nama]"
-                        value="{{ $keg['nama'] ?? '' }}" placeholder="Nama kegiatan (mis. Upacara)" maxlength="100">
-                      <select class="form-select" style="width: 150px;"
-                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][posisi]">
-                        <option value="sebelum" {{ ($keg['posisi'] ?? 'sebelum') === 'sebelum' ? 'selected' : '' }}>
-                          Sebelum jam ke-</option>
-                        <option value="sesudah" {{ ($keg['posisi'] ?? '') === 'sesudah' ? 'selected' : '' }}>
-                          Sesudah jam ke-</option>
-                      </select>
-                      <input type="number" class="form-control" style="width: 90px;"
-                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][jam]" value="{{ $keg['jam'] ?? '' }}"
-                        min="1" max="12" placeholder="Jam">
-                      <input type="number" class="form-control" style="width: 100px;"
-                        name="hari[{{ $hari }}][kegiatan][{{ $i }}][menit]"
-                        value="{{ $keg['menit'] ?? '' }}" min="1" max="180" placeholder="Menit">
-                    </div>
-                  @endfor
-                </td>
-              </tr>
-            @endforeach
-          </tbody>
-        </table>
-      </div>
-      <div class="card-body border-top">
-        <button type="submit" class="btn btn-primary">
-          <i class="ri ri-save-line me-1"></i> Simpan Kerangka
-        </button>
-      </div>
+  <div class="card">
+    <div class="card-header pb-3">
+      <h5 class="mb-1">Tambah Model</h5>
+      <small class="text-muted">Model baru dibuat dari pola bawaan; kerangkanya langsung bisa disesuaikan setelah
+        dibuat.</small>
     </div>
-  </form>
+    <div class="card-body">
+      <form method="POST" action="{{ route('jadwal-pelajaran.pengaturan.model.tambah') }}">
+        @csrf
+        <div class="row g-3 align-items-end">
+          <div class="col-12 col-md-5">
+            <label class="form-label" for="nama-model-baru">Nama Model</label>
+            <input type="text" id="nama-model-baru" class="form-control" name="nama" value="{{ old('nama') }}"
+              maxlength="50" placeholder="mis. Kelas Bawah" required>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="dari-baru">Tingkat Dari</label>
+            <input type="number" id="dari-baru" class="form-control" name="tingkat_dari"
+              value="{{ old('tingkat_dari') }}" min="1" max="12" placeholder="Semua">
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label" for="sampai-baru">Tingkat Sampai</label>
+            <input type="number" id="sampai-baru" class="form-control" name="tingkat_sampai"
+              value="{{ old('tingkat_sampai') }}" min="1" max="12" placeholder="Semua">
+          </div>
+          <div class="col-12 col-md-3">
+            <button type="submit" class="btn btn-primary">
+              <i class="ri ri-add-line me-1"></i> Buat Model
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 
 @endsection
