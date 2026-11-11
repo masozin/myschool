@@ -21,6 +21,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Conditional;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Protection;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 
 /**
@@ -311,20 +312,22 @@ class JadwalPelajaranController extends Controller
     return $kode;
   }
 
-  /** Rombel-rombel yang model efektifnya adalah model ini. */
+  /**
+   * Rombel-rombel yang SECARA EKSPLISIT memilih model ini di
+   * editor (jadwal_pengaturan_id terisi). Untuk template &
+   * impor Mark minta hanya rombel itu yang masuk — rombel
+   * yang belum memilih model tidak ikut, walau di editor ia
+   * tampil mengikuti model pertama sebagai bawaan.
+   */
   private function rombelPemakaiModel(JadwalPengaturan $model, int $sekolahId, int $semesterId)
   {
     return Rombel::with('ptk')
       ->where('sekolah_id', $sekolahId)
       ->where('semester_id', $semesterId)
+      ->where('jadwal_pengaturan_id', $model->id)
       ->orderBy('tingkat')
       ->orderBy('nama_rombel')
       ->get()
-      ->filter(function ($r) use ($model, $sekolahId, $semesterId) {
-        $m = $this->modelUntuk($sekolahId, $semesterId, $r);
-
-        return $m && $m->id === $model->id;
-      })
       ->values();
   }
 
@@ -339,8 +342,11 @@ class JadwalPelajaranController extends Controller
    * di setiap blok hari, kolom HARI dan baris kegiatan
    * di-merge, serta kolom bantu daftar kode mapel di kanan.
    * Sheet Pengampu berbentuk MATRIKS mapel x rombel berisi
-   * kode guru; kolom kode guru terisi rumus INDEX/MATCH dua
-   * arah dari matriks itu.
+   * ID PTK pengampu untuk SEMUA mapel hasil mapping (sesuai
+   * kurikulum tiap rombel); kolom kode guru terisi rumus
+   * INDEX/MATCH dua arah dari matriks itu. Kolom bantu
+   * (blok kode guru + daftar) dan baris catatan/ID
+   * disembunyikan; sheet dilindungi kecuali kotak isian.
    *
    * Format bersyarat pada sel mapel: MERAH bila kode guru
    * baris itu ganda (bentrok), ABU bila kode tidak ada di
@@ -380,19 +386,29 @@ class JadwalPelajaranController extends Controller
     $akhirT = $huruf($kolGuruAkhir);
     $hurufBantu = $huruf($kolBantu);
 
-    // Matriks pengampu: baris mapel (gabungan semua rombel),
-    // kolom rombel, isi kode guru.
-    $mapelBaris = [];
+    // Matriks pengampu: baris = SEMUA mapel hasil mapping
+    // yang berlaku bagi rombel-rombel ini (sesuai kurikulum
+    // tiap rombel, lewat getMapels yang juga dipakai halaman
+    // Pengampu & editor), kolom = rombel, isi = ID PTK
+    // pengampunya (kosong bila mapel tidak berlaku di rombel
+    // itu atau belum ada pengampunya).
+    $guruPerSel = [];
     foreach ($pengampus as $p) {
-      $mid = $p->mapping->master_mapel_id;
-      if (!isset($mapelBaris[$mid])) {
-        $mapelBaris[$mid] = [
-          'nama' => $p->mapping->masterMapel->nama ?? '-',
-          'kode' => $this->kodeMapel($p->mapping),
-          'perRombel' => [],
-        ];
+      $guruPerSel[$p->rombel_id][$p->mapel_mapping_id] = $p->ptk_id;
+    }
+    $mapelBaris = [];
+    foreach ($rombels as $r) {
+      foreach ($this->getMapels($sekolah, $r, $semesterId) as $m) {
+        $mid = $m->master_mapel_id;
+        if (!isset($mapelBaris[$mid])) {
+          $mapelBaris[$mid] = [
+            'nama' => $m->masterMapel->nama ?? '-',
+            'kode' => $this->kodeMapel($m),
+            'perRombel' => [],
+          ];
+        }
+        $mapelBaris[$mid]['perRombel'][$r->id] = $guruPerSel[$r->id][$m->id] ?? null;
       }
-      $mapelBaris[$mid]['perRombel'][$p->rombel_id] = $p->ptk->kodeGuru();
     }
     $mapelBaris = collect($mapelBaris)->sortBy('kode')->values();
     $barisMatriksAkhir = 2 + $mapelBaris->count();
@@ -556,6 +572,10 @@ class JadwalPelajaranController extends Controller
               'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF8E1']],
               'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ]);
+            // Satu-satunya sel yang boleh diedit saat sheet
+            // dilindungi (lihat pengaktifan proteksi di bawah).
+            $sheet->getCell($kolJ . $baris)->getStyle()->getProtection()
+              ->setLocked(Protection::PROTECTION_UNPROTECTED);
             // Kode guru OTOMATIS dari matriks Pengampu:
             // INDEX dua arah (baris kode mapel x kolom rombel).
             $lookup = 'INDEX(Pengampu!$' . $matAwal . '$3:$' . $matAkhir . '$' . $barisMatriksAkhir
@@ -629,6 +649,24 @@ class JadwalPelajaranController extends Controller
     $sheet->getColumnDimension($hurufBantu)->setWidth(16);
     $sheet->freezePane($huruf($kolKelasAwal) . '9');
 
+    // Sembunyikan bagian bantu: kolom celah, blok kode guru,
+    // kolom daftar bantu, baris catatan (5) & ID (6). Rumus
+    // dan format bersyarat tetap bekerja dari balik sembunyi;
+    // pengguna dapat memunculkannya lagi lewat Unhide.
+    foreach ([$kolKelasAkhir + 1, $kolGuruAkhir + 1, $kolBantu] as $cSembunyi) {
+      $sheet->getColumnDimension($huruf($cSembunyi))->setVisible(false);
+    }
+    for ($c = $kolGuruAwal; $c <= $kolGuruAkhir; $c++) {
+      $sheet->getColumnDimension($huruf($c))->setVisible(false);
+    }
+    $sheet->getRowDimension(5)->setVisible(false);
+    $sheet->getRowDimension(6)->setVisible(false);
+
+    // Lindungi sheet Jadwal: hanya kotak kuning pelajaran
+    // yang terbuka; struktur, rumus, dan daftar tidak bisa
+    // terutak-atik tidak sengaja. Tanpa kata sandi.
+    $sheet->getProtection()->setSheet(true);
+
     // ── Sheet Pengampu: MATRIKS mapel x rombel ──
     $ref = $ss->createSheet();
     $ref->setTitle('Pengampu');
@@ -658,6 +696,11 @@ class JadwalPelajaranController extends Controller
       $ref->getColumnDimension($huruf($c))->setWidth(11);
     }
     $ref->getStyle('A1:' . $matAkhir . ($rb - 1))->applyFromArray($garis);
+    // Baris ID rombel disembunyikan (tetap dipakai rumus) dan
+    // seluruh sheet dilindungi — matriks ini referensi, bukan
+    // untuk diedit tangan (pengampu diubah dari aplikasinya).
+    $ref->getRowDimension(1)->setVisible(false);
+    $ref->getProtection()->setSheet(true);
 
     // ── Sheet Petunjuk ──
     $petunjuk = $ss->createSheet();
@@ -673,12 +716,14 @@ class JadwalPelajaranController extends Controller
       '5. Baris berwarna (UPACARA, LITERASI, ISTIRAHAT, ...) berasal dari kerangka model dan tidak perlu diubah; baris itu dilewati saat impor.',
       '6. Jangan mengubah baris 1-8, nama sheet, atau urutan kolom. Simpan tetap sebagai .xlsx, lalu unggah lewat tombol Impor pada model ini di halaman Model Jadwal.',
       '7. Bila ada kesalahan saat impor, TIDAK ada data yang ditulis — semua diperbaiki dulu, baru impor ulang.',
+      '8. Kolom kode guru dan daftar bantu sengaja disembunyikan agar tabel bersih — rumus dan peringatan warnanya tetap bekerja; bila perlu, tampilkan lagi lewat Unhide di Excel. Sheet dilindungi: hanya kotak kuning yang bisa diedit (proteksi tanpa kata sandi, bisa dibuka dari menu Review bila terpaksa). Warna abu-abu hanya peringatan saat mengetik; aplikasi tetap memeriksa ulang semuanya saat impor.',
     ];
     foreach ($barisPetunjuk as $i => $teks) {
       $petunjuk->setCellValue('A' . ($i + 1), $teks);
     }
     $petunjuk->getStyle('A1')->getFont()->setBold(true)->setSize(13);
     $petunjuk->getStyle('A1:A' . count($barisPetunjuk))->getAlignment()->setWrapText(true);
+    $petunjuk->getProtection()->setSheet(true);
 
     $ss->setActiveSheetIndex(0);
     $namaFile = 'template-jadwal-' . Str::slug($model->nama) . '.xlsx';
@@ -740,7 +785,7 @@ class JadwalPelajaranController extends Controller
       }
       $m = $this->modelUntuk($sekolahId, $semesterId, $r);
       if (!$m || $m->id !== $model->id) {
-        $kesalahan[] = "Rombel {$r->nama_rombel} tidak lagi memakai model \"{$model->nama}\" — unduh template baru.";
+        $kesalahan[] = "Rombel {$r->nama_rombel} belum memilih model \"{$model->nama}\" di editor — unduh template baru.";
       }
     }
     if ($kesalahan) {
