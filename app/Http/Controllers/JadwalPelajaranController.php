@@ -399,7 +399,7 @@ class JadwalPelajaranController extends Controller
     $mapelBaris = [];
     foreach ($rombels as $r) {
       foreach ($this->getMapels($sekolah, $r, $semesterId) as $m) {
-        $mid = $m->master_mapel_id;
+        $mid = $m->mapel_master_id;
         if (!isset($mapelBaris[$mid])) {
           $mapelBaris[$mid] = [
             'nama' => $m->masterMapel->nama ?? '-',
@@ -650,10 +650,11 @@ class JadwalPelajaranController extends Controller
     $sheet->freezePane($huruf($kolKelasAwal) . '9');
 
     // Sembunyikan bagian bantu: kolom celah, blok kode guru,
-    // kolom daftar bantu, baris catatan (5) & ID (6). Rumus
+    // baris catatan (5) & ID (6). Kolom daftar bantu SENGAJA
+    // tetap terlihat sebagai referensi saat mengetik. Rumus
     // dan format bersyarat tetap bekerja dari balik sembunyi;
     // pengguna dapat memunculkannya lagi lewat Unhide.
-    foreach ([$kolKelasAkhir + 1, $kolGuruAkhir + 1, $kolBantu] as $cSembunyi) {
+    foreach ([$kolKelasAkhir + 1, $kolGuruAkhir + 1] as $cSembunyi) {
       $sheet->getColumnDimension($huruf($cSembunyi))->setVisible(false);
     }
     for ($c = $kolGuruAwal; $c <= $kolGuruAkhir; $c++) {
@@ -716,7 +717,7 @@ class JadwalPelajaranController extends Controller
       '5. Baris berwarna (UPACARA, LITERASI, ISTIRAHAT, ...) berasal dari kerangka model dan tidak perlu diubah; baris itu dilewati saat impor.',
       '6. Jangan mengubah baris 1-8, nama sheet, atau urutan kolom. Simpan tetap sebagai .xlsx, lalu unggah lewat tombol Impor pada model ini di halaman Model Jadwal.',
       '7. Bila ada kesalahan saat impor, TIDAK ada data yang ditulis — semua diperbaiki dulu, baru impor ulang.',
-      '8. Kolom kode guru dan daftar bantu sengaja disembunyikan agar tabel bersih — rumus dan peringatan warnanya tetap bekerja; bila perlu, tampilkan lagi lewat Unhide di Excel. Sheet dilindungi: hanya kotak kuning yang bisa diedit (proteksi tanpa kata sandi, bisa dibuka dari menu Review bila terpaksa). Warna abu-abu hanya peringatan saat mengetik; aplikasi tetap memeriksa ulang semuanya saat impor.',
+      '8. Kolom kode guru sengaja disembunyikan agar tabel bersih — rumus dan peringatan warnanya tetap bekerja; bila perlu, tampilkan lagi lewat Unhide di Excel. Kolom daftar bantu di kanan tetap terlihat sebagai referensi kode mapel. Sheet dilindungi: hanya kotak kuning yang bisa diedit (proteksi tanpa kata sandi, bisa dibuka dari menu Review bila terpaksa). Warna abu-abu hanya peringatan saat mengetik; aplikasi tetap memeriksa ulang semuanya saat impor.',
     ];
     foreach ($barisPetunjuk as $i => $teks) {
       $petunjuk->setCellValue('A' . ($i + 1), $teks);
