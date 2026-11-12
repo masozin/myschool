@@ -260,6 +260,16 @@
       "fitur": "formulir"
     },
     {
+      "url": "/formulir/kelola",
+      "icon": "menu-icon icon-base ri ri-survey-line",
+      "name": "Kelola Formulir",
+      "slug": "kelola-formulir",
+      "roles": [
+        "Admin"
+      ],
+      "fitur": "formulir"
+    },
+    {
       "menuHeader": "Pengaturan"
     },
     {
