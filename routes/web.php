@@ -5,6 +5,7 @@ use App\Http\Controllers\DhSiswaController;
 use App\Http\Controllers\FormulirBuilderController;
 use App\Http\Controllers\FormulirController;
 use App\Http\Controllers\FormulirPublikController;
+use App\Http\Controllers\FormulirSubmissionController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
@@ -815,6 +816,25 @@ Route::controller(FormulirBuilderController::class)
     Route::put('/{formulir}', 'update')->name('update');
     Route::delete('/{formulir}', 'destroy')->name('destroy');
     Route::put('/{formulir}/struktur', 'updateStructure')->name('structure');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| FORMULIR K3S — jawaban & ekspor (Batch 4, khusus Admin)
+|--------------------------------------------------------------------------
+| Daftar/detail jawaban, ekspor Excel, ekspor berkas (ZIP), dan
+| pemantauan per sekolah. Route ekspor didaftarkan sebelum route
+| detail {submission} agar tidak tertangkap sebagai id jawaban.
+*/
+Route::controller(FormulirSubmissionController::class)
+  ->prefix('formulir/kelola')
+  ->name('formulir.kelola.')
+  ->middleware(['auth:sanctum', 'fitur:formulir', 'role:Admin'])
+  ->group(function () {
+    Route::get('/{formulir}/jawaban', 'index')->name('submissions.index');
+    Route::get('/{formulir}/jawaban/ekspor', 'exportExcel')->name('submissions.export');
+    Route::get('/{formulir}/jawaban/ekspor-berkas', 'exportFiles')->name('submissions.exportFiles');
+    Route::get('/{formulir}/jawaban/{submission}', 'show')->name('submissions.show');
   });
 
 /*
