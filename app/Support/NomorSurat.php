@@ -26,13 +26,15 @@ class NomorSurat
       return;
     }
 
+    // Pola klasifikasi surat dinas (000–900): untuk SD yang
+    // terpakai umumnya empat ini — 000 Umum, 420 Pendidikan,
+    // 800 Kepegawaian, 900 Keuangan. Rincian lebih halus
+    // (mis. 421, 422) bisa ditambah dari Pengaturan.
     $bawaan = [
-      ['UM', 'Umum'],
-      ['KP', 'Kepegawaian'],
-      ['KS', 'Kesiswaan'],
-      ['KR', 'Kurikulum'],
-      ['SP', 'Sarana & Prasarana'],
-      ['KU', 'Keuangan'],
+      ['000', 'Umum'],
+      ['420', 'Pendidikan'],
+      ['800', 'Kepegawaian'],
+      ['900', 'Keuangan'],
     ];
 
     foreach ($bawaan as $i => [$kode, $nama]) {
