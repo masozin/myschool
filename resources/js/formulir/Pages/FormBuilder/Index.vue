@@ -21,6 +21,11 @@ import {
     IconChevronLeft,
     IconChevronRight,
     IconSchool,
+    IconClipboardList,
+    IconFileSpreadsheet,
+    IconFileZip,
+    IconCopy,
+    IconCheck,
 } from "@tabler/icons-vue";
 
 const props = defineProps({
@@ -78,6 +83,38 @@ function destroyForm(form) {
     ) {
         router.delete(route("formulir.kelola.destroy", form.id));
     }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Salin Tautan publik (Batch 4.5)
+|--------------------------------------------------------------------------
+| Ditampilkan untuk semua status — Admin boleh membagikan tautan lebih
+| dulu; form draf/ditutup memang menampilkan halaman tertutup ke pengisi.
+*/
+
+const copiedSlug = ref(null);
+let copiedTimer = null;
+
+async function copyFormLink(form) {
+    const url = `${window.location.origin}/form/${form.slug}`;
+
+    try {
+        await navigator.clipboard.writeText(url);
+    } catch {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+    }
+
+    copiedSlug.value = form.slug;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copiedSlug.value = null), 2000);
 }
 
 function clearSearch() {
@@ -457,10 +494,58 @@ function clearSearch() {
                             </span>
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1">
+                            <Link
+                                :href="route('formulir.kelola.submissions.index', form.id)"
+                                class="mr-0.5 flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10"
+                                title="Lihat jawaban masuk"
+                            >
+                                <IconClipboardList :size="14" stroke="1.8" />
+                                Jawaban
+                            </Link>
+
+                            <a
+                                v-if="(form.submissions_count ?? 0) > 0"
+                                :href="route('formulir.kelola.submissions.export', form.id)"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+                                title="Ekspor Excel"
+                            >
+                                <IconFileSpreadsheet :size="16" stroke="1.8" />
+                            </a>
+
+                            <a
+                                v-if="(form.submissions_count ?? 0) > 0"
+                                :href="route('formulir.kelola.submissions.exportFiles', form.id)"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-amber-50 hover:text-amber-600 dark:text-zinc-500 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
+                                title="Ekspor Berkas (ZIP)"
+                            >
+                                <IconFileZip :size="16" stroke="1.8" />
+                            </a>
+
+                            <span class="relative">
+                                <button
+                                    type="button"
+                                    @click="copyFormLink(form)"
+                                    class="flex h-8 w-8 items-center justify-center rounded-lg transition"
+                                    :class="copiedSlug === form.slug
+                                        ? 'text-emerald-500'
+                                        : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-white'"
+                                    :title="copiedSlug === form.slug ? 'Tersalin!' : 'Salin Tautan'"
+                                >
+                                    <IconCheck v-if="copiedSlug === form.slug" :size="16" stroke="2" />
+                                    <IconCopy v-else :size="16" stroke="1.8" />
+                                </button>
+                                <span
+                                    v-if="copiedSlug === form.slug"
+                                    class="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[10px] font-bold text-white shadow-lg dark:bg-white dark:text-slate-900"
+                                >
+                                    Tersalin
+                                </span>
+                            </span>
+
                             <Link
                                 :href="route('formulir.kelola.edit', form.id)"
-                                class="flex items-center gap-1 text-xs font-bold text-indigo-600 transition hover:gap-1.5 dark:text-indigo-400"
+                                class="ml-1 flex items-center gap-1 text-xs font-bold text-indigo-600 transition hover:gap-1.5 dark:text-indigo-400"
                             >
                                 Kelola
                                 <IconArrowUpRight :size="14" stroke="2" />
@@ -537,9 +622,48 @@ function clearSearch() {
                         class="flex shrink-0 items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                     >
                         <Link
+                            :href="route('formulir.kelola.submissions.index', form.id)"
+                            class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:text-zinc-500 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
+                            title="Lihat Jawaban"
+                        >
+                            <IconClipboardList :size="17" stroke="1.8" />
+                        </Link>
+
+                        <a
+                            v-if="(form.submissions_count ?? 0) > 0"
+                            :href="route('formulir.kelola.submissions.export', form.id)"
+                            class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:text-zinc-500 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+                            title="Ekspor Excel"
+                        >
+                            <IconFileSpreadsheet :size="17" stroke="1.8" />
+                        </a>
+
+                        <a
+                            v-if="(form.submissions_count ?? 0) > 0"
+                            :href="route('formulir.kelola.submissions.exportFiles', form.id)"
+                            class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-amber-50 hover:text-amber-600 dark:text-zinc-500 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
+                            title="Ekspor Berkas (ZIP)"
+                        >
+                            <IconFileZip :size="17" stroke="1.8" />
+                        </a>
+
+                        <button
+                            type="button"
+                            @click="copyFormLink(form)"
+                            class="flex h-9 w-9 items-center justify-center rounded-lg transition"
+                            :class="copiedSlug === form.slug
+                                ? 'text-emerald-500'
+                                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-white'"
+                            :title="copiedSlug === form.slug ? 'Tersalin!' : 'Salin Tautan'"
+                        >
+                            <IconCheck v-if="copiedSlug === form.slug" :size="17" stroke="2" />
+                            <IconCopy v-else :size="17" stroke="1.8" />
+                        </button>
+
+                        <Link
                             :href="route('formulir.kelola.edit', form.id)"
                             class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-white"
-                            title="Edit Jawaban"
+                            title="Edit Form"
                         >
                             <IconPencil :size="17" stroke="1.8" />
                         </Link>

@@ -18,6 +18,10 @@ import {
     IconLayoutRows,
     IconArrowLeft,
     IconEye,
+    IconClipboardList,
+    IconFileSpreadsheet,
+    IconFileZip,
+    IconLink,
 } from "@tabler/icons-vue";
 
 const props = defineProps({
@@ -67,6 +71,37 @@ function isFirst(index) {
 function isLast(index) {
     return index === state.items.length - 1;
 }
+
+/*
+|--------------------------------------------------------------------------
+| Salin Tautan publik (Batch 4.5) — untuk semua status, sama seperti
+| daftar form: Admin boleh membagikan tautan lebih dulu.
+|--------------------------------------------------------------------------
+*/
+
+const copied = ref(false);
+let copiedTimer = null;
+
+async function copyFormLink() {
+    const url = `${window.location.origin}/form/${props.form.slug}`;
+
+    try {
+        await navigator.clipboard.writeText(url);
+    } catch {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+    }
+
+    copied.value = true;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copied.value = false), 2000);
+}
 </script>
 
 <template>
@@ -100,6 +135,53 @@ function isLast(index) {
                         :field-count="totalFieldCount"
                         @edit="metaOpen = true"
                     />
+
+                    <!-- Aksi jawaban, ekspor, dan berbagi tautan (Batch 4 + 4.5) -->
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <Link :href="route('formulir.kelola.submissions.index', form.id)">
+                            <Button variant="secondary">
+                                <template #icon>
+                                    <IconClipboardList :size="16" stroke="1.75" />
+                                </template>
+                                Jawaban
+                                <span class="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[11px] font-bold leading-none text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
+                                    {{ form.submissions_count ?? 0 }}
+                                </span>
+                            </Button>
+                        </Link>
+
+                        <a
+                            v-if="(form.submissions_count ?? 0) > 0"
+                            :href="route('formulir.kelola.submissions.export', form.id)"
+                        >
+                            <Button variant="secondary">
+                                <template #icon>
+                                    <IconFileSpreadsheet :size="16" stroke="1.75" />
+                                </template>
+                                Ekspor Excel
+                            </Button>
+                        </a>
+
+                        <a
+                            v-if="(form.submissions_count ?? 0) > 0"
+                            :href="route('formulir.kelola.submissions.exportFiles', form.id)"
+                        >
+                            <Button variant="secondary">
+                                <template #icon>
+                                    <IconFileZip :size="16" stroke="1.75" />
+                                </template>
+                                Ekspor Berkas
+                            </Button>
+                        </a>
+
+                        <Button variant="secondary" class="ml-auto" @click="copyFormLink">
+                            <template #icon>
+                                <IconCheck v-if="copied" :size="16" stroke="2" class="text-emerald-500" />
+                                <IconLink v-else :size="16" stroke="1.75" />
+                            </template>
+                            {{ copied ? "Tersalin" : "Salin Tautan" }}
+                        </Button>
+                    </div>
 
                     <button
                         type="button"
