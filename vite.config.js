@@ -87,6 +87,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      // Pulau Formulir: impor "@/..." di file Vue formulir menunjuk ke
+      // resources/js/formulir (pola form-k3s). Entri spesifik harus
+      // sebelum '@' umum; '@' bawaan template tetap dipertahankan.
+      '@/Components': path.resolve(__dirname, 'resources/js/formulir/Components'),
+      '@/Layouts': path.resolve(__dirname, 'resources/js/formulir/Layouts'),
+      '@/Composables': path.resolve(__dirname, 'resources/js/formulir/Composables'),
+      '@/utils': path.resolve(__dirname, 'resources/js/formulir/utils'),
       '@': path.resolve(__dirname, 'resources')
     }
   },
