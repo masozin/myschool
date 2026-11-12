@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\RombelAnggota;
 use App\Models\Semester;
+use App\Support\InfoHariIni;
 
 class DashboardController extends Controller
 {
@@ -21,6 +22,20 @@ class DashboardController extends Controller
     $ptk = Ptk::where('user_id', $user->id)->first();
 
     $data = compact('user', 'ptk', 'isAdmin');
+
+    // Info hari ini — kaldik & ulang tahun PTK, aturan bersama
+    // dengan aplikasi mobile (App\Support\InfoHariIni).
+    $data['kaldikHariIni'] = InfoHariIni::kaldikPada(now());
+    $data['ultahHariIni'] = InfoHariIni::ulangTahunPada(
+      now(),
+      $isAdmin ? null : $ptk?->sekolah_id
+    );
+    $data['ultahSaya'] = $ptk
+      ? $data['ultahHariIni']->contains('id', $ptk->id)
+      : false;
+    $data['ucapanSaya'] = $data['ultahSaya'] && $ptk
+      ? InfoHariIni::ucapanUntuk($ptk, now())
+      : null;
 
     if ($isAdmin) {
       // Statistik global untuk admin

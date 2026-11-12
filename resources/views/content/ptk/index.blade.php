@@ -82,6 +82,11 @@
         </div>
 
         <div class="form-floating form-floating-outline mb-5">
+          <input type="date" class="form-control" id="tanggal_lahir" name="tanggal_lahir" />
+          <label for="tanggal_lahir">Tanggal Lahir (opsional, untuk ucapan ulang tahun)</label>
+        </div>
+
+        <div class="form-floating form-floating-outline mb-5">
           <select id="jenis_kelamin" name="jenis_kelamin" class="form-select">
             <option value="">Pilih Jenis Kelamin</option>
             <option value="L">Laki-laki</option>
@@ -577,6 +582,7 @@
             document.getElementById('nama_ptk').value = data.nama_ptk;
             document.getElementById('gelar_depan').value = data.gelar_depan || '';
             document.getElementById('gelar_belakang').value = data.gelar_belakang || '';
+            document.getElementById('tanggal_lahir').value = data.tanggal_lahir ? String(data.tanggal_lahir).slice(0, 10) : '';
             document.getElementById('nip').value = data.nip || '';
             document.getElementById('kode').value = data.kode || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';

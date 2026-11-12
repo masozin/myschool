@@ -17,6 +17,86 @@
 
 @section('content')
 
+  {{-- ── INFO HARI INI : ucapan untuk saya, kaldik, ulang tahun ── --}}
+  @if ($ucapanSaya)
+    <div class="alert alert-primary d-flex align-items-start gap-3 mb-6" role="alert">
+      <span class="avatar avatar-md flex-shrink-0">
+        <span class="avatar-initial rounded-circle bg-primary">
+          <i class="ri ri-cake-2-line ri-24px text-white"></i>
+        </span>
+      </span>
+      <div>
+        <h5 class="alert-heading mb-1">{{ $ucapanSaya['judul'] }}</h5>
+        <p class="mb-0">{{ $ucapanSaya['doa'] }}</p>
+      </div>
+    </div>
+  @endif
+
+  @if ($kaldikHariIni->isNotEmpty() || $ultahHariIni->isNotEmpty())
+    <div class="row g-6 mb-6">
+      @if ($kaldikHariIni->isNotEmpty())
+        <div class="col-12 {{ $ultahHariIni->isNotEmpty() ? 'col-lg-6' : '' }}">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title d-flex align-items-center gap-2 mb-3">
+                <i class="ri ri-calendar-event-line text-warning ri-20px"></i>
+                Kalender Pendidikan Hari Ini
+              </h6>
+              @foreach ($kaldikHariIni as $k)
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                  <span class="fw-medium">{{ $k->kegiatan }}</span>
+                  @if ($k->is_libur)
+                    <span class="badge bg-label-danger flex-shrink-0">Libur</span>
+                  @else
+                    <span class="badge bg-label-info flex-shrink-0">{{ $k->jenis }}</span>
+                  @endif
+                </div>
+                <small class="text-muted d-block mb-2">
+                  {{ $k->tanggal_mulai->translatedFormat('d F Y') }} &ndash;
+                  {{ $k->tanggal_selesai->translatedFormat('d F Y') }}
+                </small>
+              @endforeach
+            </div>
+          </div>
+        </div>
+      @endif
+
+      @if ($ultahHariIni->isNotEmpty())
+        <div class="col-12 {{ $kaldikHariIni->isNotEmpty() ? 'col-lg-6' : '' }}">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title d-flex align-items-center gap-2 mb-3">
+                <i class="ri ri-gift-line text-primary ri-20px"></i>
+                Ulang Tahun Hari Ini
+              </h6>
+              @foreach ($ultahHariIni as $pUltah)
+                <div class="d-flex align-items-center gap-3 py-1">
+                  <span class="avatar flex-shrink-0">
+                    <span
+                      class="avatar-initial rounded-circle bg-label-primary">{{ collect(explode(' ', $pUltah->nama_ptk))->filter()->map(fn($w) => Str::substr($w, 0, 1))->take(2)->implode('') }}</span>
+                  </span>
+                  <div class="flex-grow-1">
+                    <div class="fw-medium">
+                      {{ $pUltah->nama_lengkap }}
+                      @if ($ptk && $pUltah->id === $ptk->id)
+                        <span class="badge bg-primary ms-1">Anda</span>
+                      @endif
+                    </div>
+                    <small class="text-muted">
+                      {{ $pUltah->jabatan }} &bull; ulang tahun
+                      ke-{{ \App\Support\InfoHariIni::usiaPada($pUltah, now()) }}
+                    </small>
+                  </div>
+                  <i class="ri ri-cake-2-line text-warning ri-20px"></i>
+                </div>
+              @endforeach
+            </div>
+          </div>
+        </div>
+      @endif
+    </div>
+  @endif
+
   {{-- ── ROW 1 : Selamat Datang + Statistik utama ── --}}
   <div class="row g-6 mb-6">
     {{-- Card Selamat Datang --}}
