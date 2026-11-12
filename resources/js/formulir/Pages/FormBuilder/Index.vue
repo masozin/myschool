@@ -93,7 +93,7 @@ function clearSearch() {
             <!-- ===================================================== -->
 
             <section
-                class="relative mb-8 overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_15px_45px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20"
+                class="relative mb-8 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20"
             >
                 <!-- Decorative glow -->
                 <div
@@ -185,7 +185,7 @@ function clearSearch() {
                         v-model="searchQuery"
                         type="text"
                         placeholder="Cari form..."
-                        class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-10 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-600 dark:focus:border-indigo-500"
+                        class="h-11 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-10 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-600 dark:focus:border-indigo-500"
                     />
 
                     <button
@@ -216,7 +216,7 @@ function clearSearch() {
 
                     <!-- View switcher -->
                     <div
-                        class="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                        class="flex items-center rounded-xl border border-slate-300 bg-white p-1 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
                     >
                         <button
                             type="button"
@@ -255,7 +255,7 @@ function clearSearch() {
 
             <div
                 v-if="isEmpty"
-                class="relative overflow-hidden rounded-[28px] border border-dashed border-slate-200 bg-white px-6 py-20 text-center dark:border-zinc-800 dark:bg-zinc-900"
+                class="relative overflow-hidden rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-20 shadow-card text-center dark:border-zinc-800 dark:bg-zinc-900"
             >
                 <div
                     class="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[70px]"
@@ -302,10 +302,10 @@ function clearSearch() {
 
             <div
                 v-else-if="isSearchEmpty"
-                class="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center dark:border-zinc-800 dark:bg-zinc-900"
+                class="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
             >
                 <div
-                    class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-zinc-500"
+                    class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-200/70 text-slate-500 dark:bg-zinc-800 dark:text-zinc-500"
                 >
                     <IconSearch :size="25" stroke="1.6" />
                 </div>
@@ -345,11 +345,11 @@ function clearSearch() {
                 <article
                     v-for="form in filteredForms"
                     :key="form.id"
-                    class="group relative flex min-h-[255px] flex-col overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_20px_45px_rgba(15,23,42,0.09)] dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-500/30 dark:hover:shadow-black/30"
+                    class="group relative flex min-h-[255px] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-card ring-1 ring-slate-900/5 transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-500/30 dark:hover:shadow-black/30"
                 >
                     <!-- Top accent -->
                     <div
-                        class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-400 opacity-70 transition-opacity group-hover:opacity-100"
+                        class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-400 opacity-90 transition-opacity group-hover:opacity-100"
                     ></div>
 
                     <!-- Decorative glow -->
@@ -407,7 +407,7 @@ function clearSearch() {
 
                         <!-- Slug -->
                         <div
-                            class="mt-4 flex min-w-0 items-center gap-2 text-xs text-slate-400 dark:text-zinc-500"
+                            class="mt-4 flex min-w-0 items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-500"
                         >
                             <IconLink
                                 :size="14"
@@ -422,7 +422,7 @@ function clearSearch() {
 
                         <!-- Sekolah tujuan -->
                         <div
-                            class="mt-2 flex min-w-0 items-center gap-2 text-xs text-slate-400 dark:text-zinc-500"
+                            class="mt-2 flex min-w-0 items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-500"
                         >
                             <IconSchool
                                 :size="14"
@@ -438,7 +438,7 @@ function clearSearch() {
 
                     <!-- Footer -->
                     <div
-                        class="relative mt-5 flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-950/30"
+                        class="relative mt-5 flex items-center justify-between border-t border-slate-200/80 bg-slate-50 px-5 py-3.5 dark:border-zinc-800 dark:bg-zinc-950/30"
                     >
                         <div
                             class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400"
@@ -478,7 +478,7 @@ function clearSearch() {
                 <div
                     v-for="form in filteredForms"
                     :key="form.id"
-                    class="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-[1px] hover:border-indigo-200 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-500/30"
+                    class="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-card ring-1 ring-slate-900/5 transition hover:-translate-y-[1px] hover:border-indigo-300 hover:shadow-lift dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-indigo-500/30"
                 >
                     <div class="flex min-w-0 flex-1 items-center gap-4">
                         <div
@@ -502,7 +502,7 @@ function clearSearch() {
                             </Link>
 
                             <div
-                                class="mt-2 flex flex-wrap items-center gap-4 text-xs text-slate-400 dark:text-zinc-500"
+                                class="mt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-slate-500 dark:text-zinc-500"
                             >
                                 <StatusDot :status="form.status" />
 

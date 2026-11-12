@@ -51,11 +51,11 @@ defineEmits(["remove", "move-up", "move-down", "open-picker"]);
         <!-- class "drag-handle" disamakan dengan FieldCard supaya satu draggable bisa pakai satu handle selector -->
         <IconGripVertical
             :size="16"
-            class="drag-handle mt-1.5 shrink-0 cursor-grab text-slate-300 dark:text-zinc-700"
+            class="drag-handle mt-1.5 shrink-0 cursor-grab text-slate-400 opacity-80 transition hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
         />
 
         <div
-            class="min-w-0 flex-1 border-b border-slate-200 pb-3 dark:border-zinc-800"
+            class="min-w-0 flex-1 rounded-2xl border border-slate-200 border-l-4 border-l-indigo-500 bg-white px-4 py-3 shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
         >
             <div class="flex items-center justify-between gap-2">
                 <InlineEditableText

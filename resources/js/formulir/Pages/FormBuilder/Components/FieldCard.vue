@@ -193,11 +193,11 @@ function toggleExtension(ext) {
 
 <template>
     <div
-        class="group/card relative rounded-xl border bg-white transition-all duration-150 dark:bg-zinc-900"
+        class="group/card relative rounded-2xl border bg-white shadow-card ring-1 ring-slate-900/5 transition-all duration-150 dark:bg-zinc-900"
         :class="
             field._hidden
-                ? 'border-slate-200 opacity-50 dark:border-zinc-800'
-                : 'border-slate-200 dark:border-zinc-800'
+                ? 'border-slate-300 opacity-60 dark:border-zinc-800'
+                : 'border-slate-300 dark:border-zinc-800'
         "
     >
         <!-- Toolbar hover kanan -->
@@ -228,10 +228,10 @@ function toggleExtension(ext) {
         </div>
 
         <!-- Bar atas -->
-        <div class="flex items-center gap-2 px-4 py-3">
+        <div class="flex items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-slate-50/90 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/40">
             <IconGripVertical
                 :size="16"
-                class="drag-handle shrink-0 cursor-grab text-slate-300 dark:text-zinc-700"
+                class="drag-handle shrink-0 cursor-grab text-slate-400 opacity-80 transition hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
             />
             <span
                 class="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white"
@@ -239,7 +239,16 @@ function toggleExtension(ext) {
                 {{ field.label || "Pertanyaan tanpa judul" }}
             </span>
             <span
-                class="hidden shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-zinc-800 dark:text-zinc-400 sm:block"
+                class="hidden shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 sm:block"
+                :class="
+                    ['select', 'radio', 'checkbox'].includes(field.type)
+                        ? 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/30'
+                        : field.type === 'file'
+                          ? 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30'
+                          : ['heading', 'paragraph'].includes(field.type)
+                            ? 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700'
+                            : 'bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/30'
+                "
             >
                 {{ TYPE_OPTIONS.find((t) => t.value === field.type)?.label }}
             </span>
@@ -293,17 +302,17 @@ function toggleExtension(ext) {
 
         <div
             v-show="!field._collapsed"
-            class="space-y-2 border-t border-slate-200 px-4 pb-4 pt-4 dark:border-zinc-800"
+            class="space-y-2 px-4 pb-4 pt-4"
         >
             <div class="flex flex-col gap-3 sm:flex-row">
                 <input
                     v-model="field.label"
                     placeholder="Tulis pertanyaan..."
-                    class="flex-1 rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+                    class="flex-1 rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
                 />
                 <select
                     v-model="field.type"
-                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white sm:w-48"
+                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white sm:w-48"
                 >
                     <option
                         v-for="t in TYPE_OPTIONS"
@@ -340,7 +349,7 @@ function toggleExtension(ext) {
                     <input
                         v-model="opt.label"
                         @input="syncValue(opt)"
-                        class="flex-1 rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                        class="flex-1 rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                     />
                     <button
                         @click="removeOption(i)"
@@ -401,7 +410,7 @@ function toggleExtension(ext) {
                                 <input
                                     v-model.number="rule.min"
                                     type="number"
-                                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                 />
                             </div>
                             <div>
@@ -413,7 +422,7 @@ function toggleExtension(ext) {
                                 <input
                                     v-model.number="rule.max"
                                     type="number"
-                                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                 />
                             </div>
                         </div>
@@ -423,7 +432,7 @@ function toggleExtension(ext) {
                                 v-model="rule.value"
                                 type="text"
                                 placeholder="cth: kata1;kata2|kata3"
-                                class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+                                class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
                             />
                             <p
                                 class="mt-1 text-xs text-slate-500 dark:text-zinc-400"
@@ -479,7 +488,7 @@ function toggleExtension(ext) {
                                 <select
                                     v-model="field.config.validation.operator"
                                     @change="onOperatorChange"
-                                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                 >
                                     <option
                                         v-for="op in NUMBER_OPERATORS"
@@ -502,7 +511,7 @@ function toggleExtension(ext) {
                                 <input
                                     v-model="field.config.validation.value"
                                     :type="inputType"
-                                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                 />
                             </div>
                             <div v-if="isNotEqualsOperator" class="flex-1">
@@ -515,7 +524,7 @@ function toggleExtension(ext) {
                                     v-model="field.config.validation.values"
                                     type="text"
                                     placeholder="cth: 1;2;3"
-                                    class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
+                                    class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:placeholder:text-zinc-500"
                                 />
                             </div>
                             <template v-if="isRangeOperator">
@@ -528,7 +537,7 @@ function toggleExtension(ext) {
                                     <input
                                         v-model="field.config.validation.value"
                                         :type="inputType"
-                                        class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                        class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                     />
                                 </div>
                                 <div class="flex-1">
@@ -540,7 +549,7 @@ function toggleExtension(ext) {
                                     <input
                                         v-model="field.config.validation.value2"
                                         :type="inputType"
-                                        class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                        class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                                     />
                                 </div>
                             </template>
@@ -567,7 +576,7 @@ function toggleExtension(ext) {
                             v-model="field.config.number_format"
                             type="text"
                             placeholder="Contoh: Rp#.###,00"
-                            class="mt-1.5 w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white font-mono"
+                            class="mt-1.5 w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white font-mono"
                         />
                         <p class="mt-1 text-xs text-muted">
                             <code>#</code> = digit, <code>.</code>/<code
@@ -593,7 +602,7 @@ function toggleExtension(ext) {
                         >
                         <select
                             v-model="field.config.date_format"
-                            class="w-full mt-1.5 rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            class="w-full mt-1.5 rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                         >
                             <option
                                 v-for="p in DATE_FORMAT_PRESETS"
@@ -639,7 +648,7 @@ function toggleExtension(ext) {
                                 "
                                 type="number"
                                 min="1"
-                                class="w-24 rounded-md border-slate-200 bg-white text-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                                class="w-24 rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                             />
                             <span
                                 class="text-sm text-slate-500 dark:text-zinc-400"
@@ -744,12 +753,12 @@ function toggleExtension(ext) {
                 </button>
                 <label
                     v-if="!isDisplayOnly"
-                    class="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-900 dark:text-white"
+                    class="flex cursor-pointer items-center gap-2 rounded-full bg-rose-50 py-1 pl-2.5 pr-3 text-xs font-semibold text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30"
                 >
                     <input
                         v-model="field.is_required"
                         type="checkbox"
-                        class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30 dark:border-zinc-600 dark:bg-zinc-800"
+                        class="rounded border-rose-300 text-rose-600 focus:ring-rose-500/30 dark:border-rose-500/40 dark:bg-zinc-800"
                     />
                     Wajib diisi
                 </label>

@@ -128,25 +128,25 @@ function onCropped(croppedFile) {
 
                     <div>
                         <label
-                            class="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white"
+                            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
                         >
                             Deskripsi
                         </label>
                         <textarea
                             v-model="local.description"
                             rows="3"
-                            class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                         ></textarea>
                     </div>
 
                     <div>
                         <label
-                            class="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white"
+                            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
                         >
                             Banner
                         </label>
                         <label
-                            class="flex h-32 cursor-pointer items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 bg-cover bg-center text-sm text-slate-500 hover:bg-slate-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            class="flex h-32 cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 bg-cover bg-center text-sm font-medium text-slate-600 hover:border-indigo-400 hover:bg-indigo-50/60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
                             :style="
                                 bannerPreview
                                     ? {
@@ -180,13 +180,13 @@ function onCropped(croppedFile) {
 
                     <div>
                         <label
-                            class="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white"
+                            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
                         >
                             Status
                         </label>
                         <select
                             v-model="local.status"
-                            class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                         >
                             <option value="draft">Draft</option>
                             <option value="published">Terbit</option>
@@ -208,7 +208,7 @@ function onCropped(croppedFile) {
                     </div>
 
                     <label
-                        class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-zinc-800"
+                        class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white p-3 shadow-sm transition-all hover:border-indigo-300 dark:border-zinc-800"
                     >
                         <input
                             v-model="local.allow_multiple_submissions"
@@ -225,7 +225,7 @@ function onCropped(croppedFile) {
                     </label>
 
                     <label
-                        class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-zinc-800"
+                        class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white p-3 shadow-sm transition-all hover:border-indigo-300 dark:border-zinc-800"
                     >
                         <input
                             v-model="local.require_login"
@@ -243,13 +243,13 @@ function onCropped(croppedFile) {
 
                     <div>
                         <label
-                            class="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white"
+                            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
                         >
                             Ditujukan untuk
                         </label>
                         <select
                             v-model="local.target_role"
-                            class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                         >
                             <option value="semua">Semua</option>
                             <option value="operator">Operator</option>
@@ -269,13 +269,13 @@ function onCropped(croppedFile) {
 
                     <div>
                         <label
-                            class="mb-1.5 block text-sm font-medium text-slate-900 dark:text-white"
+                            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
                         >
                             Sekolah Tujuan
                         </label>
                         <select
                             v-model="local.school_id"
-                            class="w-full rounded-md border-slate-200 bg-white text-sm text-slate-900 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                            class="w-full rounded-xl border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm text-slate-900 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                         >
                             <option :value="null">Semua Sekolah</option>
                             <option

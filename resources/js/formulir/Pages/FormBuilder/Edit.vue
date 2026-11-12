@@ -104,7 +104,7 @@ function isLast(index) {
                     <button
                         type="button"
                         @click="openPickerAt(0)"
-                        class="group mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-indigo-300 bg-white px-4 py-4 text-sm font-medium text-slate-500 shadow-sm transition-all hover:border-indigo-500 hover:bg-indigo-50/60 hover:text-indigo-600 hover:shadow-md dark:border-indigo-500/30 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-400/60 dark:hover:bg-zinc-800 dark:hover:text-indigo-400"
+                        class="group mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-indigo-300 bg-white px-4 py-4 text-sm font-semibold text-slate-600 shadow-card transition-all hover:border-indigo-500 hover:bg-indigo-50/60 hover:text-indigo-700 hover:shadow-lift dark:border-indigo-500/30 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-indigo-400/60 dark:hover:bg-zinc-800 dark:hover:text-indigo-400"
                     >
                         <span
                             class="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-105 dark:bg-indigo-500/10 dark:text-indigo-400"
@@ -117,7 +117,7 @@ function isLast(index) {
                     <div class="relative mt-5">
                         <div
                             v-if="state.items.length === 0"
-                            class="rounded-2xl border border-slate-200 bg-white px-5 py-14 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                            class="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-14 text-center shadow-card dark:border-zinc-800 dark:bg-zinc-900"
                         >
                             <div
                                 class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
@@ -193,7 +193,7 @@ function isLast(index) {
                             v-if="state.items.length > 0"
                             type="button"
                             @click="openPickerAt(state.items.length)"
-                            class="group mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-3.5 text-sm font-medium text-slate-500 transition-all hover:border-indigo-400 hover:bg-white hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400 dark:hover:border-indigo-400/60 dark:hover:bg-zinc-900 dark:hover:text-indigo-400"
+                            class="group mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3.5 text-sm font-semibold text-slate-600 shadow-sm transition-all hover:border-indigo-400 hover:bg-white hover:text-indigo-700 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400 dark:hover:border-indigo-400/60 dark:hover:bg-zinc-900 dark:hover:text-indigo-400"
                         >
                             <span
                                 class="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-indigo-50 group-hover:text-indigo-600 dark:bg-zinc-800 dark:text-zinc-400 dark:group-hover:bg-indigo-500/10 dark:group-hover:text-indigo-400"
@@ -208,7 +208,7 @@ function isLast(index) {
         </div>
 
         <div
-            class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/70 bg-white/85 shadow-[0_-8px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-950/85 dark:shadow-black/20"
+            class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 shadow-bar backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-950/85 dark:shadow-black/20"
         >
             <div
                 class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8"

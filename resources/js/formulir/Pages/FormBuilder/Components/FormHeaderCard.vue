@@ -21,7 +21,7 @@ function formatDate(d) {
 
 <template>
     <div
-        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
     >
         <div v-if="form.banner_image" class="relative h-32 w-full sm:h-40">
             <img
@@ -32,7 +32,7 @@ function formatDate(d) {
                 class="absolute inset-0 bg-gradient-to-t from-slate-950/50 to-transparent"
             ></div>
         </div>
-        <div v-else class="relative h-16 w-full bg-slate-50 dark:bg-zinc-950">
+        <div v-else class="relative h-16 w-full bg-brand-gradient dark:bg-zinc-950">
             <div
                 class="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-500/10 blur-2xl"
             ></div>
@@ -68,7 +68,7 @@ function formatDate(d) {
             <div class="flex gap-2">
                 <button
                     @click="$emit('edit')"
-                    class="flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:self-auto"
+                    class="flex min-h-[40px] shrink-0 items-center gap-2 self-start rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30 active:scale-[.98] dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:self-auto"
                 >
                     <IconPencil :size="16" stroke="1.75" /> Edit Info Form
                 </button>
