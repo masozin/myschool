@@ -247,6 +247,17 @@ class SuratKeluarController extends Controller
   public function edit(SuratKeluar $surat)
   {
     $this->pastikanKonteks($surat);
+
+    // Surat yang lahir dari modul lain (Surat Pindah, kelak
+    // SKHU/SKL) isinya dibekukan di modul asalnya — dari agenda
+    // ia hanya bisa dibatalkan, bukan diubah, supaya snapshot
+    // cetaknya tidak basi.
+    if ($surat->sumber !== null) {
+      return redirect()->route('surat-keluar.index')
+        ->with('error', 'Surat bernomor ' . ($surat->nomor_surat ?? '-')
+          . ' terbit dari modul asalnya dan tidak dapat diubah dari agenda. '
+          . 'Batalkan dari sini bila perlu, lalu terbitkan ulang dari modul asalnya.');
+    }
     $surat->load(['berkas.pengunggah', 'kategori', 'penandatangan']);
 
     return view('content.surat-keluar.form', [
@@ -259,6 +270,10 @@ class SuratKeluarController extends Controller
   public function update(Request $request, SuratKeluar $surat)
   {
     $this->pastikanKonteks($surat);
+
+    if ($surat->sumber !== null) {
+      return back()->with('error', 'Surat dari modul lain tidak dapat diubah dari agenda.');
+    }
 
     if ($surat->status === 'batal') {
       return back()->with('error', 'Surat yang sudah dibatalkan tidak dapat diubah.');

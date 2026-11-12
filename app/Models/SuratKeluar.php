@@ -26,11 +26,15 @@ class SuratKeluar extends Model
     'status',
     'dibuat_oleh',
     'catatan',
+    'sumber',
+    'sumber_id',
+    'data_cetak',
   ];
 
   protected $casts = [
     'tanggal_surat' => 'date',
     'nomor_manual' => 'boolean',
+    'data_cetak' => 'array',
   ];
 
   public function sekolah(): BelongsTo

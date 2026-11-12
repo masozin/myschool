@@ -32,6 +32,7 @@ use App\Http\Controllers\SklKomponenController;
 use App\Http\Controllers\SklKonfigurasiController;
 use App\Http\Controllers\SklKomponenSubController;
 use App\Http\Controllers\SuratKeluarController;
+use App\Http\Controllers\SuratPindahController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidasiKelulusan;
 use App\Http\Controllers\WaliKelasController;
@@ -748,6 +749,29 @@ Route::controller(SuratKeluarController::class)
       ->middleware('role:Operator Sekolah|Tata Usaha');
     Route::delete('/pengaturan/kategori/{kategori}', 'kategoriHapus')->name('kategori.hapus')
       ->middleware('role:Operator Sekolah|Tata Usaha');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| SURAT PINDAH SISWA (anak modul Surat Keluar, fitur sama)
+|--------------------------------------------------------------------------
+| Surat Keterangan Pindah untuk siswa berstatus mutasi.
+| Nomornya dari penghitung Surat Keluar, agendanya tercatat
+| di buku agenda yang sama (sumber 'surat-pindah'). Awalan
+| rute 'surat-keluar' membuatnya ikut terkecuali dari kunci
+| semester global, sama seperti modul induknya.
+*/
+Route::controller(SuratPindahController::class)
+  ->prefix('surat-keluar/pindah')
+  ->name('surat-keluar.pindah.')
+  ->middleware(['auth:sanctum', 'fitur:surat-keluar'])
+  ->group(function () {
+    Route::get('/baru/{registrasi}', 'create')->name('create')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/baru/{registrasi}', 'store')->name('store')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::get('/{surat}/cetak', 'cetak')->name('cetak')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
   });
 
 

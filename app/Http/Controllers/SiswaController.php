@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\SiswaExport;
+use App\Helpers\FiturHelper;
+use App\Models\SuratKeluar;
+use Illuminate\Support\Facades\Schema;
 
 class SiswaController extends Controller
 {
@@ -1228,7 +1231,32 @@ class SiswaController extends Controller
       ->sortByDesc(fn($s) => $s->registrasiTerbaru?->tanggal_keluar ?? '')
       ->values();
 
-    return view('content.siswa.keluar', compact('siswaKeluar', 'statusDipilih', 'sekolahId'));
+    // Surat Pindah (anak modul Surat Keluar): peta registrasi →
+    // surat aktifnya, untuk tombol buat/cetak per baris mutasi.
+    // Hanya berjalan bila fitur surat-keluar aktif untuk sekolah
+    // pengguna; sekolah tanpa fitur tidak berubah sama sekali.
+    $fiturSurat = FiturHelper::punya('surat-keluar');
+    $bisaKelolaSurat = Auth::user()->hasAnyRole(['Operator Sekolah', 'Tata Usaha']);
+    $suratPindah = collect();
+    if ($fiturSurat && Schema::hasColumn('tabel_surat_keluar', 'sumber')) {
+      $regIds = $siswaKeluar->map(fn($s) => $s->registrasiTerbaru?->id)->filter();
+      if ($regIds->isNotEmpty()) {
+        $suratPindah = SuratKeluar::where('sumber', 'surat-pindah')
+          ->whereIn('sumber_id', $regIds)
+          ->where('status', 'terbit')
+          ->get()
+          ->keyBy('sumber_id');
+      }
+    }
+
+    return view('content.siswa.keluar', compact(
+      'siswaKeluar',
+      'statusDipilih',
+      'sekolahId',
+      'fiturSurat',
+      'bisaKelolaSurat',
+      'suratPindah'
+    ));
   }
 
   /**

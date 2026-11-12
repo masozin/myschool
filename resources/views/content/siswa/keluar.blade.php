@@ -145,6 +145,21 @@
                   class="btn btn-icon btn-text-secondary btn-sm rounded-pill" title="Detail Siswa">
                   <i class="ri ri-eye-line icon-18px"></i>
                 </a>
+                @if (($reg?->status ?? null) === 'mutasi' && ($fiturSurat ?? false))
+                @php $sp = ($suratPindah ?? collect())->get($reg->id); @endphp
+                @if ($sp)
+                <a href="{{ route('surat-keluar.pindah.cetak', $sp->id) }}" target="_blank"
+                  class="btn btn-icon btn-text-success btn-sm rounded-pill"
+                  title="Cetak Surat Pindah ({{ $sp->nomor_surat }})">
+                  <i class="ri ri-printer-line icon-18px"></i>
+                </a>
+                @elseif ($bisaKelolaSurat ?? false)
+                <a href="{{ route('surat-keluar.pindah.create', $reg->id) }}"
+                  class="btn btn-icon btn-text-primary btn-sm rounded-pill" title="Buat Surat Pindah">
+                  <i class="ri ri-file-text-line icon-18px"></i>
+                </a>
+                @endif
+                @endif
                 @if ($siswa->bisa_batal)
                 <form action="{{ route('siswa.keluar.batal', $siswa->id) }}" method="POST"
                   onsubmit="return confirm('Batalkan status keluar siswa ini? Registrasinya dibuka kembali sebagai aktif agar bisa dimasukkan ke rombel.')">

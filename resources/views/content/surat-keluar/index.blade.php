@@ -156,6 +156,10 @@
                   @endif
                 </td>
                 <td class="text-end text-nowrap">
+                  @if ($s->sumber === 'surat-pindah')
+                    <a href="{{ route('surat-keluar.pindah.cetak', $s) }}" target="_blank" class="btn btn-sm btn-outline-success">
+                      <i class="icon-base ri ri-printer-line"></i> Cetak</a>
+                  @endif
                   <a href="{{ route('surat-keluar.edit', $s) }}" class="btn btn-sm btn-outline-primary">
                     <i class="icon-base ri ri-eye-line"></i> {{ $bolehKelola && $s->status !== 'batal' ? 'Ubah' : 'Lihat' }}</a>
                   @if ($bolehKelola && $s->status === 'draft')
