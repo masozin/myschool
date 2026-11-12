@@ -4,16 +4,16 @@
 
 @layer base {
     :root {
-        --color-canvas: 248 250 252;   /* slate-50 */
+        --color-canvas: 237 240 245;   /* slate-150-ish #EDF0F5 — kanvas lebih dalam agar kartu putih menonjol */
         --color-surface: 255 255 255;  /* white */
         --color-ink: 15 23 42;         /* slate-900 */
-        --color-muted: 100 116 139;    /* slate-500 */
-        --color-border: 226 232 240;   /* slate-200 */
-        --color-brand: 99 102 241;     /* indigo-500 */
-        --color-success: 5 150 105;    /* emerald-600 */
-        --color-warning: 217 119 6;    /* amber-600 */
-        --color-danger: 239 68 68;     /* red-500 */
-        --color-info: 37 99 235;       /* blue-600 */
+        --color-muted: 71 85 105;      /* slate-600 — teks sekunder tidak lebih terang dari ini di atas putih */
+        --color-border: 203 213 225;   /* slate-300 — garis tepi jelas terlihat */
+        --color-brand: 79 70 229;      /* indigo-600 */
+        --color-success: 4 120 87;     /* emerald-700 */
+        --color-warning: 180 83 9;     /* amber-700 */
+        --color-danger: 225 29 72;     /* rose-600 */
+        --color-info: 29 78 216;       /* blue-700 */
     }
 
     .dark {
@@ -21,23 +21,46 @@
         --color-surface: 24 24 27;     /* zinc-900 */
         --color-ink: 255 255 255;      /* white */
         --color-muted: 161 161 170;    /* zinc-400 */
-        --color-border: 39 39 42;      /* zinc-800 */
+        --color-border: 63 63 70;      /* zinc-700 — garis tepi tetap terlihat di mode gelap */
         --color-brand: 129 140 248;    /* indigo-400 */
         --color-success: 52 211 153;   /* emerald-400 */
         --color-warning: 251 191 36;   /* amber-400 */
-        --color-danger: 248 113 113;   /* red-400 */
+        --color-danger: 251 113 133;   /* rose-400 */
         --color-info: 96 165 250;      /* blue-400 */
+    }
+
+    ::selection {
+        background: rgb(199 210 254);  /* indigo-200 */
+    }
+}
+
+@layer components {
+    /* Lapisan dekoratif kanvas pulau: gradasi radial brand sangat tipis di atas warna kanvas.
+       Dipakai pada pembungkus layout (FormulirLayout & FormLayout). */
+    .island-decor {
+        background-image:
+            radial-gradient(56rem 28rem at 85% -10%, rgba(99, 102, 241, 0.10), transparent 60%),
+            radial-gradient(44rem 24rem at -10% 0%, rgba(124, 58, 237, 0.07), transparent 55%),
+            radial-gradient(40rem 30rem at 50% 115%, rgba(79, 70, 229, 0.05), transparent 60%);
+        background-attachment: fixed;
+    }
+
+    .dark .island-decor {
+        background-image:
+            radial-gradient(56rem 28rem at 85% -10%, rgba(99, 102, 241, 0.14), transparent 60%),
+            radial-gradient(44rem 24rem at -10% 0%, rgba(124, 58, 237, 0.10), transparent 55%);
+        background-attachment: fixed;
     }
 }
 
 /* Progress bar Inertia */
 #nprogress .bar {
-    background: rgb(99 102 241) !important;
+    background: rgb(79 70 229) !important;
     height: 3px !important;
 }
 
 #nprogress .peg {
-    box-shadow: 0 0 10px rgb(99 102 241), 0 0 5px rgb(99 102 241) !important;
+    box-shadow: 0 0 10px rgb(79 70 229), 0 0 5px rgb(79 70 229) !important;
 }
 
 .dark #nprogress .bar {
@@ -49,8 +72,8 @@
 }
 
 #nprogress .spinner-icon {
-    border-top-color: rgb(99 102 241) !important;
-    border-left-color: rgb(99 102 241) !important;
+    border-top-color: rgb(79 70 229) !important;
+    border-left-color: rgb(79 70 229) !important;
 }
 
 .dark #nprogress .spinner-icon {
