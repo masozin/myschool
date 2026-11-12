@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import vue from '@vitejs/plugin-vue';
 import html from '@rollup/plugin-html';
 import { glob } from 'glob';
 import path from 'path';
@@ -57,6 +58,8 @@ export default defineConfig({
         'resources/css/app.css',
         'resources/assets/css/demo.css',
         'resources/js/app.js',
+        'resources/js/formulir/app.js',
+        'resources/css/formulir.css',
         ...pageJsFiles,
         ...vendorJsFiles,
         ...LibsJsFiles,
@@ -69,6 +72,14 @@ export default defineConfig({
         ...FontsCssFiles
       ],
       refresh: true
+    }),
+    vue({
+      template: {
+        transformAssetUrls: {
+          base: null,
+          includeAbsolute: false
+        }
+      }
     }),
     html(),
     libsWindowAssignment(),
