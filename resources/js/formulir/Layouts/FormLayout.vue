@@ -3,14 +3,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { Link, usePage } from "@inertiajs/vue3";
-import {
-    IconSchool,
-    IconLogin,
-    IconSun,
-    IconMoon,
-} from "@tabler/icons-vue";
+import { IconSchool, IconLogin } from "@tabler/icons-vue";
 
 import CountdownBadge from "@/Components/CountdownBadge.vue";
+import ThemeToggle from "@/Components/ThemeToggle.vue";
 
 const props = defineProps({
     schoolName: {
@@ -35,7 +31,6 @@ const page = usePage();
 
 const user = computed(() => page.props.auth?.user);
 
-const isDark = ref(false);
 const isScrolled = ref(false);
 
 /*
@@ -57,28 +52,6 @@ const progressPercent = computed(() => {
 
 /*
 |--------------------------------------------------------------------------
-| Theme
-|--------------------------------------------------------------------------
-*/
-
-const applyTheme = (dark) => {
-    isDark.value = dark;
-
-    if (dark) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("theme", "dark");
-    } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("theme", "light");
-    }
-};
-
-const toggleTheme = () => {
-    applyTheme(!isDark.value);
-};
-
-/*
-|--------------------------------------------------------------------------
 | Scroll
 |--------------------------------------------------------------------------
 */
@@ -94,13 +67,8 @@ const handleScroll = () => {
 */
 
 onMounted(() => {
-    const saved = localStorage.getItem("theme");
-
-    const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-    ).matches;
-
-    applyTheme(saved === "dark" || (!saved && prefersDark));
+    // Tema awal sudah dipasang skrip inisialisasi di app.blade.php
+    // (kelas "dark" di <html>); pengalihnya komponen ThemeToggle.
 
     window.addEventListener("scroll", handleScroll, {
         passive: true,
@@ -179,19 +147,7 @@ onUnmounted(() => {
                     <CountdownBadge v-if="endAt" :end-at="endAt" />
 
                     <!-- Theme -->
-                    <button
-                        type="button"
-                        @click="toggleTheme"
-                        class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white"
-                        :title="
-                            isDark
-                                ? 'Gunakan mode terang'
-                                : 'Gunakan mode gelap'
-                        "
-                    >
-                        <IconSun v-if="isDark" :size="18" stroke="1.7" />
-                        <IconMoon v-else :size="18" stroke="1.7" />
-                    </button>
+                    <ThemeToggle />
 
                     <!-- Divider -->
                     <div
