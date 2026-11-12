@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DhSiswaController;
+use App\Http\Controllers\FormulirBuilderController;
 use App\Http\Controllers\FormulirController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\KalenderPendidikanController;
@@ -714,8 +715,8 @@ Route::middleware(['auth'])->prefix('learning-modules')->name('learning-modules.
 |--------------------------------------------------------------------------
 | FORMULIR K3S (fitur: formulir) — pulau Inertia/Vue
 |--------------------------------------------------------------------------
-| Batch 1 baru menyediakan halaman pembuka; route builder &
-| pengisian formulir ditambahkan pada batch berikutnya.
+| Batch 1 menyediakan halaman pembuka; Batch 2 menambahkan route
+| builder (kelola form) khusus Admin di bawah ini.
 */
 Route::controller(FormulirController::class)
   ->prefix('formulir')
@@ -723,4 +724,18 @@ Route::controller(FormulirController::class)
   ->middleware(['auth:sanctum', 'fitur:formulir'])
   ->group(function () {
     Route::get('/', 'index')->name('index');
+  });
+
+Route::controller(FormulirBuilderController::class)
+  ->prefix('formulir/kelola')
+  ->name('formulir.kelola.')
+  ->middleware(['auth:sanctum', 'fitur:formulir', 'role:Admin'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/buat', 'create')->name('create');
+    Route::post('/', 'store')->name('store');
+    Route::get('/{formulir}/edit', 'edit')->name('edit');
+    Route::put('/{formulir}', 'update')->name('update');
+    Route::delete('/{formulir}', 'destroy')->name('destroy');
+    Route::put('/{formulir}/struktur', 'updateStructure')->name('structure');
   });
