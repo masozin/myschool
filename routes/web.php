@@ -31,6 +31,7 @@ use App\Http\Controllers\SklController;
 use App\Http\Controllers\SklKomponenController;
 use App\Http\Controllers\SklKonfigurasiController;
 use App\Http\Controllers\SklKomponenSubController;
+use App\Http\Controllers\SuratKeluarController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidasiKelulusan;
 use App\Http\Controllers\WaliKelasController;
@@ -697,6 +698,57 @@ Route::middleware(['auth:sanctum', 'role:Operator Sekolah'])->group(function () 
 Route::get('/sekolah-belum-aktif', function () {
   return view('errors.sekolah-belum-aktif');
 })->middleware('auth:sanctum')->name('sekolah.belum-aktif');
+
+/*
+|--------------------------------------------------------------------------
+| SURAT KELUAR (fitur: surat-keluar)
+|--------------------------------------------------------------------------
+| Buku agenda surat keluar per sekolah. Diterbitkan langsung
+| oleh petugas (Operator Sekolah / Tata Usaha) tanpa alur
+| persetujuan. Kepala Sekolah mode lihat, Admin memantau per
+| sekolah terpilih. Modul ini dikecualikan dari kunci semester
+| global (digerakkan tanggal surat).
+*/
+Route::controller(SuratKeluarController::class)
+  ->prefix('surat-keluar')
+  ->name('surat-keluar.')
+  ->middleware(['auth:sanctum', 'fitur:surat-keluar'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
+    Route::get('/ekspor-excel', 'eksporExcel')->name('ekspor.excel')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
+    Route::get('/cetak-agenda', 'cetakAgenda')->name('cetak.agenda')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
+    Route::get('/buat', 'create')->name('create')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/', 'store')->name('store')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::get('/{surat}/ubah', 'edit')->name('edit')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
+    Route::put('/{surat}', 'update')->name('update')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/{surat}/terbitkan', 'terbitkan')->name('terbitkan')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/{surat}/batalkan', 'batalkan')->name('batalkan')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::delete('/{surat}', 'hapus')->name('hapus')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/{surat}/berkas', 'berkasUnggah')->name('berkas.unggah')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::get('/berkas/{berkas}', 'berkasLihat')->name('berkas.lihat')
+      ->middleware('role:Admin|Operator Sekolah|Tata Usaha|Kepala Sekolah');
+    Route::delete('/berkas/{berkas}', 'berkasHapus')->name('berkas.hapus')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::get('/pengaturan', 'pengaturan')->name('pengaturan')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::post('/pengaturan/kategori', 'kategoriSimpan')->name('kategori.simpan')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+    Route::delete('/pengaturan/kategori/{kategori}', 'kategoriHapus')->name('kategori.hapus')
+      ->middleware('role:Operator Sekolah|Tata Usaha');
+  });
 
 
 

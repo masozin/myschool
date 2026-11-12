@@ -24,6 +24,7 @@ class FiturSeeder extends Seeder
       ['kode' => 'modul-ajar',      'nama' => 'Modul Ajar',          'deskripsi' => ''],
       ['kode' => 'presensi',        'nama' => 'Presensi Siswa',      'deskripsi' => ''],
       ['kode' => 'sistem-point',    'nama' => 'Sistem Point',        'deskripsi' => 'Sistem point siswa'],
+      ['kode' => 'surat-keluar',    'nama' => 'Surat Keluar',        'deskripsi' => 'Pengelola surat keluar: agenda, penomoran otomatis, dan arsip digital'],
     ];
 
     foreach ($fiturs as $f) {

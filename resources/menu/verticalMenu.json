@@ -270,6 +270,22 @@
       "fitur": "formulir"
     },
     {
+      "menuHeader": "Persuratan"
+    },
+    {
+      "url": "/surat-keluar",
+      "icon": "menu-icon icon-base ri ri-mail-send-line",
+      "name": "Surat Keluar",
+      "slug": "surat-keluar",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Tata Usaha",
+        "Kepala Sekolah"
+      ],
+      "fitur": "surat-keluar"
+    },
+    {
       "menuHeader": "Pengaturan"
     },
     {

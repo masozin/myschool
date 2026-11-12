@@ -23,6 +23,9 @@ use Illuminate\Http\Request;
  *   datanya per tahun pelajaran, bukan per semester.
  * - Pembaruan Aplikasi (Admin) adalah urusan pemeliharaan
  *   sistem, tidak terkait data semester mana pun.
+ * - Surat Keluar digerakkan tanggal surat, bukan semester
+ *   sesi; mencatat surat bertanggal semester lalu adalah
+ *   pekerjaan administrasi yang sah.
  * - Admin tetap dapat mengelola halaman Semester (mengaktifkan
  *   semester dan membuka/menerapkan kunci).
  */
@@ -43,6 +46,7 @@ class CheckSemesterLock
     'skhu',
     'skl',
     'kalender-pendidikan',
+    'surat-keluar',
     'pembaruan',
     'up',
   ];
