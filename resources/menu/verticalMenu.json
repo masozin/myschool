@@ -247,6 +247,19 @@
       "fitur": "kartu-ujian"
     },
     {
+      "url": "/formulir",
+      "icon": "menu-icon icon-base ri ri-survey-line",
+      "name": "Formulir",
+      "slug": "formulir",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah",
+        "Guru"
+      ],
+      "fitur": "formulir"
+    },
+    {
       "menuHeader": "Pengaturan"
     },
     {

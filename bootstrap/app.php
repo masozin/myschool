@@ -19,7 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
       LocaleMiddleware::class,
       SemesterSessionMiddleware::class,
       \App\Http\Middleware\CekDataPeriodik::class,
-      \App\Http\Middleware\CheckSemesterLock::class
+      \App\Http\Middleware\CheckSemesterLock::class,
+      \App\Http\Middleware\HandleInertiaRequests::class
     ]);
     $middleware->alias([
       'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,

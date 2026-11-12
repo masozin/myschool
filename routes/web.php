@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DhSiswaController;
+use App\Http\Controllers\FormulirController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
@@ -707,3 +708,19 @@ Route::middleware(['auth'])->prefix('learning-modules')->name('learning-modules.
   // routes/web.php — dalam group learning-modules.
   Route::get('/{learningModule}/export', [LearningModuleController::class, 'export'])->name('export');
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| FORMULIR K3S (fitur: formulir) — pulau Inertia/Vue
+|--------------------------------------------------------------------------
+| Batch 1 baru menyediakan halaman pembuka; route builder &
+| pengisian formulir ditambahkan pada batch berikutnya.
+*/
+Route::controller(FormulirController::class)
+  ->prefix('formulir')
+  ->name('formulir.')
+  ->middleware(['auth:sanctum', 'fitur:formulir'])
+  ->group(function () {
+    Route::get('/', 'index')->name('index');
+  });

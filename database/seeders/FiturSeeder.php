@@ -16,6 +16,7 @@ class FiturSeeder extends Seeder
       ['kode' => 'jadwal-pelajaran', 'nama' => 'Jadwal Pelajaran',   'deskripsi' => ''],
       ['kode' => 'kartu-pelajar',   'nama' => 'Kartu Pelajar',       'deskripsi' => ''],
       ['kode' => 'kartu-ujian',     'nama' => 'Kartu Ujian',         'deskripsi' => ''],
+      ['kode' => 'formulir',        'nama' => 'Formulir K3S',        'deskripsi' => ''],
       ['kode' => 'skl',             'nama' => 'SKL',                 'deskripsi' => ''],
       ['kode' => 'skhu',            'nama' => 'SKHU',                'deskripsi' => ''],
       ['kode' => 'dh-siswa',        'nama' => 'Daftar Hadir Siswa',  'deskripsi' => 'Lembah daftar hadir siswa'],
