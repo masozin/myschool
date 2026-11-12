@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\JadwalApiController;
 use App\Http\Controllers\Api\PresensiApiController;
 use App\Http\Controllers\Api\SiswaApiController;
 use App\Http\Controllers\ValidasiKelulusan;
@@ -38,4 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::get('/siswa', [SiswaApiController::class, 'daftar']);
   Route::get('/siswa/{id}', [SiswaApiController::class, 'detail'])->whereNumber('id');
+
+  Route::get('/jadwal/hari-ini', [JadwalApiController::class, 'hariIni']);
+  Route::get('/jadwal/saya', [JadwalApiController::class, 'jadwalSaya']);
+  Route::get('/jadwal/rombel', [JadwalApiController::class, 'daftarRombel']);
+  Route::get('/jadwal/rombel/{id}', [JadwalApiController::class, 'jadwalRombel'])->whereNumber('id');
 });
