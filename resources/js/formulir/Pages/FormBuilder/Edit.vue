@@ -17,6 +17,7 @@ import {
     IconPlus,
     IconLayoutRows,
     IconArrowLeft,
+    IconEye,
 } from "@tabler/icons-vue";
 
 const props = defineProps({
@@ -232,6 +233,22 @@ function isLast(index) {
                 </div>
 
                 <div class="ml-auto flex items-center gap-2">
+                    <a
+                        :href="route('formulir.publik.show', form.slug)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <Button
+                            variant="secondary"
+                            class="min-w-[44px] sm:min-w-0"
+                        >
+                            <template #icon>
+                                <IconEye :size="17" stroke="1.75" />
+                            </template>
+                            <span class="hidden sm:inline">Pratinjau</span>
+                        </Button>
+                    </a>
+
                     <Button
                         variant="primary"
                         :disabled="state.saving"

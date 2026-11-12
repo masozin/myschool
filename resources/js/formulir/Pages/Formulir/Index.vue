@@ -1,5 +1,14 @@
 <script setup>
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from "@inertiajs/vue3";
+import {
+    IconCircleCheck,
+    IconCircleDashed,
+    IconClockHour4,
+    IconForms,
+    IconSettings,
+} from "@tabler/icons-vue";
+import FormulirLayout from "@/Layouts/FormulirLayout.vue";
+import { formatDate } from "@/utils/dateFormat";
 
 const props = defineProps({
     user: {
@@ -14,71 +23,154 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    activeForms: {
+        type: Array,
+        default: () => [],
+    },
+    stats: {
+        type: Object,
+        default: () => ({
+            forms_active: 0,
+            forms_submitted: 0,
+            forms_pending: 0,
+        }),
+    },
 });
 </script>
 
 <template>
     <Head title="Formulir K3S" />
 
-    <div class="min-h-screen bg-slate-50 text-slate-900">
-        <div class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-            <header class="mb-8">
-                <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-                    MySchool
-                </p>
-                <h1 class="mt-1 text-3xl font-bold">Formulir K3S</h1>
-                <p class="mt-2 text-slate-600">
-                    Modul formulir ini sekarang memakai akun myschool yang sama —
-                    tidak ada login terpisah.
+    <FormulirLayout>
+        <div class="mx-auto max-w-4xl">
+            <header class="mb-6">
+                <h1 class="text-2xl font-bold text-slate-900">
+                    Form yang Bisa Diisi
+                </h1>
+                <p class="mt-1 text-sm text-slate-600">
+                    Halo, {{ props.user.name }}
+                    <span v-if="props.sekolah">
+                        — {{ props.sekolah.nama ?? "Sekolah" }} (NPSN
+                        {{ props.sekolah.npsn }})
+                    </span>
                 </p>
             </header>
 
-            <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                <h2 class="text-lg font-semibold">Kamu masuk sebagai</h2>
-                <dl class="mt-4 space-y-3 text-sm">
-                    <div class="flex flex-wrap gap-x-3">
-                        <dt class="w-28 shrink-0 font-medium text-slate-500">Nama</dt>
-                        <dd class="font-medium">{{ props.user.name }}</dd>
-                    </div>
-                    <div class="flex flex-wrap gap-x-3">
-                        <dt class="w-28 shrink-0 font-medium text-slate-500">Username</dt>
-                        <dd>{{ props.user.user_name }}</dd>
-                    </div>
-                    <div class="flex flex-wrap gap-x-3">
-                        <dt class="w-28 shrink-0 font-medium text-slate-500">Role</dt>
-                        <dd>
-                            <span
-                                v-for="role in props.user.roles"
-                                :key="role"
-                                class="mr-1 inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700"
-                            >
-                                {{ role }}
-                            </span>
-                            <span v-if="props.user.roles.length === 0" class="text-slate-400">
-                                (belum ada role)
-                            </span>
-                        </dd>
-                    </div>
-                    <div v-if="props.sekolah" class="flex flex-wrap gap-x-3">
-                        <dt class="w-28 shrink-0 font-medium text-slate-500">Sekolah</dt>
-                        <dd>
-                            {{ props.sekolah.nama ?? 'Sekolah' }}
-                            <span class="text-slate-400">
-                                — NPSN {{ props.sekolah.npsn }} · {{ props.sekolah.jenjang }}
-                            </span>
-                        </dd>
-                    </div>
-                </dl>
-
-                <p v-if="props.isAdmin" class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    Kamu adalah Admin — pengelola formulir.
+            <div
+                v-if="props.isAdmin"
+                class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4"
+            >
+                <p class="text-sm text-amber-800">
+                    Kamu adalah Admin — daftar di bawah menampilkan semua form
+                    yang sedang terbuka untuk semua sekolah dan role.
                 </p>
-            </section>
+                <Link
+                    :href="route('formulir.kelola.index')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                >
+                    <IconSettings :size="16" stroke="1.8" />
+                    Kelola Formulir
+                </Link>
+            </div>
 
-            <section class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-sm text-slate-600">
-                Fondasi integrasi selesai. Halaman pembuat formulir (builder) dan
-                halaman pengisian akan tiba di batch berikutnya.
+            <section
+                class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6"
+            >
+                <div class="mb-4 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
+                    <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700">
+                        {{ props.stats.forms_active }} form aktif
+                    </span>
+                    <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                        {{ props.stats.forms_submitted }} sudah diisi
+                    </span>
+                    <span class="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">
+                        {{ props.stats.forms_pending }} belum diisi
+                    </span>
+                </div>
+
+                <div
+                    v-if="props.activeForms.length === 0"
+                    class="py-10 text-center"
+                >
+                    <div
+                        class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"
+                    >
+                        <IconForms :size="24" stroke="1.6" />
+                    </div>
+                    <p class="mt-3 text-sm text-slate-500">
+                        Tidak ada form aktif untuk kamu saat ini.
+                    </p>
+                </div>
+
+                <div v-else class="space-y-2">
+                    <div
+                        v-for="form in props.activeForms"
+                        :key="form.id"
+                        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 transition hover:bg-slate-50"
+                    >
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                                :class="
+                                    form.has_submitted
+                                        ? 'bg-emerald-50 text-emerald-600'
+                                        : 'bg-indigo-50 text-indigo-600'
+                                "
+                            >
+                                <component
+                                    :is="
+                                        form.has_submitted
+                                            ? IconCircleCheck
+                                            : IconCircleDashed
+                                    "
+                                    :size="17"
+                                    stroke="1.75"
+                                />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-slate-900">
+                                    {{ form.title }}
+                                </p>
+                                <p class="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                                    <span>{{ form.sekolah_nama ?? "Semua Sekolah" }}</span>
+                                    <span
+                                        v-if="form.end_at"
+                                        class="inline-flex items-center gap-1"
+                                    >
+                                        <IconClockHour4 :size="12" />
+                                        Batas: {{ formatDate(form.end_at) }}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span
+                                class="rounded-full px-2.5 py-1 text-xs font-medium"
+                                :class="
+                                    form.has_submitted
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-indigo-50 text-indigo-700'
+                                "
+                            >
+                                {{
+                                    form.has_submitted
+                                        ? form.allow_multiple_submissions
+                                            ? "Sudah diisi · Bisa isi lagi"
+                                            : "Sudah diisi"
+                                        : "Belum diisi"
+                                }}
+                            </span>
+                            <Link
+                                :href="route('formulir.publik.show', form.slug)"
+                                class="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                            >
+                                {{ form.has_submitted ? "Lihat/Edit Jawaban" : "Isi Form" }}
+                            </Link>
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
-    </div>
+    </FormulirLayout>
 </template>
