@@ -64,7 +64,7 @@ function formatDate(d) {
 
         <Link :href="route('formulir.publik.isi', form.slug)">
             <button
-                class="mb-6 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand/40 bg-brand/5 py-4 text-sm font-medium text-brand transition-colors hover:border-brand hover:bg-brand/10"
+                class="mb-6 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/60 py-4 text-sm font-semibold text-indigo-700 shadow-sm transition-all hover:border-indigo-500 hover:bg-indigo-50"
             >
                 <IconPlus :size="18" stroke="1.75" /> Tambah Jawaban Baru
             </button>
@@ -72,7 +72,7 @@ function formatDate(d) {
 
         <div
             v-if="submissions.length === 0"
-            class="flex flex-col items-center rounded-xl border border-dashed border-border dark:border-border-dark bg-canvas dark:bg-zinc-900/40 px-6 py-14 text-center"
+            class="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white shadow-card dark:border-zinc-800 dark:bg-zinc-900/40 px-6 py-14 text-center"
         >
             <IconInbox :size="28" stroke="1.5" class="text-muted" />
             <p class="mt-3 text-sm text-muted">
@@ -88,11 +88,11 @@ function formatDate(d) {
             <div
                 v-for="(s, i) in submissions"
                 :key="s.id"
-                class="flex items-center justify-between rounded-xl border border-border dark:border-border-dark/60 bg-white p-4"
+                class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-card ring-1 ring-slate-900/5 transition hover:-translate-y-px hover:shadow-lift dark:border-zinc-800"
             >
                 <div class="flex items-center gap-3">
                     <div
-                        class="flex h-9 w-9 items-center justify-center rounded-lg bg-canvas dark:bg-zinc-900 text-sm font-medium text-ink"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-sm font-bold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
                     >
                         {{ submissions.length - i }}
                     </div>
@@ -109,7 +109,7 @@ function formatDate(d) {
 
                 <Link
                     :href="route('formulir.publik.edit', [form.slug, s.id])"
-                    class="flex items-center gap-1.5 rounded-md border border-border dark:border-border-dark/70 px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas dark:bg-zinc-900 transition-colors"
+                    class="flex min-h-[36px] items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:bg-zinc-900"
                 >
                     <IconPencil :size="15" /> Edit
                 </Link>

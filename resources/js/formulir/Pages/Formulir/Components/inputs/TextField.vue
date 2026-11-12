@@ -146,7 +146,7 @@ function onWheel(e) {
                 @focus="onFocus"
                 @blur="onBlur"
                 @wheel="onWheel"
-                class="w-full border-0 bg-transparent px-0 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                class="w-full border-0 bg-transparent px-0 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
         </div>
 

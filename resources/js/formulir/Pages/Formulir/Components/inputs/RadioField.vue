@@ -26,7 +26,7 @@ function select(value) {
                     :value="opt.value"
                     :checked="modelValue === opt.value"
                     @change="select(opt.value)"
-                    class="h-4 w-4 border-slate-300 text-indigo-600 transition-all duration-150 focus:ring-2 focus:ring-indigo-500/30 dark:border-zinc-600 dark:bg-zinc-800 dark:checked:bg-indigo-500"
+                    class="h-4 w-4 border-slate-400 text-indigo-600 transition-all duration-150 focus:ring-2 focus:ring-indigo-500/30 dark:border-zinc-600 dark:bg-zinc-800 dark:checked:bg-indigo-500"
                 />
             </span>
             <span

@@ -42,7 +42,7 @@ onMounted(resize);
             rows="1"
             @input="onInput"
             @blur="$emit('blur')"
-            class="block w-full resize-none overflow-hidden border-0 border-b bg-transparent px-0 py-1.5 text-sm leading-relaxed text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500"
+            class="block w-full resize-none overflow-hidden border-0 border-b bg-transparent px-0 py-1.5 text-sm leading-relaxed text-slate-900 outline-none placeholder:text-slate-500 focus:ring-0 dark:text-white dark:placeholder:text-zinc-500"
             :class="
                 error
                     ? 'border-red-400 dark:border-red-500/60'

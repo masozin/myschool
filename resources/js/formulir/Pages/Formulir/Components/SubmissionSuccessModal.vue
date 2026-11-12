@@ -56,7 +56,7 @@ function close() {
                     enter-from-class="opacity-0 scale-95 translate-y-2"
                 >
                     <div
-                        class="relative w-full max-w-md overflow-hidden rounded-xl bg-white p-6 shadow-hover"
+                        class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-lift ring-1 ring-slate-900/10"
                     >
                         <div
                             class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-brand/10 blur-3xl"
@@ -70,12 +70,12 @@ function close() {
                         </button>
 
                         <div
-                            class="relative flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 text-brand"
+                            class="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg"
                         >
                             <IconCircleCheck :size="28" stroke="1.5" />
                         </div>
 
-                        <h2 class="relative mt-4 font-display text-xl text-ink">
+                        <h2 class="relative mt-4 font-display text-xl font-bold text-ink">
                             {{
                                 payload.is_update
                                     ? "Perubahan tersimpan"
@@ -105,7 +105,7 @@ function close() {
                                 <input
                                     readonly
                                     :value="payload.review_url"
-                                    class="flex-1 truncate rounded-md border-border dark:border-border-dark bg-white text-xs text-muted"
+                                    class="flex-1 truncate rounded-lg border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
                                     @click="$event.target.select()"
                                 />
                                 <button

@@ -96,14 +96,14 @@ const config = computed(
 
         <!-- Body: alasan kenapa tidak bisa diakses -->
         <div
-            class="relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+            class="relative flex flex-col items-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
         >
             <div
                 class="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-indigo-500/10 blur-3xl"
             ></div>
 
             <div
-                class="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400"
+                class="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-rose-500 text-white shadow-lg dark:text-white"
             >
                 <component :is="config.icon" :size="26" stroke="1.5" />
             </div>

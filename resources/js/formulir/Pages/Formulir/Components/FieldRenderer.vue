@@ -79,28 +79,28 @@ const inputSpacingClass = computed(() =>
         <h2 class="text-xl font-bold text-slate-900 dark:text-white">
             {{ field.label }}
         </h2>
-        <div class="mt-2 h-px w-12 bg-indigo-600 dark:bg-indigo-400"></div>
+        <div class="mt-2 h-1 w-12 rounded-full bg-brand-gradient"></div>
     </div>
 
     <p
         v-else-if="field.type === 'paragraph'"
-        class="text-sm leading-relaxed text-slate-500 dark:text-zinc-400"
+        class="text-sm leading-relaxed text-slate-600 dark:text-zinc-400"
     >
         {{ field.label }}
     </p>
 
     <div v-else class="scroll-mt-20" :id="`field-${field.name}`">
-        <label class="block text-sm font-medium text-slate-900 dark:text-white">
+        <label class="block text-sm font-semibold text-slate-800 dark:text-white">
             {{ field.label }}
             <span
                 v-if="field.is_required"
-                class="text-red-500 dark:text-red-400"
+                class="font-bold text-rose-600 dark:text-rose-400"
                 >*</span
             >
         </label>
         <p
             v-if="field.description"
-            class="mt-1 text-sm text-slate-500 dark:text-zinc-400"
+            class="mt-1 text-sm text-slate-600 dark:text-zinc-400"
         >
             {{ field.description }}
         </p>
@@ -123,7 +123,7 @@ const inputSpacingClass = computed(() =>
         >
             <p
                 v-if="displayError"
-                class="mt-1.5 text-sm text-red-500 dark:text-red-400"
+                class="mt-1.5 text-sm font-medium text-rose-600 dark:text-rose-400"
             >
                 {{ displayError }}
             </p>

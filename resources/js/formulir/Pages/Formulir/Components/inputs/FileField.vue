@@ -217,7 +217,7 @@ const displaySize = computed(() => formatSize(fileSize.value));
             @dragover.prevent="dragging = true"
             @dragleave="dragging = false"
             @drop.prevent="onDrop"
-            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-8 text-center transition-colors duration-200 ease-out"
+            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-8 text-center transition-colors duration-200 ease-out"
             :class="[
                 dragging
                     ? 'border-brand bg-brand/5'
@@ -225,10 +225,10 @@ const displaySize = computed(() => formatSize(fileSize.value));
                 displayError ? 'border-danger' : '',
             ]"
         >
-            <IconUpload :size="22" stroke="1.5" class="text-muted" />
+            <IconUpload :size="22" stroke="1.5" class="text-indigo-500" />
             <span class="text-sm text-muted">
                 Seret file ke sini atau
-                <span class="font-medium text-brand">pilih file</span>
+                <span class="font-semibold text-indigo-700">pilih file</span>
             </span>
             <span
                 v-if="allowedExtensions || maxSizeMb"
@@ -252,7 +252,7 @@ const displaySize = computed(() => formatSize(fileSize.value));
         <!-- FILE TERPILIH -->
         <div
             v-else
-            class="flex items-center gap-3 rounded-xl border border-border bg-surface p-3"
+            class="flex items-center gap-3 rounded-xl border border-slate-300 bg-white p-3 shadow-sm"
         >
             <button
                 v-if="isPreviewable && previewUrl"

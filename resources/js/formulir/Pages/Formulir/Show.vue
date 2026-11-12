@@ -174,10 +174,10 @@ function submit() {
         <!-- FORM DITUTUP -->
         <div
             v-if="!form.status || form.status === 'closed'"
-            class="flex flex-col items-center rounded-xl border border-slate-200 bg-white px-6 py-14 text-center dark:border-zinc-800 dark:bg-zinc-900"
+            class="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
         >
             <div
-                class="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-500/10 dark:text-red-400"
+                class="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-lg dark:text-white"
             >
                 <IconLock :size="26" stroke="1.5" />
             </div>
@@ -192,22 +192,23 @@ function submit() {
             <Link
                 v-if="isEditMode && form.allow_multiple_submissions"
                 :href="route('formulir.publik.show', form.slug)"
-                class="mb-4 flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"
+                class="mb-4 flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white"
             >
                 <IconArrowLeft :size="16" />
                 Kembali ke Riwayat Jawaban
             </Link>
 
-            <div v-if="!form.banner_image" class="mb-6">
+            <div v-if="!form.banner_image" class="relative mb-6 overflow-hidden rounded-2xl bg-brand-gradient px-6 py-6 shadow-lift">
+                <div class="pointer-events-none absolute -right-14 -top-20 h-48 w-48 rounded-full bg-white/10 blur-2xl"></div>
                 <h1
-                    class="text-2xl font-bold tracking-[-0.01em] text-slate-900 dark:text-white sm:text-3xl"
+                    class="relative text-2xl font-bold tracking-[-0.01em] text-white sm:text-3xl"
                 >
                     {{ form.title }}
                 </h1>
 
                 <p
                     v-if="form.description"
-                    class="mt-2 text-sm leading-relaxed text-slate-500 dark:text-zinc-400"
+                    class="relative mt-2 text-sm leading-relaxed text-indigo-100"
                 >
                     {{ form.description }}
                 </p>
@@ -215,7 +216,7 @@ function submit() {
 
             <div
                 v-if="isEditMode"
-                class="mb-6 rounded-lg bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                class="mb-6 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 shadow-sm dark:bg-indigo-500/10 dark:text-indigo-400"
             >
                 Kamu sedang mengedit jawaban yang sudah dikirim sebelumnya.
             </div>
@@ -240,7 +241,7 @@ function submit() {
 
                     <div
                         v-else
-                        class="rounded-xl border border-slate-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
+                        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
                     >
                         <FieldRenderer
                             :field="field"
@@ -256,13 +257,14 @@ function submit() {
 
                 <!-- SECTION -->
                 <div
-                    v-for="section in form.sections"
+                    v-for="(section, sectionIndex) in form.sections"
                     :key="section.id"
                     class="space-y-4"
                 >
                     <div
-                        class="border-b border-slate-200 pb-3 dark:border-zinc-800"
+                        class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-300 pb-3 dark:border-zinc-800"
                     >
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-sm font-bold text-white shadow-glow">{{ sectionIndex + 1 }}</span>
                         <h2
                             class="text-lg font-bold text-slate-900 dark:text-white"
                         >
@@ -270,7 +272,7 @@ function submit() {
                         </h2>
                         <p
                             v-if="section.description"
-                            class="mt-1 text-sm text-slate-500 dark:text-zinc-400"
+                            class="mt-1 w-full pl-[44px] text-sm text-slate-600 dark:text-zinc-400"
                         >
                             {{ section.description }}
                         </p>
@@ -294,7 +296,7 @@ function submit() {
 
                         <div
                             v-else
-                            class="rounded-xl border border-slate-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
+                            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
                         >
                             <FieldRenderer
                                 :field="field"
@@ -310,12 +312,12 @@ function submit() {
                 </div>
 
                 <!-- SUBMIT BUTTON -->
-                <div class="sticky bottom-4 pt-2">
+                <div class="sticky bottom-4 rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-bar backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/85">
                     <Button
                         type="submit"
                         variant="primary"
                         :disabled="formState.processing"
-                        class="w-full justify-center py-3 shadow-lg"
+                        class="w-full justify-center py-3 shadow-glow"
                     >
                         <template #icon>
                             <IconSend :size="18" stroke="1.75" />
