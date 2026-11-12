@@ -10,6 +10,7 @@ use App\Models\Ptk;
 use App\Models\Rombel;
 use App\Models\Sekolah;
 use App\Models\Semester;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
@@ -558,6 +559,22 @@ class JadwalPelajaranController extends Controller
    */
   public function templateImpor($id)
   {
+    return $this->unduhBukuModel($id, false);
+  }
+
+  /**
+   * Ekspor Excel: buku yang sama persis dengan template impor,
+   * tetapi kotak pelajarannya SUDAH TERISI jadwal saat ini —
+   * untuk arsip / dibagikan, bukan untuk diimpor ulang (walau
+   * tetap bisa, isinya memang jadwal yang berlaku).
+   */
+  public function eksporExcel($id)
+  {
+    return $this->unduhBukuModel($id, true);
+  }
+
+  private function unduhBukuModel($id, bool $terisi)
+  {
     $model = $this->cariModel($id);
     $sekolahId = (int) $model->sekolah_id;
     $semesterId = (int) $model->semester_id;
@@ -614,6 +631,19 @@ class JadwalPelajaranController extends Controller
       }
     }
     $mapelBaris = collect($mapelBaris)->sortBy('kode')->values();
+
+    // Mode ekspor: jadwal yang sudah tersimpan, untuk ditulis
+    // ke kotak pelajaran (kode mapel / *kegiatan).
+    $selJadwal = [];
+    if ($terisi) {
+      $selRows = JadwalPelajaran::with('pengampu.mapping')
+        ->where('semester_id', $semesterId)
+        ->whereIn('rombel_id', $rombels->pluck('id'))
+        ->get();
+      foreach ($selRows as $sj) {
+        $selJadwal[$sj->rombel_id][$sj->hari][$sj->jam_ke] = $sj;
+      }
+    }
     $barisMatriksAkhir = 2 + $mapelBaris->count();
     $matAwal = $huruf(3);                     // kolom C di sheet Pengampu
     $matAkhir = $huruf(3 + $n - 1);
@@ -807,6 +837,14 @@ class JadwalPelajaranController extends Controller
             );
             $sheet->getStyle($kolT . $baris)->getAlignment()
               ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            if ($terisi) {
+              $selIsi = $selJadwal[$r->id][$hari][$jam] ?? null;
+              if ($selIsi) {
+                $sheet->setCellValue($kolJ . $baris, $selIsi->pengampu
+                  ? $this->kodeMapel($selIsi->pengampu->mapping)
+                  : '*' . $selIsi->nama_kegiatan);
+              }
+            }
           }
 
           // Format bersyarat pada SEL MAPEL baris ini:
@@ -947,7 +985,7 @@ class JadwalPelajaranController extends Controller
     $petunjuk->getProtection()->setSheet(true);
 
     $ss->setActiveSheetIndex(0);
-    $namaFile = 'template-jadwal-' . Str::slug($model->nama) . '.xlsx';
+    $namaFile = ($terisi ? 'jadwal-terisi-' : 'template-jadwal-') . Str::slug($model->nama) . '.xlsx';
     $path = tempnam(sys_get_temp_dir(), 'tpl-jadwal-') . '.xlsx';
     (new XlsxWriter($ss))->save($path);
 
@@ -1173,6 +1211,180 @@ class JadwalPelajaranController extends Controller
     });
 
     return back()->with('success', "Impor jadwal model \"{$model->nama}\" berhasil: {$terisi} kotak pelajaran terisi, {$kegiatan} kegiatan, {$dikosongkan} kotak dikosongkan.");
+  }
+
+  /**
+   * Blok-blok satu rombel per hari untuk cetakan: pelajaran,
+   * istirahat, dan kegiatan tetap digabung lalu diurutkan
+   * menurut jam mulai, dari kerangka model rombel itu sendiri.
+   * Hasil: [nomorHari => ['nama' =>, 'blok' => [...]]].
+   */
+  private function blokJadwalRombel(Sekolah $sekolah, int $semesterId, Rombel $rombel): array
+  {
+    $frame = $this->kerangka($sekolah, $semesterId, $rombel);
+    $selPerHari = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk', 'pembina'])
+      ->where('rombel_id', $rombel->id)
+      ->where('semester_id', $semesterId)
+      ->get()
+      ->groupBy('hari');
+
+    $hasil = [];
+    foreach ($frame['hari'] as $hari => $f) {
+      $gw = $this->garisWaktu($f);
+      $selHari = ($selPerHari->get($hari) ?? collect())->keyBy('jam_ke');
+      $blok = [];
+      foreach ($gw['pelajaran'] as $jam => $w) {
+        $c = $selHari->get($jam);
+        $blok[] = [
+          'mulai' => $w[0],
+          'selesai' => $w[1],
+          'jenis' => 'pelajaran',
+          'label' => $c?->pengampu
+            ? ($c->pengampu->mapping?->masterMapel?->nama ?? '-')
+            : ($c?->nama_kegiatan ?? ''),
+          'sub' => $c?->pengampu
+            ? ($c->pengampu->ptk?->nama_lengkap ?? '')
+            : ($c?->pembina?->nama_lengkap ?? ''),
+        ];
+      }
+      foreach ($gw['lainnya'] as $evs) {
+        foreach ($evs as $ev) {
+          $blok[] = [
+            'mulai' => $ev['waktu'][0],
+            'selesai' => $ev['waktu'][1],
+            'jenis' => $ev['jenis'],
+            'label' => $ev['nama'],
+            'sub' => '',
+          ];
+        }
+      }
+      usort($blok, fn($a, $b) => strcmp($a['mulai'], $b['mulai']));
+      $hasil[$hari] = ['nama' => self::HARI[$hari] ?? (string) $hari, 'blok' => $blok];
+    }
+    return $hasil;
+  }
+
+  /** Cetak PDF jadwal per kelas: satu lembar per rombel. */
+  public function eksporPdfKelas()
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return back()->with('error', 'Pilih sekolah dulu lewat pemilih konteks.');
+    }
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+    $semesterId = $this->semesterId();
+    $semester = Semester::find($semesterId);
+
+    $rombels = Rombel::with(['ptk', 'jadwalPengaturan'])
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->orderBy('tingkat')
+      ->orderBy('nama_rombel')
+      ->get();
+
+    $lembar = $rombels->map(function ($r) use ($sekolah, $semesterId) {
+      $hari = $this->blokJadwalRombel($sekolah, $semesterId, $r);
+      return [
+        'rombel' => $r,
+        'model' => $this->kerangka($sekolah, $semesterId, $r)['model']?->nama,
+        'hari' => $hari,
+        'baris' => collect($hari)->max(fn($h) => count($h['blok'])) ?? 0,
+      ];
+    });
+
+    $pdf = Pdf::setPaper('a4', 'landscape');
+    $pdf->setOption(['defaultFont' => 'sans-serif']);
+    $pdf->loadView('content.jadwal-pelajaran.pdf-kelas', [
+      'sekolah' => $sekolah,
+      'semester' => $semester,
+      'lembar' => $lembar,
+    ]);
+    return $pdf->download('jadwal-per-kelas.pdf');
+  }
+
+  /** Cetak PDF jadwal per guru: satu lembar per guru pengampu / pembina. */
+  public function eksporPdfGuru()
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return back()->with('error', 'Pilih sekolah dulu lewat pemilih konteks.');
+    }
+    $sekolah = Sekolah::with('detailTerbaru')->findOrFail($sekolahId);
+    $semesterId = $this->semesterId();
+    $semester = Semester::find($semesterId);
+
+    $rombels = Rombel::where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->get()
+      ->keyBy('id');
+
+    // Garis waktu per rombel+hari (cache) untuk rentang waktunya.
+    $gwCache = [];
+    $rentang = function (Rombel $r, int $hari, int $jam) use (&$gwCache, $sekolah, $semesterId) {
+      if (!isset($gwCache[$r->id][$hari])) {
+        $frame = $this->kerangka($sekolah, $semesterId, $r)['hari'][$hari] ?? null;
+        $gwCache[$r->id][$hari] = $frame ? $this->garisWaktu($frame) : null;
+      }
+      return $gwCache[$r->id][$hari]['pelajaran'][$jam] ?? null;
+    };
+
+    $baris = JadwalPelajaran::with(['pengampu.mapping.masterMapel', 'pengampu.ptk', 'pembina'])
+      ->where('sekolah_id', $sekolahId)
+      ->where('semester_id', $semesterId)
+      ->get();
+
+    $perGuru = [];
+    foreach ($baris as $b) {
+      $rombel = $rombels->get($b->rombel_id);
+      if (!$rombel) {
+        continue;
+      }
+      $w = $rentang($rombel, (int) $b->hari, (int) $b->jam_ke);
+      if (!$w) {
+        continue;
+      }
+      $ptk = $b->pengampu?->ptk ?? $b->pembina;
+      if (!$ptk) {
+        continue;
+      }
+      $perGuru[$ptk->id]['ptk'] = $ptk;
+      $perGuru[$ptk->id]['hari'][(int) $b->hari]['nama'] = self::HARI[(int) $b->hari] ?? (string) $b->hari;
+      $perGuru[$ptk->id]['hari'][(int) $b->hari]['blok'][] = [
+        'mulai' => $w[0],
+        'selesai' => $w[1],
+        'jenis' => 'pelajaran',
+        'label' => $rombel->nama_rombel,
+        'sub' => $b->pengampu
+          ? ($b->pengampu->mapping?->masterMapel?->nama ?? '-')
+          : ('Kegiatan: ' . ($b->nama_kegiatan ?? '-')),
+      ];
+    }
+
+    $lembar = collect($perGuru)
+      ->sortBy(fn($g) => $g['ptk']->nama_ptk)
+      ->map(function ($g) {
+        $hari = collect($g['hari'])->sortKeys()
+          ->map(function ($h) {
+            $blok = $h['blok'];
+            usort($blok, fn($a, $b) => strcmp($a['mulai'], $b['mulai']));
+            return ['nama' => $h['nama'], 'blok' => $blok];
+          });
+        return [
+          'ptk' => $g['ptk'],
+          'hari' => $hari->all(),
+          'baris' => $hari->max(fn($h) => count($h['blok'])) ?? 0,
+        ];
+      })
+      ->values();
+
+    $pdf = Pdf::setPaper('a4', 'landscape');
+    $pdf->setOption(['defaultFont' => 'sans-serif']);
+    $pdf->loadView('content.jadwal-pelajaran.pdf-guru', [
+      'sekolah' => $sekolah,
+      'semester' => $semester,
+      'lembar' => $lembar,
+    ]);
+    return $pdf->download('jadwal-per-guru.pdf');
   }
 
   /**

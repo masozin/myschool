@@ -609,6 +609,10 @@ Route::controller(JadwalPelajaranController::class)
   ->group(function () {
     Route::get('/', 'index')->name('index')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
+    Route::get('/ekspor-pdf-kelas', 'eksporPdfKelas')->name('ekspor.pdf.kelas')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/ekspor-pdf-guru', 'eksporPdfGuru')->name('ekspor.pdf.guru')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
     Route::get('/editor/{rombel}', 'editor')->name('editor')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Guru');
     Route::post('/editor/{rombel}/model', 'pilihModel')->name('rombel.model')
@@ -628,6 +632,8 @@ Route::controller(JadwalPelajaranController::class)
     Route::post('/pengaturan/{id}/hapus', 'hapusModel')->name('pengaturan.model.hapus')
       ->middleware('role:Operator Sekolah');
     Route::get('/pengaturan/{id}/template-impor', 'templateImpor')->name('pengaturan.model.template-impor')
+      ->middleware('role:Operator Sekolah');
+    Route::get('/pengaturan/{id}/ekspor-excel', 'eksporExcel')->name('pengaturan.model.ekspor-excel')
       ->middleware('role:Operator Sekolah');
     Route::post('/pengaturan/{id}/impor', 'imporJadwal')->name('pengaturan.model.impor')
       ->middleware('role:Operator Sekolah');

@@ -49,6 +49,12 @@
             @endif
           </div>
         </div>
+        @hasanyrole('Admin|Operator Sekolah|Kepala Sekolah')
+          <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+            data-bs-target="#modal-ekspor-jadwal">
+            <i class="ri ri-download-2-line me-1"></i> Ekspor Jadwal
+          </button>
+        @endhasanyrole
         @if ($bolehSusun)
           <button type="button" class="btn btn-outline-success" data-bs-toggle="modal"
             data-bs-target="#modal-impor-jadwal">
@@ -205,6 +211,53 @@
     </div>
   @endif
 
+  @hasanyrole('Admin|Operator Sekolah|Kepala Sekolah')
+    <div class="modal fade" id="modal-ekspor-jadwal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Ekspor Jadwal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+          </div>
+          <div class="modal-body">
+            <h6 class="mb-2"><i class="ri ri-file-excel-2-line me-1"></i>Excel — format template impor, sudah terisi</h6>
+            @if ($daftarModel->isEmpty())
+              <div class="alert alert-warning">Belum ada model jadwal di semester ini.</div>
+            @else
+              <div class="mb-2">
+                <label class="form-label" for="ekspor-model">Model Jadwal</label>
+                <select id="ekspor-model" class="form-select">
+                  @foreach ($daftarModel as $m)
+                    <option value="{{ $m->id }}">{{ $m->nama }}</option>
+                  @endforeach
+                </select>
+              </div>
+              <a href="#" id="ekspor-excel-link" class="btn btn-outline-success w-100 mb-1">
+                <i class="ri ri-file-excel-2-line me-1"></i> Unduh Excel Terisi
+              </a>
+              <small class="text-muted d-block mb-4">Isinya jadwal yang berlaku sekarang untuk rombel-rombel pemakai
+                model ini — formatnya persis template impor.</small>
+            @endif
+
+            <h6 class="mb-2"><i class="ri ri-file-pdf-2-line me-1"></i>PDF — siap cetak</h6>
+            <div class="d-grid gap-2">
+              <a href="{{ route('jadwal-pelajaran.ekspor.pdf.kelas', ['sekolah_id' => $sekolahId]) }}"
+                class="btn btn-outline-danger">
+                <i class="ri ri-file-pdf-2-line me-1"></i> PDF per Kelas
+              </a>
+              <a href="{{ route('jadwal-pelajaran.ekspor.pdf.guru', ['sekolah_id' => $sekolahId]) }}"
+                class="btn btn-outline-danger">
+                <i class="ri ri-file-pdf-2-line me-1"></i> PDF per Guru
+              </a>
+            </div>
+            <small class="text-muted d-block mt-2">Setiap kelas / guru mendapat lembarnya sendiri (A4 mendatar),
+              mengikuti kerangka model masing-masing kelas.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  @endhasanyrole
+
   @if ($bolehSusun)
     <div class="modal fade" id="modal-impor-jadwal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -214,7 +267,16 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
           </div>
           <div class="modal-body">
-            @if (session('impor_errors'))
+            const eksporSel = document.getElementById('ekspor-model');
+      if (eksporSel) {
+        const eksporLink = document.getElementById('ekspor-excel-link');
+        const perbaruiEkspor = () => {
+          eksporLink.href = '{{ url('/jadwal-pelajaran/pengaturan') }}/' + eksporSel.value + '/ekspor-excel';
+        };
+        eksporSel.addEventListener('change', perbaruiEkspor);
+        perbaruiEkspor();
+      }
+      @if (session('impor_errors'))
               <div class="alert alert-danger">
                 <div class="fw-semibold mb-1">{{ session('error') ?? 'Impor dibatalkan — tidak ada data yang ditulis.' }}
                 </div>
