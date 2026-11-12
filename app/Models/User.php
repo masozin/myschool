@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -78,5 +79,17 @@ class User extends Authenticatable
   public function Siswa(): HasOne
   {
     return $this->hasOne(Siswa::class, 'user_id');
+  }
+
+  // Formulir K3S yang dibuat pengguna ini (sebagai Admin)
+  public function formulirDibuat(): HasMany
+  {
+    return $this->hasMany(Formulir::class, 'created_by');
+  }
+
+  // Jawaban formulir K3S yang dikirim pengguna ini
+  public function jawabanFormulir(): HasMany
+  {
+    return $this->hasMany(FormulirJawaban::class, 'user_id');
   }
 }
