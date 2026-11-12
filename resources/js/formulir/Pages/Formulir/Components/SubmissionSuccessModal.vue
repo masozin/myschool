@@ -122,9 +122,10 @@ function close() {
                                 Tersalin ke clipboard
                             </p>
                             <p class="mt-2 text-xs text-muted">
-                                Link ini berlaku 90 hari. Karena kamu tidak
-                                login, ini satu-satunya cara untuk kembali
-                                mengedit jawabanmu.
+                                Link ini berlaku 30 hari dan tidak dapat
+                                diterbitkan ulang — simpan baik-baik. Karena
+                                kamu tidak login, ini satu-satunya cara untuk
+                                kembali mengedit jawabanmu.
                             </p>
                         </div>
 
