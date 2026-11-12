@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DhSiswaController;
 use App\Http\Controllers\FormulirBuilderController;
 use App\Http\Controllers\FormulirController;
+use App\Http\Controllers\FormulirPublikController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
@@ -738,4 +739,40 @@ Route::controller(FormulirBuilderController::class)
     Route::put('/{formulir}', 'update')->name('update');
     Route::delete('/{formulir}', 'destroy')->name('destroy');
     Route::put('/{formulir}/struktur', 'updateStructure')->name('structure');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| FORMULIR K3S — halaman pengisian publik (Batch 3)
+|--------------------------------------------------------------------------
+| Route ini SENGAJA tanpa middleware auth/fitur: akses diatur oleh
+| status form, periode, require_login, dan target role di dalam
+| FormulirPublikController (persis pola form-k3s). Parameter anak
+| memakai nama {submission} agar binding berlingkup (scopeBindings)
+| memakai relasi submissions() pada model Formulir — nama relasi
+| diturunkan Laravel dari nama parameter (Str::plural).
+*/
+Route::controller(FormulirPublikController::class)
+  ->prefix('form')
+  ->name('formulir.publik.')
+  ->group(function () {
+    Route::get('/{formulir:slug}', 'show')->name('show');
+    Route::get('/{formulir:slug}/isi', 'create')->name('isi');
+    Route::post('/{formulir:slug}', 'store')->name('simpan');
+
+    Route::scopeBindings()->group(function () {
+      // Pengguna login
+      Route::get('/{formulir:slug}/jawaban/{submission}', 'edit')->name('edit');
+      Route::put('/{formulir:slug}/jawaban/{submission}', 'update')->name('update');
+      Route::get('/{formulir:slug}/jawaban/{submission}/lihat', 'review')
+        ->middleware('auth')
+        ->name('review');
+
+      // Tamu (signed URL)
+      Route::middleware('signed')->group(function () {
+        Route::get('/{formulir:slug}/jawaban/{submission}/tamu', 'editGuest')->name('tamu.edit');
+        Route::put('/{formulir:slug}/jawaban/{submission}/tamu', 'updateGuest')->name('tamu.update');
+        Route::get('/{formulir:slug}/jawaban/{submission}/tamu/lihat', 'reviewGuest')->name('tamu.review');
+      });
+    });
   });
