@@ -62,7 +62,8 @@ class FormulirPublikController extends Controller
 
     protected function signed(string $route, Formulir $formulir, FormulirJawaban $submission): string
     {
-        return URL::temporarySignedRoute($route, now()->addDays(5), [
+        // (Batch 4.5) Masa berlaku disamakan dengan teks modal sukses: 30 hari.
+        return URL::temporarySignedRoute($route, now()->addDays(30), [
             'formulir' => $formulir->slug,
             'submission' => $submission->id,
         ]);
@@ -239,11 +240,20 @@ class FormulirPublikController extends Controller
         $validated = $request->validated();
         $data = $validated['data'] ?? [];
         $files = $validated['files'] ?? [];
+        $userId = $request->user()?->id;
 
-        $submission = DB::transaction(function () use ($formulir, $request, $data, $files) {
+        $submission = DB::transaction(function () use ($formulir, $userId, $data, $files) {
+            // (Batch 4.5) Penjaga kirim ganda di dalam transaksi: untuk
+            // form sekali-isi, pengguna login tidak boleh punya dua
+            // jawaban — apa pun require_login form-nya. Pemeriksaan di
+            // authorize() bisa terlewat oleh dua kiriman bersamaan.
+            if ($userId && $formulir->hasSubmittedBy($userId)) {
+                abort(403, 'Anda sudah mengirim jawaban untuk formulir ini.');
+            }
+
             $submission = FormulirJawaban::create([
                 'form_id' => $formulir->id,
-                'user_id' => $request->user()?->id,
+                'user_id' => $userId,
                 'data' => $data,
                 'submitted_at' => now(),
             ]);

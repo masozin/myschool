@@ -12,6 +12,19 @@ use App\Rules\NumberDateOperatorRule;
 class FormValidationRuleBuilder
 {
     /**
+     * Pagar bawaan server untuk field file (Batch 4.5): ekstensi yang
+     * diizinkan secara global. Konfigurasi Admin hanya boleh
+     * mempersempit daftar ini, tidak pernah memperluasnya.
+     */
+    public const ALLOWED_EXTENSIONS = [
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt',
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip',
+    ];
+
+    /** Ukuran maksimum berkas global dalam KILOBYTE (10 MB). */
+    public const MAX_FILE_SIZE_KB = 10240;
+
+    /**
      * @return array{rules: array, attributes: array, messages: array}
      */
     public function build(Formulir $form): array
@@ -31,6 +44,12 @@ class FormValidationRuleBuilder
             $fieldRules = $this->baseRules($field);
             $fieldRules = array_merge($fieldRules, $this->typeSpecificRules($field));
             $fieldRules = array_merge($fieldRules, $this->configuredValidationRules($field));
+
+            // Field file SELALU mendapat pagar bawaan server, walau
+            // Admin tidak mengonfigurasi validasi apa pun.
+            if ($field->isFileType()) {
+                $fieldRules = array_merge($fieldRules, $this->fileGuardRules($field));
+            }
 
             $rules[$key] = $fieldRules;
         }
@@ -76,7 +95,7 @@ class FormValidationRuleBuilder
             'text', 'textarea' => $this->textRules($validation),
             'number' => $this->operatorRule($validation, 'number'),
             'date' => $this->operatorRule($validation, 'date'),
-            'file' => $this->fileRules($validation),
+            // Field file ditangani fileGuardRules() — selalu diterapkan.
             default => [],
         };
     }
@@ -120,19 +139,40 @@ class FormValidationRuleBuilder
         )];
     }
 
-    protected function fileRules(array $validation): array
+    /**
+     * Pagar bawaan berkas: batas ukuran + daftar putih ekstensi global.
+     * Konfigurasi Admin (config.validation) hanya boleh mempersempit:
+     * ukuran efektif = min(konfigurasi, global), ekstensi efektif =
+     * irisan konfigurasi dengan daftar putih global. Konfigurasi yang
+     * seluruhnya di luar daftar putih diabaikan (kembali ke bawaan)
+     * agar field tidak terkunci total oleh kesalahan konfigurasi.
+     */
+    protected function fileGuardRules(FormulirField $field): array
     {
-        $rules = [];
+        $validation = $field->getValidationConfig();
 
-        if (!empty($validation['max_size'])) {
-            // Laravel 'max' untuk file dalam KILOBYTE
-            $rules[] = 'max:' . ($validation['max_size'] * 1024);
+        $maxKb = self::MAX_FILE_SIZE_KB;
+        if (! empty($validation['max_size'])) {
+            // max_size konfigurasi dalam MEGABYTE; Laravel 'max' file dalam KILOBYTE
+            $maxKb = min($maxKb, (int) ($validation['max_size'] * 1024));
         }
 
-        if (!empty($validation['extensions'])) {
-            $rules[] = 'mimes:' . implode(',', $validation['extensions']);
+        $extensions = self::ALLOWED_EXTENSIONS;
+        if (! empty($validation['extensions'])) {
+            $configured = array_map(
+                fn ($e) => strtolower(trim((string) $e)),
+                (array) $validation['extensions']
+            );
+            $narrowed = array_values(array_intersect($configured, self::ALLOWED_EXTENSIONS));
+
+            if ($narrowed) {
+                $extensions = $narrowed;
+            }
         }
 
-        return $rules;
+        return [
+            'max:' . $maxKb,
+            'mimes:' . implode(',', $extensions),
+        ];
     }
 }

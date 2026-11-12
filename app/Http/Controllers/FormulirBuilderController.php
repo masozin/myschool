@@ -57,6 +57,14 @@ class FormulirBuilderController extends Controller
     {
         $data = $request->validated();
 
+        // (Batch 4.5) Form baru belum punya pertanyaan sama sekali, jadi
+        // tidak boleh langsung diterbitkan — simpan sebagai draf dulu.
+        if (($data['status'] ?? null) === Formulir::STATUS_PUBLISHED) {
+            return back()
+                ->with('error', 'Form belum memiliki pertanyaan. Simpan sebagai draf terlebih dahulu, tambahkan minimal satu pertanyaan, lalu terbitkan.')
+                ->withInput();
+        }
+
         if ($request->hasFile('banner_image')) {
             $data['banner_image'] = $request->file('banner_image')
                 ->store('formulir/banners', 'public');
@@ -80,6 +88,9 @@ class FormulirBuilderController extends Controller
     {
         Gate::authorize('update', $formulir);
 
+        // Jumlah jawaban untuk baris aksi halaman edit (Batch 4)
+        $formulir->loadCount('submissions');
+
         // Sections + fields dimuat sekaligus untuk halaman builder
         $formulir->load(['sections.fields', 'fields' => fn ($q) => $q->whereNull('section_id')]);
 
@@ -92,6 +103,15 @@ class FormulirBuilderController extends Controller
     public function update(UpdateFormulirRequest $request, Formulir $formulir): RedirectResponse
     {
         $data = $request->validated();
+
+        // (Batch 4.5) Form tanpa pertanyaan yang bisa dijawab tidak
+        // boleh berstatus diterbitkan.
+        if (($data['status'] ?? null) === Formulir::STATUS_PUBLISHED
+            && $formulir->fields()->whereNotIn('type', FormulirField::DISPLAY_ONLY_TYPES)->count() === 0) {
+            return back()
+                ->with('error', 'Form belum memiliki pertanyaan. Tambahkan minimal satu pertanyaan sebelum menerbitkan.')
+                ->withInput();
+        }
 
         if ($request->hasFile('banner_image')) {
             if ($formulir->banner_image) {
