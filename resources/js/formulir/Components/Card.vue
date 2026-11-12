@@ -5,10 +5,10 @@ defineProps({ hover: { type: Boolean, default: true } });
 
 <template>
     <div
-        class="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-6 transition-shadow duration-200"
+        class="rounded-2xl border border-slate-200 bg-surface p-6 shadow-card ring-1 ring-slate-900/5 transition-all duration-200 dark:border-zinc-800 dark:bg-surface-dark"
         :class="
             hover
-                ? 'shadow-premium dark:shadow-premium-dark hover:shadow-glow'
+                ? 'hover:-translate-y-0.5 hover:shadow-lift'
                 : ''
         "
     >

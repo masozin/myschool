@@ -40,7 +40,7 @@ function stopEdit() {
         :is="tag"
         v-else
         @click="startEdit"
-        class="cursor-text rounded px-0 py-0.5 border-b border-transparent hover:border-border dark:border-border-dark/60 transition-colors"
+        class="cursor-text rounded-lg border-b border-transparent px-1 py-0.5 transition-colors hover:border-border hover:bg-slate-900/[0.04] dark:border-border-dark/60 dark:hover:bg-white/[0.06]"
         :class="[textClass, !modelValue && 'text-muted/60']"
     >
         {{ modelValue || placeholder }}

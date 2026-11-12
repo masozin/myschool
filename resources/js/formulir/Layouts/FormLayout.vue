@@ -116,7 +116,7 @@ onUnmounted(() => {
 
 <template>
     <div
-        class="min-h-screen bg-[#f7f8fc] font-sans text-slate-900 antialiased transition-colors duration-300 dark:bg-[#09090b] dark:text-white"
+        class="island-decor min-h-screen bg-canvas font-sans text-slate-900 antialiased transition-colors duration-300 dark:bg-[#09090b] dark:text-white"
     >
         <!-- ========================================================= -->
         <!-- TOP NAVIGATION -->
@@ -126,7 +126,7 @@ onUnmounted(() => {
             class="sticky top-0 z-50 transition-all duration-300"
             :class="
                 isScrolled
-                    ? 'border-b border-slate-200/70 bg-white/80 shadow-[0_8px_30px_rgba(15,23,42,0.06)] backdrop-blur-2xl dark:border-zinc-800/70 dark:bg-zinc-950/80 dark:shadow-black/20'
+                    ? 'border-b border-slate-200 bg-white/85 shadow-[0_8px_30px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-zinc-800/70 dark:bg-zinc-950/80 dark:shadow-black/20'
                     : 'border-b border-transparent bg-transparent'
             "
         >
@@ -274,7 +274,7 @@ onUnmounted(() => {
         <!-- ========================================================= -->
 
         <footer
-            class="border-t border-slate-200/60 py-6 text-center text-sm text-slate-400 dark:border-zinc-800/60 dark:text-zinc-500"
+            class="border-t border-slate-200/80 py-6 text-center text-sm text-slate-500 dark:border-zinc-800/60 dark:text-zinc-500"
         >
             Formulir K3S — MySchool
         </footer>

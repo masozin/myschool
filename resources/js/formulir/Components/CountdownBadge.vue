@@ -50,13 +50,13 @@ const label = computed(() => {
 
 <template>
     <div
-        class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium tabular-nums transition-colors"
+        class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums shadow-sm transition-colors"
         :class="
             isClosed
-                ? 'bg-danger/10 text-danger'
+                ? 'border border-slate-300 bg-slate-200/70 text-slate-600'
                 : isUrgent
-                  ? 'bg-danger/10 text-danger animate-pulse'
-                  : 'bg-brand/10 text-brand'
+                  ? 'bg-rose-600 text-white animate-pulse'
+                  : 'border border-amber-200 bg-amber-50 text-amber-800'
         "
     >
         <IconClock :size="13" stroke="2" />

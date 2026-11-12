@@ -11,11 +11,11 @@ const config = {
 
 <template>
     <span
-        class="inline-flex items-center gap-1.5 text-sm text-ink/80 dark:text-ink-dark/80"
+        class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
     >
         <span
-            class="h-1.5 w-1.5 rounded-full"
-            :class="config[status]?.color"
+            class="h-2 w-2 shrink-0 rounded-full"
+            :class="[config[status]?.color, status === 'published' ? 'animate-pulse' : '']"
         ></span>
         {{ config[status]?.label ?? status }}
     </span>

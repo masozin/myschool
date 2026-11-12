@@ -272,7 +272,7 @@ const cornerCursor = {
                 class="fixed inset-0 z-[60] flex items-center justify-center bg-ink/60 p-4"
             >
                 <div
-                    class="w-full max-w-md rounded-2xl bg-surface p-5 shadow-premium dark:shadow-premium-dark"
+                    class="w-full max-w-md rounded-2xl bg-surface p-5 shadow-lift ring-1 ring-slate-900/10 dark:shadow-premium-dark"
                 >
                     <div class="mb-4 flex items-center justify-between">
                         <h3

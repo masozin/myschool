@@ -14,7 +14,7 @@ defineEmits(["update:modelValue"]);
     <div>
         <label
             v-if="label"
-            class="mb-1.5 block text-sm font-medium text-ink dark:text-ink-dark"
+            class="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-zinc-200"
         >
             {{ label }}
         </label>
@@ -23,13 +23,13 @@ defineEmits(["update:modelValue"]);
             :value="modelValue"
             :placeholder="placeholder"
             @input="$emit('update:modelValue', $event.target.value)"
-            class="text-sm w-full rounded-md border-border dark:border-border-dark bg-surface dark:bg-surface-dark text-ink dark:text-ink-dark placeholder:text-muted/60 focus:border-brand focus:ring-brand/20 transition-colors duration-150"
+            class="w-full rounded-xl border-slate-300 bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm transition-all duration-150 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 dark:border-zinc-700 dark:bg-surface-dark dark:text-ink-dark"
             :class="{
                 'border-red-400 focus:border-red-400 focus:ring-red-400/20':
                     error,
             }"
         />
-        <p v-if="error" class="mt-1.5 text-sm text-red-500 dark:text-red-400">
+        <p v-if="error" class="mt-1.5 text-sm font-medium text-rose-600 dark:text-rose-400">
             {{ error }}
         </p>
     </div>

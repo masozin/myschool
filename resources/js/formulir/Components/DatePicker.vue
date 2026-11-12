@@ -179,7 +179,7 @@ watch(open, (val) => {
             <div
                 v-if="open"
                 @click.stop
-                class="absolute left-0 z-40 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+                class="absolute left-0 z-40 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-lift ring-1 ring-slate-900/5 dark:border-zinc-800 dark:bg-zinc-900"
             >
                 <!-- ============ PANEL: HARI ============ -->
                 <template v-if="panelMode === 'days'">
