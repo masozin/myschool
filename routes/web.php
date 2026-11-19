@@ -772,6 +772,14 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
     Route::get('/bku', 'bku')->name('bku')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/referensi/kegiatan', 'referensiKegiatan')->name('referensi.kegiatan')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/referensi/rekening', 'referensiRekening')->name('referensi.rekening')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
   });
 
 /*

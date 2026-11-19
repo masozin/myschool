@@ -22,10 +22,12 @@ class BosAnggaran extends Model
     'sisa_anggaran',
     'is_pengesahan',
     'is_approve',
+    'is_revisi',
     'is_aktif',
     'tanggal_pengajuan',
     'tanggal_pengesahan',
     'soft_delete',
+    'arkas_create_date',
     'arkas_last_update',
   ];
 
@@ -39,6 +41,7 @@ class BosAnggaran extends Model
     'soft_delete' => 'boolean',
     'tanggal_pengajuan' => 'datetime',
     'tanggal_pengesahan' => 'datetime',
+    'arkas_create_date' => 'datetime',
     'arkas_last_update' => 'datetime',
   ];
 

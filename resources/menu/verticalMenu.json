@@ -318,6 +318,46 @@
             "Operator Sekolah",
             "Kepala Sekolah"
           ]
+        },
+        {
+          "url": "/kelola-bos/perbandingan",
+          "name": "Perbandingan Versi",
+          "slug": "kelola-bos.perbandingan",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/kelola-bos/referensi/barang",
+          "name": "Referensi Barang",
+          "slug": "kelola-bos.referensi-barang",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/kelola-bos/referensi/kegiatan",
+          "name": "Referensi Kegiatan",
+          "slug": "kelola-bos.referensi-kegiatan",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/kelola-bos/referensi/rekening",
+          "name": "Referensi Rekening",
+          "slug": "kelola-bos.referensi-rekening",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
         }
       ]
     },

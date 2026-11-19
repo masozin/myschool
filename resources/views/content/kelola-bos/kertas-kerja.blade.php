@@ -93,12 +93,25 @@
               @endforeach
             </select>
           </div>
+          @if (request()->filled('sumber_dana'))
+            <div class="col-6 col-md-2">
+              <label class="form-label">Versi RKAS</label>
+              <select name="versi" class="form-select">
+                <option value="" {{ !request('versi') ? 'selected' : '' }}>Terakhir disetujui (bawaan)</option>
+                @foreach ($daftarVersi as $v)
+                  <option value="{{ $v['id_arkas'] }}" {{ request('versi') === $v['id_arkas'] ? 'selected' : '' }}>
+                    {{ $v['label'] }} ({{ $v['disetujui'] ? 'Disetujui' : 'Draf' }})</option>
+                @endforeach
+                <option value="semua" {{ request('versi') === 'semua' ? 'selected' : '' }}>Semua versi</option>
+              </select>
+            </div>
+          @endif
           <div class="col-12 col-md-3">
             <label class="form-label">Kegiatan</label>
             <select name="kegiatan" class="form-select">
               <option value="">Semua kegiatan</option>
               @foreach ($daftarKegiatan as $k)
-                <option value="{{ $k->id_arkas }}" {{ request('kegiatan') === $k->id_arkas ? 'selected' : '' }}>
+                <option value="{{ $k->id_ref_kode }}" {{ request('kegiatan') === $k->id_ref_kode ? 'selected' : '' }}>
                   {{ $k->id_kode }} {{ $k->uraian_kode }}</option>
               @endforeach
             </select>

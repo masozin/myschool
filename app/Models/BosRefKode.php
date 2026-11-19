@@ -13,9 +13,12 @@ class BosRefKode extends Model
   protected $fillable = [
     'sekolah_id',
     'id_arkas',
+    'id_ref_kode',
     'id_kode',
     'uraian_kode',
     'id_level_kode',
+    'sumber_dana_id',
+    'bentuk_pendidikan_id',
     'tahun',
     'arkas_last_update',
   ];
