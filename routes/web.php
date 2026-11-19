@@ -7,6 +7,7 @@ use App\Http\Controllers\FormulirController;
 use App\Http\Controllers\FormulirPublikController;
 use App\Http\Controllers\FormulirSubmissionController;
 use App\Http\Controllers\JadwalPelajaranController;
+use App\Http\Controllers\KelolaBosController;
 use App\Http\Controllers\KalenderPendidikanController;
 use App\Http\Controllers\KartuPelajarController;
 use App\Http\Controllers\KartuUjianController;
@@ -750,6 +751,27 @@ Route::controller(SuratKeluarController::class)
       ->middleware('role:Operator Sekolah|Tata Usaha');
     Route::delete('/pengaturan/kategori/{kategori}', 'kategoriHapus')->name('kategori.hapus')
       ->middleware('role:Operator Sekolah|Tata Usaha');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| KELOLA BOS (fitur: kelola-bos) — Fase 1
+|--------------------------------------------------------------------------
+| Tampilan read-only cermin data ARKAS: Kertas Kerja
+| (rapbs) dan BKU (kas_umum), disinkronkan agen dari laptop
+| ARKAS lewat /api/bos/sinkron. Operator Sekolah & Kepala
+| Sekolah melihat sekolahnya, Admin memantau per sekolah
+| terpilih. Tidak ada penulisan data dari halaman ini.
+*/
+Route::controller(KelolaBosController::class)
+  ->prefix('kelola-bos')
+  ->name('kelola-bos.')
+  ->middleware(['auth:sanctum', 'fitur:kelola-bos'])
+  ->group(function () {
+    Route::get('/kertas-kerja', 'kertasKerja')->name('kertas-kerja')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    Route::get('/bku', 'bku')->name('bku')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
   });
 
 /*

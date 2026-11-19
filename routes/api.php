@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\BosSinkronController;
 use App\Http\Controllers\Api\InfoApiController;
 use App\Http\Controllers\Api\JadwalApiController;
 use App\Http\Controllers\Api\PresensiApiController;
@@ -12,6 +13,21 @@ use Illuminate\Support\Facades\Route;
 Route::get('/user', function (Request $request) {
   return $request->user();
 })->middleware('auth:sanctum');
+
+/*
+|--------------------------------------------------------------------------
+| SINKRON KELOLA BOS — agen di laptop ARKAS mengirim cermin
+| data ARKAS per tabel. Otentikasi BUKAN Sanctum pengguna,
+| melainkan token sinkron per sekolah (middleware bos.token);
+| sekolah tujuan ditentukan token, bukan isi kiriman.
+|--------------------------------------------------------------------------
+*/
+Route::middleware('bos.token')
+  ->prefix('bos/sinkron')
+  ->group(function () {
+    Route::post('/{tabel}', [BosSinkronController::class, 'simpan'])
+      ->where('tabel', 'kas-umum|kas-nota|rapbs|anggaran|ref-rekening|ref-kode|ref-bku|penjab');
+  });
 
 Route::get('/validasi-skhu/{nisn}', [ValidasiKelulusan::class, 'validasiSkhu'])
   ->name('api.skhu')

@@ -25,6 +25,7 @@ class FiturSeeder extends Seeder
       ['kode' => 'presensi',        'nama' => 'Presensi Siswa',      'deskripsi' => ''],
       ['kode' => 'sistem-point',    'nama' => 'Sistem Point',        'deskripsi' => 'Sistem point siswa'],
       ['kode' => 'surat-keluar',    'nama' => 'Surat Keluar',        'deskripsi' => 'Pengelola surat keluar: agenda, penomoran otomatis, dan arsip digital'],
+      ['kode' => 'kelola-bos',      'nama' => 'Kelola BOS',          'deskripsi' => 'Cermin data ARKAS: Kertas Kerja dan BKU BOS hasil sinkronisasi dari aplikasi ARKAS sekolah'],
     ];
 
     foreach ($fiturs as $f) {

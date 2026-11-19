@@ -29,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
       'semester.session' => \App\Http\Middleware\SemesterSessionMiddleware::class,
       'semester.lock' => \App\Http\Middleware\CheckSemesterLock::class,
       'fitur' => \App\Http\Middleware\CheckFitur::class,
+      'bos.token' => \App\Http\Middleware\BosSinkronTokenMiddleware::class,
       'cek.periodik' => \App\Http\Middleware\CekDataPeriodik::class,
     ]);
   })

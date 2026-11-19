@@ -286,6 +286,42 @@
       "fitur": "surat-keluar"
     },
     {
+      "menuHeader": "Keuangan"
+    },
+    {
+      "name": "Kelola BOS",
+      "icon": "menu-icon icon-base ri ri-wallet-3-line",
+      "slug": "kelola-bos",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah"
+      ],
+      "fitur": "kelola-bos",
+      "submenu": [
+        {
+          "url": "/kelola-bos/kertas-kerja",
+          "name": "Kertas Kerja",
+          "slug": "kelola-bos.kertas-kerja",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        },
+        {
+          "url": "/kelola-bos/bku",
+          "name": "BKU",
+          "slug": "kelola-bos.bku",
+          "roles": [
+            "Admin",
+            "Operator Sekolah",
+            "Kepala Sekolah"
+          ]
+        }
+      ]
+    },
+    {
       "menuHeader": "Pengaturan"
     },
     {
