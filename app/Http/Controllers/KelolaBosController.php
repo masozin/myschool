@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\BosAnggaran;
 use App\Models\BosKasUmum;
 use App\Models\BosRapbs;
+use App\Models\BosRapbsPeriode;
 use App\Models\BosRefAcuanBarang;
 use App\Models\BosRefBku;
 use App\Models\BosRefKode;
@@ -17,17 +18,27 @@ use Illuminate\Support\Facades\Auth;
 /**
  * Kelola BOS (fitur: kelola-bos) — tampilan read-only cermin
  * data ARKAS. Halaman: Kertas Kerja (bos_rapbs, dengan
- * pemilih versi RKAS), BKU (bos_kas_umum), Perbandingan
- * Versi (selisih dua versi kertas kerja — lembar kerja
- * pergeseran), dan Referensi kode (barang/kegiatan/
- * rekening). Data TIDAK diubah dari sini; ia datang dari
- * agen sinkron di laptop ARKAS.
+ * pemilih versi RKAS serta — Fase 1.6 — jadwal bulanan dari
+ * bos_rapbs_periode dan status realisasi BKU per baris), BKU
+ * (bos_kas_umum), Perbandingan Versi (selisih dua versi
+ * kertas kerja — lembar kerja pergeseran), dan Referensi
+ * kode (barang/kegiatan/rekening). Data TIDAK diubah dari
+ * sini; ia datang dari agen sinkron di laptop ARKAS.
  *
  * Operator Sekolah & Kepala Sekolah melihat sekolahnya;
  * Admin memantau lewat pemilih sekolah (pola Surat Keluar).
  */
 class KelolaBosController extends Controller
 {
+  /** Nama bulan untuk pemilih jadwal (id_periode ARKAS 81–92). */
+  private const NAMA_BULAN = [
+    1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+
+  /** Jenis BKU belanja (Kas Keluar dkk.) untuk realisasi. */
+  private const JENIS_BELANJA = [4, 15, 24, 35];
+
   /** Konteks sekolah aktif (pola yang sama dengan Surat Keluar). */
   private function sekolahKonteksIdNullable(): ?int
   {
@@ -215,6 +226,11 @@ class KelolaBosController extends Controller
         'daftarSumberDana' => collect(),
         'daftarKegiatan' => collect(),
         'daftarVersi' => [],
+        'daftarBulan' => self::NAMA_BULAN,
+        'bulan' => (int) now()->format('n'),
+        'mode' => 'kumulatif',
+        'statusFilter' => '',
+        'kartu' => ['terjadwal' => 0.0, 'realisasi' => 0.0, 'sisa' => 0.0],
         'urut' => 'kegiatan',
         'arah' => 'asc',
       ]);
@@ -223,6 +239,23 @@ class KelolaBosController extends Controller
     $tahunReq = $request->filled('tahun') ? $request->integer('tahun') : null;
     $sumberReq = $request->filled('sumber_dana') ? $request->integer('sumber_dana') : null;
     $versiParam = $request->filled('versi') ? (string) $request->input('versi') : null;
+
+    // ── Jadwal & status realisasi (Fase 1.6) ──
+    // Bulan bawaan mengikuti tahun yang dipilih: tahun
+    // berjalan → bulan ini, tahun lampau → Desember,
+    // tahun depan → Januari.
+    $tahunIni = (int) now()->format('Y');
+    $tahunAcuan = $tahunReq ?? $tahunIni;
+    $bulanBawaan = $tahunAcuan === $tahunIni
+      ? (int) now()->format('n')
+      : ($tahunAcuan < $tahunIni ? 12 : 1);
+    $bulan = $request->filled('bulan')
+      ? max(1, min(12, $request->integer('bulan')))
+      : $bulanBawaan;
+    $mode = $request->input('mode') === 'bulan' ? 'bulan' : 'kumulatif';
+    $statusFilter = in_array($request->input('status'), ['sudah', 'sebagian', 'belum', 'belum_terjadwal'], true)
+      ? (string) $request->input('status')
+      : '';
 
     $kelompok = $this->kelompokVersi($sekolahId);
     $idsUtama = $this->pilihVersiIds($kelompok, $tahunReq, $sumberReq, $versiParam);
@@ -273,7 +306,72 @@ class KelolaBosController extends Controller
       return $q;
     };
 
+    // ── Agregat jadwal & realisasi per baris (Fase 1.6) ──
+    // Jadwal: jumlah bos_rapbs_periode (baris bulanan saja,
+    // id_periode 81–92; baris Triwulan 1–4 diabaikan untuk
+    // tampilan bulanan) milik baris rapbs ini. Mode
+    // kumulatif menjumlah Januari s.d. bulan pilihan, mode
+    // bulan hanya bulan pilihan itu.
+    // Realisasi: saldo BKU belanja (jenis 4/15/24/35) yang
+    // terhubung ke baris periode milik baris rapbs ini
+    // lewat bos_kas_umum.id_rapbs_periode — jadi realisasi
+    // selalu menempel ke versi tempat BKU diinput di ARKAS.
+    $periodeDari = $mode === 'bulan' ? 80 + $bulan : 81;
+    $periodeSampai = 80 + $bulan;
+
+    $buatSubJadwal = fn() => BosRapbsPeriode::query()
+      ->select('sekolah_id', 'id_rapbs_arkas')
+      ->selectRaw('SUM(jumlah) as jadwal')
+      ->where('soft_delete', false)
+      ->whereBetween('id_periode', [$periodeDari, $periodeSampai])
+      ->groupBy('sekolah_id', 'id_rapbs_arkas');
+
+    $buatSubRealisasi = fn() => BosKasUmum::query()
+      ->from('bos_kas_umum as bku16')
+      ->join('bos_rapbs_periode as per16', function ($j) {
+        $j->on('per16.id_arkas', '=', 'bku16.id_rapbs_periode')
+          ->on('per16.sekolah_id', '=', 'bku16.sekolah_id');
+      })
+      ->select('per16.sekolah_id', 'per16.id_rapbs_arkas')
+      ->selectRaw('SUM(bku16.saldo) as realisasi')
+      ->where('bku16.soft_delete', false)
+      ->whereIn('bku16.id_ref_bku', self::JENIS_BELANJA)
+      ->whereNotNull('bku16.id_rapbs_periode')
+      ->groupBy('per16.sekolah_id', 'per16.id_rapbs_arkas');
+
+    $denganAgg = function ($q) use ($buatSubJadwal, $buatSubRealisasi) {
+      return $q
+        ->leftJoinSub($buatSubJadwal(), 'jad', function ($j) {
+          $j->on('jad.id_rapbs_arkas', '=', 'bos_rapbs.id_arkas')
+            ->on('jad.sekolah_id', '=', 'bos_rapbs.sekolah_id');
+        })
+        ->leftJoinSub($buatSubRealisasi(), 'rea', function ($j) {
+          $j->on('rea.id_rapbs_arkas', '=', 'bos_rapbs.id_arkas')
+            ->on('rea.sekolah_id', '=', 'bos_rapbs.sekolah_id');
+        });
+    };
+
+    // Kelas status per baris dari jadwal & realisasi.
+    $kasusStatus = "CASE
+      WHEN COALESCE(jad.jadwal, 0) > 0 AND COALESCE(rea.realisasi, 0) >= COALESCE(jad.jadwal, 0) THEN 'sudah'
+      WHEN COALESCE(rea.realisasi, 0) > 0 AND COALESCE(rea.realisasi, 0) < COALESCE(jad.jadwal, 0) THEN 'sebagian'
+      WHEN COALESCE(rea.realisasi, 0) = 0 AND COALESCE(jad.jadwal, 0) > 0 THEN 'belum'
+      ELSE 'belum_terjadwal' END";
+
     $totalJumlah = (float) $saring($dasar(), $idsUtama)->sum('bos_rapbs.jumlah');
+
+    // Kartu ringkasan jadwal/realisasi: cakupan sama dengan
+    // tabel (versi, kegiatan, pencarian) tetapi TANPA
+    // saringan status — status adalah saringan tampilan
+    // atas kolom hitungan ini, bukan cakupan datanya.
+    $aggKartu = $denganAgg($saring($dasar(), $idsUtama))
+      ->selectRaw('COALESCE(SUM(jad.jadwal), 0) as terjadwal, COALESCE(SUM(rea.realisasi), 0) as realisasi')
+      ->first();
+    $kartu = [
+      'terjadwal' => (float) ($aggKartu->terjadwal ?? 0),
+      'realisasi' => (float) ($aggKartu->realisasi ?? 0),
+    ];
+    $kartu['sisa'] = $kartu['terjadwal'] - $kartu['realisasi'];
 
     // Ringkasan per sumber dana: saringan yang sama kecuali
     // saringan sumber dana itu sendiri.
@@ -290,12 +388,16 @@ class KelolaBosController extends Controller
       'volume' => 'bos_rapbs.volume',
       'harga' => 'bos_rapbs.harga_satuan',
       'jumlah' => 'bos_rapbs.jumlah',
+      'jadwal' => 'jadwal',
+      'realisasi' => 'realisasi',
+      'sisa' => 'sisa',
     ];
     $urut = $kolomUrut[$request->input('urut')] ?? null;
     $urutKunci = $urut ? $request->input('urut') : 'kegiatan';
     $arah = $this->arah($request);
 
-    $baris = $saring($dasar(), $idsUtama)
+    $baris = $denganAgg($saring($dasar(), $idsUtama))
+      ->when($statusFilter !== '', fn($x) => $x->whereRaw("({$kasusStatus}) = ?", [$statusFilter]))
       ->select([
         'bos_rapbs.*',
         'bos_anggaran.tahun_anggaran',
@@ -304,6 +406,9 @@ class KelolaBosController extends Controller
         'bos_ref_kode.uraian_kode as nama_kegiatan',
       ])
       ->selectRaw('bos_ref_rekening.nama_rekening as nama_rekening')
+      ->selectRaw('COALESCE(jad.jadwal, 0) as jadwal, COALESCE(rea.realisasi, 0) as realisasi')
+      ->selectRaw('COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0) as sisa')
+      ->selectRaw($kasusStatus . ' as status_kelas')
       ->orderBy($urut ?? 'bos_ref_kode.uraian_kode', $urut ? $arah : 'asc')
       ->orderBy('bos_rapbs.kode_rekening')
       ->orderBy('bos_rapbs.urutan')
@@ -330,6 +435,11 @@ class KelolaBosController extends Controller
       'daftarSumberDana' => $this->daftarSumberDana($sekolahId),
       'daftarKegiatan' => $daftarKegiatan,
       'daftarVersi' => $this->pilihanVersi($kelompok, $tahunReq, $sumberReq),
+      'daftarBulan' => self::NAMA_BULAN,
+      'bulan' => $bulan,
+      'mode' => $mode,
+      'statusFilter' => $statusFilter,
+      'kartu' => $kartu,
       'urut' => $urutKunci,
       'arah' => $arah,
     ]);

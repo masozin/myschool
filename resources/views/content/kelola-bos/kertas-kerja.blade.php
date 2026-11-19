@@ -52,6 +52,48 @@
       </div>
     </div>
 
+    {{-- Kartu ringkasan anggaran, jadwal & realisasi (Fase 1.6) --}}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Total Anggaran (versi terpilih)</div>
+            <div class="fw-semibold">Rp {{ number_format($totalJumlah, 0, ',', '.') }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Terjadwal
+              {{ $mode === 'bulan' ? $daftarBulan[$bulan] : 's.d. ' . $daftarBulan[$bulan] }}</div>
+            <div class="fw-semibold">Rp {{ number_format($kartu['terjadwal'], 0, ',', '.') }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Realisasi BKU</div>
+            <div class="fw-semibold">Rp {{ number_format($kartu['realisasi'], 0, ',', '.') }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Sisa (Terjadwal − Realisasi)</div>
+            <div class="fw-semibold">Rp {{ number_format($kartu['sisa'], 0, ',', '.') }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Realisasi terhubung ke
+          versi tempat BKU diinput (umumnya versi yang aktif saat belanja dicatat) — baris pada versi lain bisa
+          tampak belum terealisasi walau belanjanya sudah dicatat di BKU.</div>
+      </div>
+    </div>
+
     {{-- Ringkasan per sumber dana --}}
     @if ($ringkasan->isNotEmpty())
       <div class="row g-3 mb-4">
@@ -106,6 +148,33 @@
               </select>
             </div>
           @endif
+          <div class="col-6 col-md-2">
+            <label class="form-label">Bulan Jadwal</label>
+            <select name="bulan" class="form-select">
+              @foreach ($daftarBulan as $angkaBulan => $namaBulan)
+                <option value="{{ $angkaBulan }}" {{ $bulan === $angkaBulan ? 'selected' : '' }}>{{ $namaBulan }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label">Mode Jadwal</label>
+            <select name="mode" class="form-select">
+              <option value="kumulatif" {{ $mode === 'kumulatif' ? 'selected' : '' }}>Kumulatif s.d. bulan</option>
+              <option value="bulan" {{ $mode === 'bulan' ? 'selected' : '' }}>Bulan ini saja</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label">Status BKU</label>
+            <select name="status" class="form-select">
+              <option value="" {{ $statusFilter === '' ? 'selected' : '' }}>Semua status</option>
+              <option value="sudah" {{ $statusFilter === 'sudah' ? 'selected' : '' }}>Sudah Masuk BKU</option>
+              <option value="sebagian" {{ $statusFilter === 'sebagian' ? 'selected' : '' }}>Sebagian</option>
+              <option value="belum" {{ $statusFilter === 'belum' ? 'selected' : '' }}>Belum Masuk BKU</option>
+              <option value="belum_terjadwal" {{ $statusFilter === 'belum_terjadwal' ? 'selected' : '' }}>Belum
+                Terjadwal</option>
+            </select>
+          </div>
           <div class="col-12 col-md-3">
             <label class="form-label">Kegiatan</label>
             <select name="kegiatan" class="form-select">
@@ -150,6 +219,10 @@
               <th>Satuan</th>
               <th class="text-end">{!! $kepala('harga', 'Harga Satuan') !!}</th>
               <th class="text-end">{!! $kepala('jumlah', 'Jumlah') !!}</th>
+              <th class="text-end">{!! $kepala('jadwal', 'Jadwal') !!}</th>
+              <th class="text-end">{!! $kepala('realisasi', 'Realisasi BKU') !!}</th>
+              <th class="text-end">{!! $kepala('sisa', 'Sisa') !!}</th>
+              <th>Status BKU</th>
               <th>Rincian Tahap</th>
             </tr>
           </thead>
@@ -169,6 +242,20 @@
                 <td>{{ $b->satuan }}</td>
                 <td class="text-end">{{ number_format($b->harga_satuan, 0, ',', '.') }}</td>
                 <td class="text-end fw-semibold">{{ number_format($b->jumlah, 0, ',', '.') }}</td>
+                <td class="text-end">{{ number_format($b->jadwal, 0, ',', '.') }}</td>
+                <td class="text-end">{{ number_format($b->realisasi, 0, ',', '.') }}</td>
+                <td class="text-end">{{ number_format($b->sisa, 0, ',', '.') }}</td>
+                <td>
+                  @php
+                    $lencana = [
+                        'sudah' => ['bg-label-success', 'Sudah Masuk BKU'],
+                        'sebagian' => ['bg-label-warning', 'Sebagian'],
+                        'belum' => ['bg-label-danger', 'Belum Masuk BKU'],
+                        'belum_terjadwal' => ['bg-label-secondary', 'Belum Terjadwal'],
+                    ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
+                  @endphp
+                  <span class="badge {{ $lencana[0] }}">{{ $lencana[1] }}</span>
+                </td>
                 <td class="small text-muted">
                   @php $tahap = collect([1 => $b->v1, 2 => $b->v2, 3 => $b->v3, 4 => $b->v4])->filter(fn($v) => $v !== null); @endphp
                   @if ($tahap->isEmpty())
@@ -182,7 +269,7 @@
               </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center text-muted py-4">Tidak ada baris kertas kerja yang cocok dengan
+                <td colspan="12" class="text-center text-muted py-4">Tidak ada baris kertas kerja yang cocok dengan
                   saringan ini.</td>
               </tr>
             @endforelse
@@ -191,7 +278,10 @@
             <tr>
               <td colspan="6" class="text-end fw-semibold">Total sesuai saringan</td>
               <td class="text-end fw-bold">Rp {{ number_format($totalJumlah, 0, ',', '.') }}</td>
-              <td></td>
+              <td class="text-end fw-bold">Rp {{ number_format($kartu['terjadwal'], 0, ',', '.') }}</td>
+              <td class="text-end fw-bold">Rp {{ number_format($kartu['realisasi'], 0, ',', '.') }}</td>
+              <td class="text-end fw-bold">Rp {{ number_format($kartu['sisa'], 0, ',', '.') }}</td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>

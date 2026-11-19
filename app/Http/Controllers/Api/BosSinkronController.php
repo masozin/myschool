@@ -8,9 +8,11 @@ use App\Models\BosKasNota;
 use App\Models\BosKasUmum;
 use App\Models\BosPenjab;
 use App\Models\BosRapbs;
+use App\Models\BosRapbsPeriode;
 use App\Models\BosRefAcuanBarang;
 use App\Models\BosRefBku;
 use App\Models\BosRefKode;
+use App\Models\BosRefPeriode;
 use App\Models\BosRefRekening;
 use App\Models\BosRefSatuan;
 use App\Models\BosSinkronLog;
@@ -23,7 +25,7 @@ use Illuminate\Http\Request;
  *
  * Agen di laptop ARKAS mengirim baris-baris cermin per tabel:
  *   POST /api/bos/sinkron/{tabel}
- *   { "agen_versi": "3.0.0", "baris": [ { "id_arkas": "...", ... } ] }
+ *   { "agen_versi": "4.0.0", "baris": [ { "id_arkas": "...", ... } ] }
  *
  * Setiap baris di-upsert berdasarkan (sekolah_id, id_arkas);
  * sekolah_id TIDAK dipercaya dari kiriman — ia berasal dari
@@ -47,6 +49,8 @@ class BosSinkronController extends Controller
     'kas-umum' => BosKasUmum::class,
     'kas-nota' => BosKasNota::class,
     'rapbs' => BosRapbs::class,
+    'rapbs-periode' => BosRapbsPeriode::class,
+    'ref-periode' => BosRefPeriode::class,
     'anggaran' => BosAnggaran::class,
     'ref-rekening' => BosRefRekening::class,
     'ref-kode' => BosRefKode::class,

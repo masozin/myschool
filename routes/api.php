@@ -26,7 +26,7 @@ Route::middleware('bos.token')
   ->prefix('bos/sinkron')
   ->group(function () {
     Route::post('/{tabel}', [BosSinkronController::class, 'simpan'])
-      ->where('tabel', 'kas-umum|kas-nota|rapbs|anggaran|ref-rekening|ref-kode|ref-bku|ref-acuan-barang|ref-satuan|penjab');
+      ->where('tabel', 'kas-umum|kas-nota|rapbs|rapbs-periode|anggaran|ref-rekening|ref-kode|ref-bku|ref-acuan-barang|ref-satuan|ref-periode|penjab');
   });
 
 Route::get('/validasi-skhu/{nisn}', [ValidasiKelulusan::class, 'validasiSkhu'])
