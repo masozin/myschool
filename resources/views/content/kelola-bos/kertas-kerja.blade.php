@@ -63,7 +63,11 @@
       </div>
     </div>
 
-    {{-- Kartu ringkasan anggaran, jadwal & realisasi (Fase 1.6) --}}
+    {{-- Kartu ringkasan anggaran, jadwal & realisasi (Fase 1.6, tiga tampilan Fase 1.8) --}}
+    @php
+      $labelPotong =
+          $bulanPotong >= 1 ? 's.d. ' . $daftarBulan[$bulanPotong] : '(belum ada bulan berjalan)';
+    @endphp
     <div class="row g-3 mb-4">
       <div class="col-6 col-md-3">
         <div class="card h-100">
@@ -76,9 +80,13 @@
       <div class="col-6 col-md-3">
         <div class="card h-100">
           <div class="card-body py-3">
-            <div class="text-muted small">Terjadwal
-              {{ $mode === 'bulan' ? $daftarBulan[$bulan] : 's.d. ' . $daftarBulan[$bulan] }}</div>
-            <div class="fw-semibold">Rp {{ number_format($kartu['terjadwal'], 0, ',', '.') }}</div>
+            @if ($tampilan === 'rencana')
+              <div class="text-muted small">Total Rencana {{ $daftarBulan[$bulan] }} {{ $tahunAcuan }}</div>
+              <div class="fw-semibold">Rp {{ number_format($totalRencana, 0, ',', '.') }}</div>
+            @else
+              <div class="text-muted small">Terjadwal {{ $labelPotong }}</div>
+              <div class="fw-semibold">Rp {{ number_format($kartu['terjadwal'], 0, ',', '.') }}</div>
+            @endif
           </div>
         </div>
       </div>
@@ -93,7 +101,13 @@
       <div class="col-6 col-md-3">
         <div class="card h-100">
           <div class="card-body py-3">
-            <div class="text-muted small">Sisa (Terjadwal − Realisasi)</div>
+            @if ($tampilan === 'belanja')
+              <div class="text-muted small">Bisa Dibelanjakan</div>
+            @elseif ($tampilan === 'rencana')
+              <div class="text-muted small">Belum Dibelanjakan (Rencana − Realisasi)</div>
+            @else
+              <div class="text-muted small">Sisa (Terjadwal − Realisasi)</div>
+            @endif
             <div class="fw-semibold">Rp {{ number_format($kartu['sisa'], 0, ',', '.') }}</div>
           </div>
         </div>
@@ -102,10 +116,23 @@
         <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Realisasi terhubung ke
           versi tempat BKU diinput (umumnya versi yang aktif saat belanja dicatat) — baris pada versi lain bisa
           tampak belum terealisasi walau belanjanya sudah dicatat di BKU.</div>
-        <div class="text-muted small mt-1"><i class="icon-base ri ri-information-line me-1"></i>Pada mode
-          Kumulatif, status membandingkan jadwal Januari s.d. bulan terpilih dengan seluruh realisasi BKU baris
-          ini — realisasi dapat berasal dari bulan-bulan sebelumnya. Pada mode Bulan ini saja, yang dibandingkan
-          hanya jadwal bulan terpilih dengan realisasi yang terhubung ke bulan itu.</div>
+        @if ($tampilan === 'posisi')
+          <div class="text-muted small mt-1"><i class="icon-base ri ri-information-line me-1"></i>Posisi
+            s.d. {{ $bulanPotong >= 1 ? $daftarBulan[$bulanPotong] : '—' }} {{ $tahunAcuan }}: status
+            membandingkan jadwal Januari s.d. bulan ini dengan seluruh realisasi BKU baris ini — realisasi dapat
+            berasal dari bulan-bulan sebelumnya. Baris yang jadwalnya baru mulai setelah bulan ini berstatus
+            Belum Terjadwal.</div>
+        @elseif ($tampilan === 'belanja')
+          <div class="text-muted small mt-1"><i class="icon-base ri ri-information-line me-1"></i>Daftar kerja:
+            hanya baris yang terjadwal s.d. {{ $bulanPotong >= 1 ? $daftarBulan[$bulanPotong] : '—' }}
+            {{ $tahunAcuan }} dan masih punya sisa — termasuk tunggakan bulan-bulan lalu yang belum masuk BKU.
+            Kolom Tertua Belum Lunas menunjukkan bulan jadwal paling awal yang belum lunas pada baris itu.</div>
+        @else
+          <div class="text-muted small mt-1"><i class="icon-base ri ri-information-line me-1"></i>Rencana
+            anggaran bulan {{ $daftarBulan[$bulan] }} {{ $tahunAcuan }}: hanya baris yang punya jadwal di bulan
+            ini. Tandanya mengikuti pembayaran yang terhubung ke jadwal bulan tersebut — jadwal bulan lalu boleh
+            dibayar terlambat, jadwal bulan depan tidak bisa dibayar lebih dulu.</div>
+        @endif
       </div>
     </div>
 
@@ -126,10 +153,27 @@
       </div>
     @endif
 
+    {{-- Pengalih tiga tampilan (Fase 1.8) --}}
+    @php
+      $queryDasar = request()->only(['sekolah_id', 'tahun', 'sumber_dana', 'versi', 'kegiatan', 'cari']);
+      $tabTampilan = [
+          'posisi' => 'Posisi s.d. Bulan Ini',
+          'belanja' => 'Bisa Dibelanjakan',
+          'rencana' => 'Rencana Bulanan',
+      ];
+    @endphp
+    <div class="btn-group mb-4" role="group" aria-label="Tampilan kertas kerja">
+      @foreach ($tabTampilan as $kunciTab => $labelTab)
+        <a href="{{ url('/kelola-bos/kertas-kerja') . '?' . http_build_query($queryDasar + ['tampilan' => $kunciTab]) }}"
+          class="btn {{ $tampilan === $kunciTab ? 'btn-primary' : 'btn-outline-primary' }}">{{ $labelTab }}</a>
+      @endforeach
+    </div>
+
     {{-- Saringan --}}
     <div class="card mb-4">
       <div class="card-body py-3">
         <form method="GET" action="{{ url('/kelola-bos/kertas-kerja') }}" class="row g-3 align-items-end">
+          <input type="hidden" name="tampilan" value="{{ $tampilan }}">
           <div class="col-6 col-md-2">
             <label class="form-label">Tahun Anggaran</label>
             <select name="tahun" class="form-select">
@@ -163,33 +207,40 @@
               </select>
             </div>
           @endif
-          <div class="col-6 col-md-2">
-            <label class="form-label">Bulan Jadwal</label>
-            <select name="bulan" class="form-select">
-              @foreach ($daftarBulan as $angkaBulan => $namaBulan)
-                <option value="{{ $angkaBulan }}" {{ $bulan === $angkaBulan ? 'selected' : '' }}>{{ $namaBulan }}
-                </option>
-              @endforeach
-            </select>
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label">Mode Jadwal</label>
-            <select name="mode" class="form-select">
-              <option value="kumulatif" {{ $mode === 'kumulatif' ? 'selected' : '' }}>Kumulatif s.d. bulan</option>
-              <option value="bulan" {{ $mode === 'bulan' ? 'selected' : '' }}>Bulan ini saja</option>
-            </select>
-          </div>
-          <div class="col-6 col-md-2">
-            <label class="form-label">Status BKU</label>
-            <select name="status" class="form-select">
-              <option value="" {{ $statusFilter === '' ? 'selected' : '' }}>Semua status</option>
-              <option value="sudah" {{ $statusFilter === 'sudah' ? 'selected' : '' }}>Sudah Masuk BKU</option>
-              <option value="sebagian" {{ $statusFilter === 'sebagian' ? 'selected' : '' }}>Sebagian</option>
-              <option value="belum" {{ $statusFilter === 'belum' ? 'selected' : '' }}>Belum Masuk BKU</option>
-              <option value="belum_terjadwal" {{ $statusFilter === 'belum_terjadwal' ? 'selected' : '' }}>Belum
-                Terjadwal</option>
-            </select>
-          </div>
+          @if ($tampilan === 'rencana')
+            <div class="col-6 col-md-2">
+              <label class="form-label">Bulan Rencana</label>
+              <select name="bulan" class="form-select">
+                @foreach ($daftarBulan as $angkaBulan => $namaBulan)
+                  <option value="{{ $angkaBulan }}" {{ $bulan === $angkaBulan ? 'selected' : '' }}>{{ $namaBulan }}
+                  </option>
+                @endforeach
+              </select>
+            </div>
+          @endif
+          @if ($tampilan === 'posisi')
+            <div class="col-6 col-md-2">
+              <label class="form-label">Status BKU</label>
+              <select name="status" class="form-select">
+                <option value="" {{ $statusFilter === '' ? 'selected' : '' }}>Semua status</option>
+                <option value="sudah" {{ $statusFilter === 'sudah' ? 'selected' : '' }}>Sudah Masuk BKU</option>
+                <option value="sebagian" {{ $statusFilter === 'sebagian' ? 'selected' : '' }}>Sebagian</option>
+                <option value="belum" {{ $statusFilter === 'belum' ? 'selected' : '' }}>Belum Masuk BKU</option>
+                <option value="belum_terjadwal" {{ $statusFilter === 'belum_terjadwal' ? 'selected' : '' }}>Belum
+                  Terjadwal</option>
+              </select>
+            </div>
+          @elseif ($tampilan === 'rencana')
+            <div class="col-6 col-md-2">
+              <label class="form-label">Tanda Belanja</label>
+              <select name="status" class="form-select">
+                <option value="" {{ $statusFilter === '' ? 'selected' : '' }}>Semua tanda</option>
+                <option value="sudah" {{ $statusFilter === 'sudah' ? 'selected' : '' }}>Sudah Dibelanjakan</option>
+                <option value="sebagian" {{ $statusFilter === 'sebagian' ? 'selected' : '' }}>Sebagian</option>
+                <option value="belum" {{ $statusFilter === 'belum' ? 'selected' : '' }}>Belum Dibelanjakan</option>
+              </select>
+            </div>
+          @endif
           <div class="col-12 col-md-3">
             <label class="form-label">Kegiatan</label>
             <select name="kegiatan" class="form-select">
@@ -237,7 +288,10 @@
               <th class="text-end">{!! $kepala('jadwal', 'Jadwal') !!}</th>
               <th class="text-end">{!! $kepala('realisasi', 'Realisasi BKU') !!}</th>
               <th class="text-end">{!! $kepala('sisa', 'Sisa') !!}</th>
-              <th>Status BKU</th>
+              @if ($tampilan === 'belanja')
+                <th>{!! $kepala('tertua', 'Tertua Belum Lunas') !!}</th>
+              @endif
+              <th>{{ $tampilan === 'rencana' ? 'Status Belanja' : 'Status BKU' }}</th>
               <th>Rincian Tahap</th>
             </tr>
           </thead>
@@ -269,18 +323,35 @@
                 <td class="text-end">{{ number_format($b->jadwal, 0, ',', '.') }}</td>
                 <td class="text-end">{{ number_format($b->realisasi, 0, ',', '.') }}</td>
                 <td class="text-end">{{ number_format($b->sisa, 0, ',', '.') }}</td>
+                @if ($tampilan === 'belanja')
+                  <td>{{ $b->tertua_periode ? $daftarBulan[$b->tertua_periode - 80] : '-' }}</td>
+                @endif
                 <td>
                   @php
-                    $lencana = [
-                        'sudah' => ['bg-label-success', 'Sudah Masuk BKU'],
-                        'sebagian' => ['bg-label-warning', 'Sebagian'],
-                        'belum' => ['bg-label-danger', 'Belum Masuk BKU'],
-                        'belum_terjadwal' => ['bg-label-secondary', 'Belum Terjadwal'],
-                    ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
+                    if ($tampilan === 'rencana') {
+                        $lencana = [
+                            'sudah' => ['bg-label-success', 'Sudah Dibelanjakan'],
+                            'sebagian' => ['bg-label-warning', 'Sebagian'],
+                            'belum' => ['bg-label-danger', 'Belum Dibelanjakan'],
+                            'belum_terjadwal' => ['bg-label-secondary', 'Belum Dibelanjakan'],
+                        ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
+                    } elseif ($tampilan === 'belanja') {
+                        $lencana = [
+                            'sebagian' => ['bg-label-warning', 'Sebagian'],
+                            'belum' => ['bg-label-danger', 'Belum Masuk BKU'],
+                        ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
+                    } else {
+                        $lencana = [
+                            'sudah' => ['bg-label-success', 'Sudah Masuk BKU'],
+                            'sebagian' => ['bg-label-warning', 'Sebagian'],
+                            'belum' => ['bg-label-danger', 'Belum Masuk BKU'],
+                            'belum_terjadwal' => ['bg-label-secondary', 'Belum Terjadwal'],
+                        ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
+                    }
                   @endphp
                   <span class="badge {{ $lencana[0] }}">{{ $lencana[1] }}</span>
                   @if ($b->realisasi_terakhir)
-                    <div class="small text-muted mt-1">terakhir:
+                    <div class="small text-muted mt-1">{{ $tampilan === 'rencana' ? 'dibayar terakhir: ' : 'terakhir: ' }}
                       {{ \Carbon\Carbon::parse($b->realisasi_terakhir)->locale('id')->translatedFormat('d M Y') }}
                     </div>
                   @endif
@@ -298,7 +369,8 @@
               </tr>
             @empty
               <tr>
-                <td colspan="12" class="text-center text-muted py-4">Tidak ada baris kertas kerja yang cocok dengan
+                <td colspan="{{ $tampilan === 'belanja' ? 13 : 12 }}" class="text-center text-muted py-4">Tidak ada
+                  baris kertas kerja yang cocok dengan
                   saringan ini.</td>
               </tr>
             @endforelse
@@ -310,7 +382,7 @@
               <td class="text-end fw-bold">Rp {{ number_format($kartu['terjadwal'], 0, ',', '.') }}</td>
               <td class="text-end fw-bold">Rp {{ number_format($kartu['realisasi'], 0, ',', '.') }}</td>
               <td class="text-end fw-bold">Rp {{ number_format($kartu['sisa'], 0, ',', '.') }}</td>
-              <td colspan="2"></td>
+              <td colspan="{{ $tampilan === 'belanja' ? 3 : 2 }}"></td>
             </tr>
           </tfoot>
         </table>

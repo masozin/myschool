@@ -292,7 +292,10 @@ class KelolaBosController extends Controller
         'daftarVersi' => [],
         'daftarBulan' => self::NAMA_BULAN,
         'bulan' => (int) now()->format('n'),
-        'mode' => 'kumulatif',
+        'bulanPotong' => (int) now()->format('n'),
+        'tahunAcuan' => (int) now()->format('Y'),
+        'tampilan' => 'posisi',
+        'totalRencana' => 0,
         'statusFilter' => '',
         'kartu' => ['terjadwal' => 0.0, 'realisasi' => 0.0, 'sisa' => 0.0],
         'urut' => 'kegiatan',
@@ -306,22 +309,54 @@ class KelolaBosController extends Controller
     $sumberReq = $request->filled('sumber_dana') ? $request->integer('sumber_dana') : null;
     $versiParam = $request->filled('versi') ? (string) $request->input('versi') : null;
 
-    // ── Jadwal & status realisasi (Fase 1.6) ──
-    // Bulan bawaan mengikuti tahun yang dipilih: tahun
-    // berjalan → bulan ini, tahun lampau → Desember,
-    // tahun depan → Januari.
+    // ── Tiga tampilan Kertas Kerja (Fase 1.8) ──
+    // Halaman ini punya tiga tampilan:
+    //  - posisi  : "Posisi s.d. Bulan Ini" — semantik
+    //    kumulatif Fase 1.6, tetapi titik potong bulannya
+    //    OTOMATIS: tahun berjalan → bulan ini, tahun
+    //    lampau → Desember, tahun depan → belum ada
+    //    bulan berjalan (potong 0). Tanpa pemilih bulan.
+    //  - belanja : "Bisa Dibelanjakan" — agregat kumulatif
+    //    yang sama dengan titik potong yang sama, tetapi
+    //    hanya baris yang masih punya sisa untuk
+    //    dibelanjakan (jadwal kumulatif > 0 dan sisa > 0),
+    //    termasuk tunggakan bulan-bulan lalu yang belum
+    //    masuk BKU.
+    //  - rencana : "Rencana Bulanan" — satu-satunya
+    //    tampilan berpemilih bulan: rencana anggaran bulan
+    //    pilihan (bulan depan, bulan-bulan berikutnya,
+    //    maupun bulan yang sudah lewat) dengan tanda
+    //    sudah/belum dibelanjakan per baris.
+    $tampilan = in_array($request->input('tampilan'), ['posisi', 'belanja', 'rencana'], true)
+      ? (string) $request->input('tampilan')
+      : 'posisi';
+
     $tahunIni = (int) now()->format('Y');
     $tahunAcuan = $tahunReq ?? $tahunIni;
-    $bulanBawaan = $tahunAcuan === $tahunIni
+    $bulanPotong = $tahunAcuan === $tahunIni
       ? (int) now()->format('n')
-      : ($tahunAcuan < $tahunIni ? 12 : 1);
-    $bulan = $request->filled('bulan')
-      ? max(1, min(12, $request->integer('bulan')))
-      : $bulanBawaan;
-    $mode = $request->input('mode') === 'bulan' ? 'bulan' : 'kumulatif';
+      : ($tahunAcuan < $tahunIni ? 12 : 0);
+
+    if ($tampilan === 'rencana') {
+      $bulanBawaan = $tahunAcuan === $tahunIni
+        ? min((int) now()->format('n') + 1, 12)
+        : 1;
+      $bulan = $request->filled('bulan')
+        ? max(1, min(12, $request->integer('bulan')))
+        : $bulanBawaan;
+    } else {
+      $bulan = $bulanPotong;
+    }
+
     $statusFilter = in_array($request->input('status'), ['sudah', 'sebagian', 'belum', 'belum_terjadwal'], true)
       ? (string) $request->input('status')
       : '';
+    if ($tampilan === 'belanja') {
+      // Pada tampilan belanja status tersirat dari
+      // saringannya sendiri (masih ada sisa) — saringan
+      // status disembunyikan dan tidak diterapkan.
+      $statusFilter = '';
+    }
 
     $kelompok = $this->kelompokVersi($sekolahId);
     $idsUtama = $this->pilihVersiIds($kelompok, $tahunReq, $sumberReq, $versiParam);
@@ -372,27 +407,33 @@ class KelolaBosController extends Controller
       return $q;
     };
 
-    // ── Agregat jadwal & realisasi per baris (Fase 1.6) ──
+    // ── Agregat jadwal & realisasi per baris ──
     // Jadwal: jumlah bos_rapbs_periode (baris bulanan saja,
     // id_periode 81–92; baris Triwulan 1–4 diabaikan untuk
-    // tampilan bulanan) milik baris rapbs ini. Mode
-    // kumulatif menjumlah Januari s.d. bulan pilihan, mode
-    // bulan hanya bulan pilihan itu.
+    // tampilan bulanan) milik baris rapbs ini. Tampilan
+    // posisi & belanja menjumlah Januari s.d. bulan potong
+    // otomatis; tampilan rencana hanya bulan pilihannya.
     // Realisasi: saldo BKU belanja (jenis 4/15/24/35) yang
     // terhubung ke baris periode milik baris rapbs ini
     // lewat bos_kas_umum.id_rapbs_periode — jadi realisasi
     // selalu menempel ke versi tempat BKU diinput di ARKAS.
-    // Atribusi bulannya mengikuti mode (Fase 1.7): setiap
-    // pembayaran BKU menempel ke SATU baris periode bulanan
-    // tertentu, jadi pada mode "bulan ini saja" realisasi
-    // hanya menjumlah pembayaran yang terhubung ke baris
-    // periode bulan pilihan (jadwal bulan mundur boleh
-    // dibayar terlambat; jadwal bulan depan tidak bisa
-    // dibayar lebih dulu). Pada mode kumulatif realisasi
-    // adalah seluruh pembayaran baris ini. Tanggal realisasi
-    // terakhir selalu sebaris penuh di kedua mode.
-    $periodeDari = $mode === 'bulan' ? 80 + $bulan : 81;
-    $periodeSampai = 80 + $bulan;
+    // Setiap pembayaran BKU menempel ke SATU baris periode
+    // bulanan tertentu (jadwal bulan mundur boleh dibayar
+    // terlambat; jadwal bulan depan tidak bisa dibayar
+    // lebih dulu), jadi:
+    //  - posisi & belanja: realisasi adalah seluruh
+    //    pembayaran baris ini, tanggal terakhir sebaris
+    //    penuh (Fase 1.6/1.7).
+    //  - rencana: realisasi & tanggal terakhir hanya dari
+    //    pembayaran yang terhubung ke baris periode bulan
+    //    pilihan (atribusi per bulan, Fase 1.7/1.8).
+    if ($tampilan === 'rencana') {
+      $periodeDari = 80 + $bulan;
+      $periodeSampai = 80 + $bulan;
+    } else {
+      $periodeDari = 81;
+      $periodeSampai = 80 + $bulanPotong;
+    }
 
     $buatSubJadwal = fn() => BosRapbsPeriode::query()
       ->select('sekolah_id', 'id_rapbs_arkas')
@@ -408,16 +449,43 @@ class KelolaBosController extends Controller
           ->on('per16.sekolah_id', '=', 'bku16.sekolah_id');
       })
       ->select('per16.sekolah_id', 'per16.id_rapbs_arkas')
-      ->selectRaw($mode === 'bulan'
-        ? 'SUM(CASE WHEN per16.id_periode = ' . $periodeSampai . ' THEN bku16.saldo ELSE 0 END) as realisasi, MAX(bku16.tanggal_transaksi) as realisasi_terakhir'
+      ->selectRaw($tampilan === 'rencana'
+        ? 'SUM(CASE WHEN per16.id_periode = ' . $periodeSampai . ' THEN bku16.saldo ELSE 0 END) as realisasi, MAX(CASE WHEN per16.id_periode = ' . $periodeSampai . ' THEN bku16.tanggal_transaksi END) as realisasi_terakhir'
         : 'SUM(bku16.saldo) as realisasi, MAX(bku16.tanggal_transaksi) as realisasi_terakhir')
       ->where('bku16.soft_delete', false)
       ->whereIn('bku16.id_ref_bku', self::JENIS_BELANJA)
       ->whereNotNull('bku16.id_rapbs_periode')
       ->groupBy('per16.sekolah_id', 'per16.id_rapbs_arkas');
 
-    $denganAgg = function ($q) use ($buatSubJadwal, $buatSubRealisasi) {
-      return $q
+    // ── Jadwal tertua yang belum lunas (Fase 1.8) ──
+    // Untuk tampilan belanja: bulan jadwal paling awal
+    // (Januari s.d. bulan potong) yang realisasi per baris
+    // periodenya masih kurang dari jumlah jadwal baris
+    // periode itu. Realisasi per baris periode dihitung
+    // dulu sebagai subquery agar join tidak menggandakan
+    // baris periode.
+    $realisasiPerPeriode = BosKasUmum::query()
+      ->select('sekolah_id', 'id_rapbs_periode')
+      ->selectRaw('SUM(saldo) as real_baris')
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->whereNotNull('id_rapbs_periode')
+      ->groupBy('sekolah_id', 'id_rapbs_periode');
+
+    $buatSubTertua = fn() => BosRapbsPeriode::query()
+      ->from('bos_rapbs_periode as perT')
+      ->leftJoinSub($realisasiPerPeriode, 'reaT', function ($j) {
+        $j->on('reaT.id_rapbs_periode', '=', 'perT.id_arkas')
+          ->on('reaT.sekolah_id', '=', 'perT.sekolah_id');
+      })
+      ->select('perT.sekolah_id', 'perT.id_rapbs_arkas')
+      ->selectRaw('MIN(CASE WHEN COALESCE(reaT.real_baris, 0) < perT.jumlah THEN perT.id_periode END) as tertua_periode')
+      ->where('perT.soft_delete', false)
+      ->whereBetween('perT.id_periode', [81, 80 + $bulanPotong])
+      ->groupBy('perT.sekolah_id', 'perT.id_rapbs_arkas');
+
+    $denganAgg = function ($q) use ($buatSubJadwal, $buatSubRealisasi, $buatSubTertua, $tampilan) {
+      $q = $q
         ->leftJoinSub($buatSubJadwal(), 'jad', function ($j) {
           $j->on('jad.id_rapbs_arkas', '=', 'bos_rapbs.id_arkas')
             ->on('jad.sekolah_id', '=', 'bos_rapbs.sekolah_id');
@@ -426,6 +494,13 @@ class KelolaBosController extends Controller
           $j->on('rea.id_rapbs_arkas', '=', 'bos_rapbs.id_arkas')
             ->on('rea.sekolah_id', '=', 'bos_rapbs.sekolah_id');
         });
+      if ($tampilan === 'belanja') {
+        $q = $q->leftJoinSub($buatSubTertua(), 'ter', function ($j) {
+          $j->on('ter.id_rapbs_arkas', '=', 'bos_rapbs.id_arkas')
+            ->on('ter.sekolah_id', '=', 'bos_rapbs.sekolah_id');
+        });
+      }
+      return $q;
     };
 
     // Kelas status per baris dari jadwal & realisasi.
@@ -441,7 +516,17 @@ class KelolaBosController extends Controller
     // tabel (versi, kegiatan, pencarian) tetapi TANPA
     // saringan status — status adalah saringan tampilan
     // atas kolom hitungan ini, bukan cakupan datanya.
+    // Pengecualian Fase 1.8: tampilan belanja memang
+    // DIDEFINISIKAN oleh saringannya (hanya baris bersisa),
+    // jadi kartu mengikuti himpunan yang tampil — kartu
+    // "Bisa Dibelanjakan" adalah sisa himpunan itu. Pada
+    // tampilan rencana kartu hanya menjumlah baris yang
+    // punya jadwal di bulan pilihan (total rencana bulan
+    // itu serta realisasinya).
+    $saringBelanja = 'COALESCE(jad.jadwal, 0) > 0 AND COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0) > 0';
     $aggKartu = $denganAgg($saring($dasar(), $idsUtama))
+      ->when($tampilan === 'belanja', fn($x) => $x->whereRaw("({$saringBelanja})"))
+      ->when($tampilan === 'rencana', fn($x) => $x->whereNotNull('jad.jadwal'))
       ->selectRaw('COALESCE(SUM(jad.jadwal), 0) as terjadwal, COALESCE(SUM(rea.realisasi), 0) as realisasi')
       ->first();
     $kartu = [
@@ -468,12 +553,15 @@ class KelolaBosController extends Controller
       'jadwal' => 'jadwal',
       'realisasi' => 'realisasi',
       'sisa' => 'sisa',
+      'tertua' => 'tertua_periode',
     ];
     $urut = $kolomUrut[$request->input('urut')] ?? null;
     $urutKunci = $urut ? $request->input('urut') : 'kegiatan';
     $arah = $this->arah($request);
 
     $baris = $denganAgg($saring($dasar(), $idsUtama))
+      ->when($tampilan === 'belanja', fn($x) => $x->whereRaw("({$saringBelanja})"))
+      ->when($tampilan === 'rencana', fn($x) => $x->whereNotNull('jad.jadwal'))
       ->when($statusFilter !== '', fn($x) => $x->whereRaw("({$kasusStatus}) = ?", [$statusFilter]))
       ->select([
         'bos_rapbs.*',
@@ -487,7 +575,12 @@ class KelolaBosController extends Controller
       ->selectRaw('rea.realisasi_terakhir as realisasi_terakhir')
       ->selectRaw('COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0) as sisa')
       ->selectRaw($kasusStatus . ' as status_kelas')
-      ->orderBy($urut ?? 'bos_ref_kode.uraian_kode', $urut ? $arah : 'asc')
+      ->when($tampilan === 'belanja', fn($x) => $x->selectRaw('ter.tertua_periode as tertua_periode'))
+      ->when(
+        $tampilan === 'belanja' && !$urut,
+        fn($x) => $x->orderBy('tertua_periode', 'asc')->orderBy('bos_rapbs.uraian', 'asc'),
+        fn($x) => $x->orderBy($urut ?? 'bos_ref_kode.uraian_kode', $urut ? $arah : 'asc')
+      )
       ->orderBy('bos_rapbs.kode_rekening')
       ->orderBy('bos_rapbs.urutan')
       ->paginate(25)
@@ -515,7 +608,10 @@ class KelolaBosController extends Controller
       'daftarVersi' => $this->pilihanVersi($kelompok, $tahunReq, $sumberReq),
       'daftarBulan' => self::NAMA_BULAN,
       'bulan' => $bulan,
-      'mode' => $mode,
+      'bulanPotong' => $bulanPotong,
+      'tahunAcuan' => $tahunAcuan,
+      'tampilan' => $tampilan,
+      'totalRencana' => $tampilan === 'rencana' ? $kartu['terjadwal'] : 0,
       'statusFilter' => $statusFilter,
       'kartu' => $kartu,
       'urut' => $urutKunci,
