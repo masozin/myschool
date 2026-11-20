@@ -38,6 +38,8 @@ use App\Http\Controllers\SuratPindahController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ValidasiKelulusan;
 use App\Http\Controllers\WaliKelasController;
+use App\Http\Controllers\WebSekolahController;
+use App\Http\Controllers\WebSekolahKelolaController;
 use App\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,7 +57,11 @@ Route::controller(WilayahController::class)->group(function () {
   Route::get('/get-desa/{district_id}', 'getDesa')->name('wilayah.desa');
 });
 
-Route::get('/', fn() => redirect()->route('home'));
+// Root: landing page Web Sekolah. Bila tepat satu web sekolah aktif,
+// tampilkan sekolah itu; bila lebih dari satu, direktori; bila belum
+// ada, WebSekolahController::beranda mengembalikan perilaku lama
+// (redirect ke home/login).
+Route::get('/', [WebSekolahController::class, 'beranda'])->name('web-sekolah.beranda');
 Route::get('/dashboard', fn() => redirect()->route('home'));
 
 // Cek SKHU Publik
@@ -127,6 +133,52 @@ Route::controller(SekolahProfilController::class)
   ->group(function () {
     Route::get('/', 'edit')->name('edit');
     Route::put('/', 'update')->name('update');
+  });
+
+/*
+|--------------------------------------------------------------------------
+| WEB SEKOLAH — halaman publik per sekolah (fitur: web-sekolah)
+|--------------------------------------------------------------------------
+| SENGAJA didaftarkan SETELAH grup route /sekolah (Admin) di atas:
+| route literal /sekolah/tabel milik Admin harus menang lebih dulu,
+| slug web publik tidak boleh menelannya. Parameter memakai nama
+| {slugWeb}/{slugBerita} agar tidak terjadi implicit model binding.
+| Gerbang fitur diperiksa di controller (tamu tidak punya user).
+*/
+Route::controller(WebSekolahController::class)->group(function () {
+  Route::get('/sekolah/{slugWeb}', 'tampil')->name('web-sekolah.tampil');
+  Route::get('/sekolah/{slugWeb}/berita', 'beritaIndex')->name('web-sekolah.berita.index');
+  Route::get('/sekolah/{slugWeb}/berita/{slugBerita}', 'beritaTampil')->name('web-sekolah.berita.tampil');
+  Route::get('/sekolah/{slugWeb}/foto-hero', 'fotoHero')->name('web-sekolah.foto-hero');
+  Route::get('/sekolah/{slugWeb}/logo', 'logo')->name('web-sekolah.logo');
+  Route::get('/web-berita/{berita}/foto', 'fotoBerita')->name('web-sekolah.berita.foto');
+  Route::get('/web-galeri/{galeri}/foto', 'fotoGaleri')->name('web-sekolah.galeri.foto');
+});
+
+/*
+|--------------------------------------------------------------------------
+| WEB SEKOLAH — kelola (Operator Sekolah sekolahnya sendiri)
+|--------------------------------------------------------------------------
+*/
+Route::controller(WebSekolahKelolaController::class)
+  ->prefix('web-sekolah')
+  ->name('web-sekolah.kelola.')
+  ->middleware(['auth:sanctum', 'role:Operator Sekolah', 'fitur:web-sekolah', 'semester.session'])
+  ->group(function () {
+    Route::get('/pengaturan', 'pengaturan')->name('pengaturan');
+    Route::put('/pengaturan', 'simpanPengaturan')->name('pengaturan.simpan');
+
+    Route::get('/berita', 'beritaIndex')->name('berita.index');
+    Route::get('/berita/buat', 'beritaCreate')->name('berita.create');
+    Route::post('/berita', 'beritaStore')->name('berita.store');
+    Route::get('/berita/{berita}/edit', 'beritaEdit')->name('berita.edit');
+    Route::put('/berita/{berita}', 'beritaUpdate')->name('berita.update');
+    Route::delete('/berita/{berita}', 'beritaDestroy')->name('berita.destroy');
+
+    Route::get('/galeri', 'galeriIndex')->name('galeri.index');
+    Route::post('/galeri', 'galeriStore')->name('galeri.store');
+    Route::put('/galeri/{galeri}', 'galeriUpdate')->name('galeri.update');
+    Route::delete('/galeri/{galeri}', 'galeriDestroy')->name('galeri.destroy');
   });
 
 /*

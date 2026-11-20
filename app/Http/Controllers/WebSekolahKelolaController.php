@@ -1,0 +1,257 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Sekolah;
+use App\Models\WebBerita;
+use App\Models\WebGaleri;
+use App\Models\WebSekolah;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+
+class WebSekolahKelolaController extends Controller
+{
+  /*
+  |--------------------------------------------------------------------------
+  | Kelola Web Sekolah — Operator Sekolah untuk sekolahnya sendiri
+  | (pola yang sama dengan SekolahProfilController & SekolahLogoController).
+  | Route-nya digerbang role:Operator Sekolah + fitur:web-sekolah.
+  |--------------------------------------------------------------------------
+  */
+
+  private function sekolahSaya(): Sekolah
+  {
+    $sekolah = Auth::user()?->ptk?->sekolah;
+    abort_if(!$sekolah, 403, 'Akun Anda tidak terhubung ke sekolah.');
+
+    return $sekolah;
+  }
+
+  // ── Pengaturan ──────────────────────────────────────────────────────
+
+  public function pengaturan()
+  {
+    $sekolah = $this->sekolahSaya();
+    $web = $sekolah->webSekolah;
+
+    return view('content.web-sekolah.pengaturan', compact('sekolah', 'web'));
+  }
+
+  public function simpanPengaturan(Request $request)
+  {
+    $sekolah = $this->sekolahSaya();
+    $webAda = $sekolah->webSekolah;
+
+    $validated = $request->validate([
+      'slug' => [
+        'required', 'string', 'max:100', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+        Rule::unique('tabel_web_sekolah', 'slug')->ignore($webAda?->id),
+        Rule::notIn(WebSekolah::SLUG_TERLARANG),
+      ],
+      'is_aktif' => ['nullable', 'boolean'],
+      'tagline' => ['nullable', 'string', 'max:255'],
+      'visi' => ['nullable', 'string'],
+      'misi' => ['nullable', 'string'],
+      'sambutan' => ['nullable', 'string'],
+      'akreditasi' => ['nullable', 'string', 'max:10'],
+      'tahun_berdiri' => ['nullable', 'integer', 'min:1800', 'max:' . (date('Y') + 1)],
+      'foto_hero' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+      'hapus_foto_hero' => ['nullable', 'boolean'],
+    ], [
+      'slug.regex' => 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (-).',
+      'slug.unique' => 'Slug ini sudah dipakai sekolah lain.',
+      'slug.not_in' => 'Slug ini terlarang karena bertabrakan dengan halaman internal.',
+    ]);
+
+    $data = collect($validated)->except(['foto_hero', 'hapus_foto_hero'])->all();
+    $data['is_aktif'] = $request->boolean('is_aktif');
+
+    $web = WebSekolah::firstOrNew(['sekolah_id' => $sekolah->id]);
+
+    if ($request->boolean('hapus_foto_hero') && $web->foto_hero) {
+      Storage::disk('public')->delete($web->foto_hero);
+      $data['foto_hero'] = null;
+    }
+
+    if ($request->hasFile('foto_hero')) {
+      if ($web->foto_hero) {
+        Storage::disk('public')->delete($web->foto_hero);
+      }
+      $data['foto_hero'] = $request->file('foto_hero')->store("web-sekolah/{$sekolah->id}", 'public');
+    }
+
+    $web->fill($data);
+    $web->sekolah_id = $sekolah->id;
+    $web->save();
+
+    return redirect()->route('web-sekolah.kelola.pengaturan')
+      ->with('success', 'Pengaturan web sekolah berhasil disimpan. Web Anda: ' . url('/sekolah/' . $web->slug));
+  }
+
+  // ── Berita ──────────────────────────────────────────────────────────
+
+  public function beritaIndex()
+  {
+    $sekolah = $this->sekolahSaya();
+    $berita = $sekolah->webBerita()->latest('updated_at')->paginate(15);
+
+    return view('content.web-sekolah.berita-index', compact('sekolah', 'berita'));
+  }
+
+  public function beritaCreate()
+  {
+    $sekolah = $this->sekolahSaya();
+    $berita = new WebBerita(['status' => WebBerita::STATUS_DRAF]);
+
+    return view('content.web-sekolah.berita-form', compact('sekolah', 'berita'));
+  }
+
+  public function beritaStore(Request $request)
+  {
+    $sekolah = $this->sekolahSaya();
+    $data = $this->validasiBerita($request);
+
+    $data['sekolah_id'] = $sekolah->id;
+    $data['user_id'] = Auth::id();
+    $data['slug'] = WebBerita::slugUnik($sekolah->id, $data['judul']);
+    $data['diterbitkan_pada'] = $data['status'] === WebBerita::STATUS_TERBIT ? now() : null;
+
+    if ($request->hasFile('foto')) {
+      $data['foto'] = $request->file('foto')->store("web-sekolah/{$sekolah->id}/berita", 'public');
+    }
+
+    WebBerita::create($data);
+
+    return redirect()->route('web-sekolah.kelola.berita.index')
+      ->with('success', 'Berita berhasil disimpan.');
+  }
+
+  public function beritaEdit(WebBerita $berita)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($berita->sekolah_id !== $sekolah->id, 404);
+
+    return view('content.web-sekolah.berita-form', compact('sekolah', 'berita'));
+  }
+
+  public function beritaUpdate(Request $request, WebBerita $berita)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($berita->sekolah_id !== $sekolah->id, 404);
+
+    $data = $this->validasiBerita($request);
+    $data['slug'] = WebBerita::slugUnik($sekolah->id, $data['judul'], $berita->id);
+
+    // Tanggal terbit diisi saat pertama kali diterbitkan, tidak di-reset saat edit.
+    if ($data['status'] === WebBerita::STATUS_TERBIT && !$berita->diterbitkan_pada) {
+      $data['diterbitkan_pada'] = now();
+    }
+    if ($data['status'] === WebBerita::STATUS_DRAF) {
+      $data['diterbitkan_pada'] = null;
+    }
+
+    if ($request->hasFile('foto')) {
+      if ($berita->foto) {
+        Storage::disk('public')->delete($berita->foto);
+      }
+      $data['foto'] = $request->file('foto')->store("web-sekolah/{$sekolah->id}/berita", 'public');
+    }
+
+    $berita->update($data);
+
+    return redirect()->route('web-sekolah.kelola.berita.index')
+      ->with('success', 'Berita berhasil diperbarui.');
+  }
+
+  public function beritaDestroy(WebBerita $berita)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($berita->sekolah_id !== $sekolah->id, 404);
+
+    if ($berita->foto) {
+      Storage::disk('public')->delete($berita->foto);
+    }
+    $berita->delete();
+
+    return redirect()->route('web-sekolah.kelola.berita.index')
+      ->with('success', 'Berita berhasil dihapus.');
+  }
+
+  private function validasiBerita(Request $request): array
+  {
+    return $request->validate([
+      'judul' => ['required', 'string', 'max:255'],
+      'isi' => ['required', 'string'],
+      'status' => ['required', Rule::in([WebBerita::STATUS_DRAF, WebBerita::STATUS_TERBIT])],
+      'foto' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+    ]);
+  }
+
+  // ── Galeri ──────────────────────────────────────────────────────────
+
+  public function galeriIndex()
+  {
+    $sekolah = $this->sekolahSaya();
+    $galeri = $sekolah->webGaleri()->orderBy('urutan')->latest('id')->get();
+
+    return view('content.web-sekolah.galeri-index', compact('sekolah', 'galeri'));
+  }
+
+  public function galeriStore(Request $request)
+  {
+    $sekolah = $this->sekolahSaya();
+
+    $request->validate([
+      'foto' => ['required', 'array', 'min:1'],
+      'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+      'judul' => ['nullable', 'string', 'max:255'],
+    ]);
+
+    $urutan = (int) ($sekolah->webGaleri()->max('urutan') ?? 0);
+
+    foreach ($request->file('foto') as $file) {
+      $path = $file->store("web-sekolah/{$sekolah->id}/galeri", 'public');
+      WebGaleri::create([
+        'sekolah_id' => $sekolah->id,
+        'judul' => $request->judul,
+        'foto' => $path,
+        'urutan' => ++$urutan,
+      ]);
+    }
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Foto galeri berhasil diunggah.');
+  }
+
+  public function galeriUpdate(Request $request, WebGaleri $galeri)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($galeri->sekolah_id !== $sekolah->id, 404);
+
+    $data = $request->validate([
+      'judul' => ['nullable', 'string', 'max:255'],
+      'keterangan' => ['nullable', 'string', 'max:255'],
+      'urutan' => ['nullable', 'integer', 'min:0'],
+    ]);
+
+    $galeri->update($data);
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Foto galeri berhasil diperbarui.');
+  }
+
+  public function galeriDestroy(WebGaleri $galeri)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($galeri->sekolah_id !== $sekolah->id, 404);
+
+    Storage::disk('public')->delete($galeri->foto);
+    $galeri->delete();
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Foto galeri berhasil dihapus.');
+  }
+}

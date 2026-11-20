@@ -362,6 +362,44 @@
       ]
     },
     {
+      "menuHeader": "Web Sekolah"
+    },
+    {
+      "name": "Web Sekolah",
+      "icon": "menu-icon icon-base ri ri-global-line",
+      "slug": "web-sekolah",
+      "roles": [
+        "Operator Sekolah"
+      ],
+      "fitur": "web-sekolah",
+      "submenu": [
+        {
+          "url": "/web-sekolah/pengaturan",
+          "name": "Pengaturan Web",
+          "slug": "web-sekolah.kelola.pengaturan",
+          "roles": [
+            "Operator Sekolah"
+          ]
+        },
+        {
+          "url": "/web-sekolah/berita",
+          "name": "Berita",
+          "slug": "web-sekolah.kelola.berita.index",
+          "roles": [
+            "Operator Sekolah"
+          ]
+        },
+        {
+          "url": "/web-sekolah/galeri",
+          "name": "Galeri",
+          "slug": "web-sekolah.kelola.galeri.index",
+          "roles": [
+            "Operator Sekolah"
+          ]
+        }
+      ]
+    },
+    {
       "menuHeader": "Pengaturan"
     },
     {

@@ -91,4 +91,20 @@ class Sekolah extends Model
   {
     return $this->asets->where('tipe', $tipe)->first();
   }
+
+  // ── Web Sekolah (landing page publik) ──────────────────────────────
+  public function webSekolah(): HasOne
+  {
+    return $this->hasOne(WebSekolah::class, 'sekolah_id');
+  }
+
+  public function webBerita(): HasMany
+  {
+    return $this->hasMany(WebBerita::class, 'sekolah_id');
+  }
+
+  public function webGaleri(): HasMany
+  {
+    return $this->hasMany(WebGaleri::class, 'sekolah_id');
+  }
 }
