@@ -22,6 +22,17 @@
     </div>
   @endhasanyrole
 
+  @if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">{{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">{{ session('error') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+
   @if (!$sekolahId)
     <div class="alert alert-warning">Pilih sekolah dulu lewat pemilih di atas — data BOS mengikuti sekolah yang
       dipilih.</div>
@@ -138,10 +149,23 @@
                 <td>{{ $b->no_bukti ?? '-' }}</td>
                 <td><span class="badge bg-label-secondary">{{ $b->nama_bku ?? 'BKU #' . $b->id_ref_bku }}</span></td>
                 <td>
-                  <div class="small text-muted">{{ $b->kode_rekening ?? '-' }}</div>
-                  <div>{{ $b->nama_rekening ?? '' }}</div>
+                  @if ($b->kode_rekening)
+                    <span title="{{ $b->nama_rekening ?? '' }}"
+                      style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $b->kode_rekening }}</span>
+                  @else
+                    -
+                  @endif
                 </td>
-                <td>{{ $b->uraian }}</td>
+                <td>
+                  @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
+                  <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
+                  @if ($bisaTulisAlias)
+                    <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                      title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
+                      data-alias="{{ $aliasUraian ?? '' }}">
+                      <i class="icon-base ri ri-pencil-line"></i></button>
+                  @endif
+                </td>
                 <td>{{ $b->nama_toko ?? '-' }}</td>
                 <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
                 <td class="text-end fw-semibold">{{ number_format($b->saldo, 0, ',', '.') }}</td>
@@ -166,6 +190,10 @@
         {{ $baris->links('pagination::bootstrap-5') }}
       </div>
     </div>
+
+    @if ($bisaTulisAlias)
+      @include('content.kelola-bos.partials.modal-alias')
+    @endif
   @endif
 
 @endsection

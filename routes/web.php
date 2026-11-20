@@ -761,7 +761,8 @@ Route::controller(SuratKeluarController::class)
 | (rapbs) dan BKU (kas_umum), disinkronkan agen dari laptop
 | ARKAS lewat /api/bos/sinkron. Operator Sekolah & Kepala
 | Sekolah melihat sekolahnya, Admin memantau per sekolah
-| terpilih. Tidak ada penulisan data dari halaman ini.
+| terpilih. Cermin bersifat hanya baca; satu-satunya
+| penulisan adalah nama alias tampilan (Fase 1.7).
 */
 Route::controller(KelolaBosController::class)
   ->prefix('kelola-bos')
@@ -780,6 +781,11 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
     Route::get('/referensi/rekening', 'referensiRekening')->name('referensi.rekening')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+    // Nama alias (Fase 1.7) — satu-satunya penulisan Kelola
+    // BOS; lapisan kerja pengguna, bukan data cermin ARKAS.
+    // Kepala Sekolah hanya membaca, jadi tidak ikut di sini.
+    Route::post('/alias', 'simpanAlias')->name('alias.simpan')
+      ->middleware('role:Admin|Operator Sekolah');
   });
 
 /*

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BosAnggaran;
 use App\Models\BosKasUmum;
+use App\Models\BosNamaAlias;
 use App\Models\BosRapbs;
 use App\Models\BosRapbsPeriode;
 use App\Models\BosRefAcuanBarang;
@@ -22,8 +23,10 @@ use Illuminate\Support\Facades\Auth;
  * bos_rapbs_periode dan status realisasi BKU per baris), BKU
  * (bos_kas_umum), Perbandingan Versi (selisih dua versi
  * kertas kerja — lembar kerja pergeseran), dan Referensi
- * kode (barang/kegiatan/rekening). Data TIDAK diubah dari
- * sini; ia datang dari agen sinkron di laptop ARKAS.
+ * kode (barang/kegiatan/rekening). Cermin TIDAK diubah
+ * dari sini; ia datang dari agen sinkron di laptop ARKAS.
+ * Satu-satunya penulisan adalah nama alias (Fase 1.7) —
+ * lapisan kerja milik pengguna, terpisah dari cermin.
  *
  * Operator Sekolah & Kepala Sekolah melihat sekolahnya;
  * Admin memantau lewat pemilih sekolah (pola Surat Keluar).
@@ -80,6 +83,67 @@ class KelolaBosController extends Controller
   private function arah(Request $request): string
   {
     return strtolower((string) $request->input('dir')) === 'asc' ? 'asc' : 'desc';
+  }
+
+  // ── Nama alias (Fase 1.7, lapisan kerja) ──────────────
+  //
+  // Alias adalah nama pendek buatan pengguna untuk nama
+  // asli ARKAS yang panjang. Peta alias untuk nama-nama di
+  // satu halaman diambil dengan SATU query (whereIn atas
+  // nama yang tampil), bukan query per baris.
+
+  /** @return array<string, string> peta nama_sumber => alias */
+  private function petaAlias(int $sekolahId, $daftarNama): array
+  {
+    $nama = collect($daftarNama)
+      ->filter(fn($n) => is_string($n) && $n !== '')
+      ->unique()
+      ->values();
+    if ($nama->isEmpty()) {
+      return [];
+    }
+    return BosNamaAlias::where('sekolah_id', $sekolahId)
+      ->whereIn('nama_sumber', $nama)
+      ->pluck('alias', 'nama_sumber')
+      ->all();
+  }
+
+  /** Alias hanya boleh ditulis Admin & Operator Sekolah. */
+  private function bisaTulisAlias(): bool
+  {
+    return Auth::user()->hasAnyRole(['Admin', 'Operator Sekolah']);
+  }
+
+  /**
+   * Simpan / hapus alias. Alias terisi → updateOrCreate;
+   * alias kosong → baris dihapus (tampilan kembali ke
+   * nama asli dari ARKAS).
+   */
+  public function simpanAlias(Request $request)
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return back()->with('error', 'Konteks sekolah belum dipilih — alias tidak disimpan.');
+    }
+
+    $data = $request->validate([
+      'nama_sumber' => ['required', 'string', 'max:500'],
+      'alias' => ['nullable', 'string', 'max:255'],
+    ]);
+
+    $alias = trim((string) ($data['alias'] ?? ''));
+    if ($alias === '') {
+      BosNamaAlias::where('sekolah_id', $sekolahId)
+        ->where('nama_sumber', $data['nama_sumber'])
+        ->delete();
+      return back()->with('success', 'Alias dihapus — nama asli dari ARKAS ditampilkan lagi.');
+    }
+
+    BosNamaAlias::updateOrCreate(
+      ['sekolah_id' => $sekolahId, 'nama_sumber' => $data['nama_sumber']],
+      ['alias' => $alias]
+    );
+    return back()->with('success', 'Alias "' . $alias . '" disimpan.');
   }
 
   private function daftarTahun(int $sekolahId): array
@@ -233,6 +297,8 @@ class KelolaBosController extends Controller
         'kartu' => ['terjadwal' => 0.0, 'realisasi' => 0.0, 'sisa' => 0.0],
         'urut' => 'kegiatan',
         'arah' => 'asc',
+        'petaAlias' => [],
+        'bisaTulisAlias' => false,
       ]);
     }
 
@@ -316,6 +382,15 @@ class KelolaBosController extends Controller
     // terhubung ke baris periode milik baris rapbs ini
     // lewat bos_kas_umum.id_rapbs_periode — jadi realisasi
     // selalu menempel ke versi tempat BKU diinput di ARKAS.
+    // Atribusi bulannya mengikuti mode (Fase 1.7): setiap
+    // pembayaran BKU menempel ke SATU baris periode bulanan
+    // tertentu, jadi pada mode "bulan ini saja" realisasi
+    // hanya menjumlah pembayaran yang terhubung ke baris
+    // periode bulan pilihan (jadwal bulan mundur boleh
+    // dibayar terlambat; jadwal bulan depan tidak bisa
+    // dibayar lebih dulu). Pada mode kumulatif realisasi
+    // adalah seluruh pembayaran baris ini. Tanggal realisasi
+    // terakhir selalu sebaris penuh di kedua mode.
     $periodeDari = $mode === 'bulan' ? 80 + $bulan : 81;
     $periodeSampai = 80 + $bulan;
 
@@ -333,7 +408,9 @@ class KelolaBosController extends Controller
           ->on('per16.sekolah_id', '=', 'bku16.sekolah_id');
       })
       ->select('per16.sekolah_id', 'per16.id_rapbs_arkas')
-      ->selectRaw('SUM(bku16.saldo) as realisasi')
+      ->selectRaw($mode === 'bulan'
+        ? 'SUM(CASE WHEN per16.id_periode = ' . $periodeSampai . ' THEN bku16.saldo ELSE 0 END) as realisasi, MAX(bku16.tanggal_transaksi) as realisasi_terakhir'
+        : 'SUM(bku16.saldo) as realisasi, MAX(bku16.tanggal_transaksi) as realisasi_terakhir')
       ->where('bku16.soft_delete', false)
       ->whereIn('bku16.id_ref_bku', self::JENIS_BELANJA)
       ->whereNotNull('bku16.id_rapbs_periode')
@@ -407,6 +484,7 @@ class KelolaBosController extends Controller
       ])
       ->selectRaw('bos_ref_rekening.nama_rekening as nama_rekening')
       ->selectRaw('COALESCE(jad.jadwal, 0) as jadwal, COALESCE(rea.realisasi, 0) as realisasi')
+      ->selectRaw('rea.realisasi_terakhir as realisasi_terakhir')
       ->selectRaw('COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0) as sisa')
       ->selectRaw($kasusStatus . ' as status_kelas')
       ->orderBy($urut ?? 'bos_ref_kode.uraian_kode', $urut ? $arah : 'asc')
@@ -442,6 +520,8 @@ class KelolaBosController extends Controller
       'kartu' => $kartu,
       'urut' => $urutKunci,
       'arah' => $arah,
+      'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
+      'bisaTulisAlias' => $this->bisaTulisAlias(),
     ]);
   }
 
@@ -598,6 +678,8 @@ class KelolaBosController extends Controller
         'daftarBlok' => [],
         'urut' => 'nama',
         'arah' => 'asc',
+        'petaAlias' => [],
+        'bisaTulisAlias' => false,
       ]);
     }
 
@@ -630,6 +712,8 @@ class KelolaBosController extends Controller
         ->distinct()->orderBy('blok_id')->pluck('blok_id')->all(),
       'urut' => $urutKunci,
       'arah' => $arah,
+      'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('nama_barang')),
+      'bisaTulisAlias' => $this->bisaTulisAlias(),
     ]);
   }
 
@@ -725,6 +809,8 @@ class KelolaBosController extends Controller
         'daftarRekening' => collect(),
         'urut' => 'tanggal',
         'arah' => 'desc',
+        'petaAlias' => [],
+        'bisaTulisAlias' => false,
       ]);
     }
 
@@ -832,6 +918,8 @@ class KelolaBosController extends Controller
       'daftarRekening' => $daftarRekening,
       'urut' => $urutKunci,
       'arah' => $arah,
+      'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
+      'bisaTulisAlias' => $this->bisaTulisAlias(),
     ]);
   }
 }

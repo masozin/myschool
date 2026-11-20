@@ -22,6 +22,17 @@
     </div>
   @endhasanyrole
 
+  @if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">{{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">{{ session('error') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+
   @if (!$sekolahId)
     <div class="alert alert-warning">Pilih sekolah dulu lewat pemilih di atas — data BOS mengikuti sekolah yang
       dipilih.</div>
@@ -91,6 +102,10 @@
         <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Realisasi terhubung ke
           versi tempat BKU diinput (umumnya versi yang aktif saat belanja dicatat) — baris pada versi lain bisa
           tampak belum terealisasi walau belanjanya sudah dicatat di BKU.</div>
+        <div class="text-muted small mt-1"><i class="icon-base ri ri-information-line me-1"></i>Pada mode
+          Kumulatif, status membandingkan jadwal Januari s.d. bulan terpilih dengan seluruh realisasi BKU baris
+          ini — realisasi dapat berasal dari bulan-bulan sebelumnya. Pada mode Bulan ini saja, yang dibandingkan
+          hanya jadwal bulan terpilih dengan realisasi yang terhubung ke bulan itu.</div>
       </div>
     </div>
 
@@ -230,14 +245,23 @@
             @forelse ($baris as $b)
               <tr>
                 <td>
-                  <div class="small text-muted">{{ $b->kode_kegiatan }}</div>
-                  <div>{{ $b->nama_kegiatan ?? '-' }}</div>
+                  <span title="{{ $b->nama_kegiatan ?? '' }}"
+                    style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $b->kode_kegiatan ?? '-' }}</span>
                 </td>
                 <td>
-                  <div class="small text-muted">{{ $b->kode_rekening }}</div>
-                  <div>{{ $b->nama_rekening ?? '-' }}</div>
+                  <span title="{{ $b->nama_rekening ?? '' }}"
+                    style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $b->kode_rekening }}</span>
                 </td>
-                <td>{{ $b->uraian }}</td>
+                <td>
+                  @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
+                  <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
+                  @if ($bisaTulisAlias)
+                    <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                      title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
+                      data-alias="{{ $aliasUraian ?? '' }}">
+                      <i class="icon-base ri ri-pencil-line"></i></button>
+                  @endif
+                </td>
                 <td class="text-end">{{ $b->volume == (int) $b->volume ? (int) $b->volume : $b->volume }}</td>
                 <td>{{ $b->satuan }}</td>
                 <td class="text-end">{{ number_format($b->harga_satuan, 0, ',', '.') }}</td>
@@ -255,6 +279,11 @@
                     ][$b->status_kelas] ?? ['bg-label-secondary', $b->status_kelas];
                   @endphp
                   <span class="badge {{ $lencana[0] }}">{{ $lencana[1] }}</span>
+                  @if ($b->realisasi_terakhir)
+                    <div class="small text-muted mt-1">terakhir:
+                      {{ \Carbon\Carbon::parse($b->realisasi_terakhir)->locale('id')->translatedFormat('d M Y') }}
+                    </div>
+                  @endif
                 </td>
                 <td class="small text-muted">
                   @php $tahap = collect([1 => $b->v1, 2 => $b->v2, 3 => $b->v3, 4 => $b->v4])->filter(fn($v) => $v !== null); @endphp
@@ -291,6 +320,10 @@
         {{ $baris->links('pagination::bootstrap-5') }}
       </div>
     </div>
+
+    @if ($bisaTulisAlias)
+      @include('content.kelola-bos.partials.modal-alias')
+    @endif
   @endif
 
 @endsection

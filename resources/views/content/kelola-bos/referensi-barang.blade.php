@@ -21,6 +21,17 @@
     </div>
   @endhasanyrole
 
+  @if (session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">{{ session('success') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+  @if (session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">{{ session('error') }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
+    </div>
+  @endif
+
   @if (!$sekolahId)
     <div class="alert alert-warning">Pilih sekolah dulu lewat pemilih di atas — data BOS mengikuti sekolah yang
       dipilih.</div>
@@ -104,7 +115,20 @@
             @forelse ($baris as $b)
               <tr>
                 <td class="small">{{ $b->id_barang ?? '-' }}</td>
-                <td>{{ $b->nama_barang ?? '-' }}</td>
+                <td>
+                  @if ($b->nama_barang)
+                    @php $aliasBarang = $petaAlias[$b->nama_barang] ?? null; @endphp
+                    <span @if ($aliasBarang) title="{{ $b->nama_barang }}" @endif>{{ $aliasBarang ?? $b->nama_barang }}</span>
+                    @if ($bisaTulisAlias)
+                      <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                        title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->nama_barang }}"
+                        data-alias="{{ $aliasBarang ?? '' }}">
+                        <i class="icon-base ri ri-pencil-line"></i></button>
+                    @endif
+                  @else
+                    -
+                  @endif
+                </td>
                 <td>{{ $b->kode_rekening ?? '-' }}</td>
                 <td>{{ $b->satuan ?? '-' }}</td>
                 <td class="text-end fw-semibold">{{ $b->harga_barang !== null ? number_format($b->harga_barang, 0, ',', '.') : '-' }}</td>
@@ -128,6 +152,10 @@
         {{ $baris->links('pagination::bootstrap-5') }}
       </div>
     </div>
+
+    @if ($bisaTulisAlias)
+      @include('content.kelola-bos.partials.modal-alias')
+    @endif
   @endif
 
 @endsection
