@@ -37,7 +37,15 @@ class WebSekolahKelolaController extends Controller
     $sekolah = $this->sekolahSaya();
     $web = $sekolah->webSekolah;
 
-    return view('content.web-sekolah.pengaturan', compact('sekolah', 'web'));
+    // Saran slug dihitung di sini, BUKAN di Blade: Blade file ini tidak
+    // mengimpor Illuminate\Support\Str, dan panggilan Str::slug() di
+    // view hanya terpicu saat $web masih null (kunjungan pertama) —
+    // di luar jalur itu error-nya tidak terlihat. (Class "Str" not
+    // found, dilaporkan Mark 2026-11-20.)
+    $slugSaran = $web?->slug
+      ?? Str::slug($sekolah->detailTerbaru->nama_sekolah ?? '');
+
+    return view('content.web-sekolah.pengaturan', compact('sekolah', 'web', 'slugSaran'));
   }
 
   public function simpanPengaturan(Request $request)

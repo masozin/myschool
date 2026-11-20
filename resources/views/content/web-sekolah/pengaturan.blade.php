@@ -50,7 +50,7 @@
           <div class="input-group">
             <span class="input-group-text">{{ url('/sekolah') }}/</span>
             <input type="text" id="slug" name="slug" class="form-control"
-              value="{{ old('slug', $web->slug ?? Str::slug($sekolah->detailTerbaru->nama_sekolah ?? '')) }}"
+              value="{{ old('slug', $slugSaran) }}"
               placeholder="sdn-01-totorejo" required>
           </div>
           <small class="text-muted">Huruf kecil, angka, dan tanda hubung saja. Berubah = alamat lama tidak berlaku lagi.</small>
