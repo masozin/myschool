@@ -28,23 +28,13 @@ class WebSekolahController extends Controller
   */
 
   // ── Root `/` ────────────────────────────────────────────────────────
-  // 1 web aktif  → langsung tampilkan sekolah itu.
-  // >1 web aktif → direktori pilih sekolah.
-  // 0            → perilaku lama: redirect ke home (login).
+  // Keputusan Mark 2026-11-21: root TIDAK menampilkan landing page —
+  // selalu redirect ke home (login/dashboard), seperti perilaku lama.
+  // Landing page sekolah dibuka lewat slug-nya saja: /sekolah/{slug}.
+  // (View direktori + daftarWebPublik() sengaja dipertahankan agar
+  // perilaku lama mudah dikembalikan bila berubah pikiran.)
   public function beranda()
   {
-    $webs = $this->daftarWebPublik();
-
-    if ($webs->count() === 1) {
-      return $this->tampil($webs->first()->slug);
-    }
-
-    if ($webs->count() > 1) {
-      return view('publik.web-sekolah.direktori', [
-        'webs' => $webs,
-      ]);
-    }
-
     return redirect()->route('home');
   }
 

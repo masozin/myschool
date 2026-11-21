@@ -57,10 +57,9 @@ Route::controller(WilayahController::class)->group(function () {
   Route::get('/get-desa/{district_id}', 'getDesa')->name('wilayah.desa');
 });
 
-// Root: landing page Web Sekolah. Bila tepat satu web sekolah aktif,
-// tampilkan sekolah itu; bila lebih dari satu, direktori; bila belum
-// ada, WebSekolahController::beranda mengembalikan perilaku lama
-// (redirect ke home/login).
+// Root: selalu redirect ke home (login/dashboard) — keputusan Mark
+// 2026-11-21. Landing page Web Sekolah TIDAK tampil di root; ia dibuka
+// lewat slug sekolahnya: /sekolah/{slug}.
 Route::get('/', [WebSekolahController::class, 'beranda'])->name('web-sekolah.beranda');
 Route::get('/dashboard', fn() => redirect()->route('home'));
 
