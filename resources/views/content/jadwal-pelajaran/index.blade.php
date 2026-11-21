@@ -267,16 +267,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
           </div>
           <div class="modal-body">
-            const eksporSel = document.getElementById('ekspor-model');
-      if (eksporSel) {
-        const eksporLink = document.getElementById('ekspor-excel-link');
-        const perbaruiEkspor = () => {
-          eksporLink.href = '{{ url('/jadwal-pelajaran/pengaturan') }}/' + eksporSel.value + '/ekspor-excel';
-        };
-        eksporSel.addEventListener('change', perbaruiEkspor);
-        perbaruiEkspor();
-      }
-      @if (session('impor_errors'))
+            @if (session('impor_errors'))
               <div class="alert alert-danger">
                 <div class="fw-semibold mb-1">{{ session('error') ?? 'Impor dibatalkan — tidak ada data yang ditulis.' }}
                 </div>
@@ -340,6 +331,15 @@
         };
         sel.addEventListener('change', perbarui);
         perbarui();
+      }
+      const eksporSel = document.getElementById('ekspor-model');
+      if (eksporSel) {
+        const eksporLink = document.getElementById('ekspor-excel-link');
+        const perbaruiEkspor = () => {
+          eksporLink.href = '{{ url('/jadwal-pelajaran/pengaturan') }}/' + eksporSel.value + '/ekspor-excel';
+        };
+        eksporSel.addEventListener('change', perbaruiEkspor);
+        perbaruiEkspor();
       }
       @if (session('impor_errors'))
         const modalEl = document.getElementById('modal-impor-jadwal');
