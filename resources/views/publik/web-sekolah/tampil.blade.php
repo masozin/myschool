@@ -5,7 +5,7 @@
 
 @section('content')
   {{-- ── Hero ─────────────────────────────────────────────────────── --}}
-  <header class="ws-hero">
+  <header class="ws-hero" id="beranda">
     @if ($web->foto_hero)
       <div class="ws-hero-bg"><img src="{{ route('web-sekolah.foto-hero', $web->slug) }}" alt="" aria-hidden="true"></div>
     @endif
@@ -50,6 +50,65 @@
       <p class="ws-stat-note">Data berjalan — semester {{ $semesterAktif->semester }} tahun pelajaran {{ $semesterAktif->tahun_pelajaran }}</p>
     @endif
   </div>
+
+  {{-- ── Jadwal pelajaran hari ini ────────────────────────────────── --}}
+  @if ($jadwalHariIni['tampil'] ?? false)
+    <section class="ws-section" id="jadwal" style="padding-top:64px;padding-bottom:10px">
+      <div class="ws-container">
+        <div class="ws-sec-head" data-reveal style="display:flex;gap:20px;align-items:flex-end;max-width:none;flex-wrap:wrap;margin-bottom:30px">
+          <div style="flex:1;min-width:260px">
+            <span class="ws-eyebrow-sm">Jadwal Pelajaran</span>
+            <h2>Jadwal Hari Ini — {{ $jadwalHariIni['namaHari'] }}</h2>
+            <p>{{ $jadwalHariIni['tanggal'] }}@if ($semesterAktif) &middot; Semester {{ $semesterAktif->semester }} {{ $semesterAktif->tahun_pelajaran }} @endif</p>
+          </div>
+          <span class="ws-jam-chip"><i></i> Pukul <span id="wsJam">{{ now()->format('H.i') }}</span> WIB</span>
+        </div>
+
+        @if ($jadwalHariIni['libur'])
+          <div class="ws-libur" data-reveal>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9.5 17 2 2 4-4.5"/></svg>
+            <h3>Hari Ini Libur</h3>
+            <p>{{ $jadwalHariIni['alasanLibur'] }} Jadwal pelajaran akan tampil kembali pada hari sekolah berikutnya.</p>
+          </div>
+        @else
+          <div class="ws-jadwal" data-reveal>
+            @if (count($jadwalHariIni['daftar']) > 1)
+              <div class="ws-pills" role="tablist" aria-label="Pilih kelas">
+                @foreach ($jadwalHariIni['daftar'] as $i => $r)
+                  <button type="button" class="ws-pill {{ $i === 0 ? 'aktif' : '' }}" data-panel="wsPanel{{ $i }}" role="tab" aria-selected="{{ $i === 0 ? 'true' : 'false' }}">{{ $r['nama'] }}</button>
+                @endforeach
+              </div>
+            @endif
+            @foreach ($jadwalHariIni['daftar'] as $i => $r)
+              <div class="ws-panel {{ $i === 0 ? 'aktif' : '' }}" id="wsPanel{{ $i }}" role="tabpanel">
+                <div class="ws-panel-head">
+                  <h3>{{ $r['nama'] }}</h3>
+                  @if ($r['wali'])
+                    <span>Wali Kelas: {{ $r['wali'] }}</span>
+                  @endif
+                </div>
+                @foreach ($r['blok'] as $b)
+                  <div class="ws-row {{ $b['jenis'] }} {{ ($b['aktif'] ?? false) ? 'berlangsung' : '' }}">
+                    <span class="ws-waktu">{{ $b['mulai'] }} – {{ $b['selesai'] }}</span>
+                    <span class="ws-titik" aria-hidden="true"></span>
+                    <span class="ws-isi">
+                      <strong>{{ $b['label'] === '' ? '—' : $b['label'] }}</strong>
+                      @if ($b['sub'] !== '')
+                        <span>{{ $b['sub'] }}</span>
+                      @endif
+                    </span>
+                    @if ($b['aktif'] ?? false)
+                      <span class="ws-lencana-live">Berlangsung</span>
+                    @endif
+                  </div>
+                @endforeach
+              </div>
+            @endforeach
+          </div>
+        @endif
+      </div>
+    </section>
+  @endif
 
   {{-- ── Sambutan + Visi Misi ─────────────────────────────────────── --}}
   @if ($web->sambutan || $web->visi || $web->misi)
@@ -333,4 +392,34 @@
       </div>
     </div>
   </section>
+@endsection
+
+@section('page-script')
+  <script>
+    (function () {
+      // Tab kelas pada Jadwal Hari Ini.
+      var pills = document.querySelectorAll('.ws-pill[data-panel]');
+      pills.forEach(function (pill) {
+        pill.addEventListener('click', function () {
+          pills.forEach(function (p) { p.classList.remove('aktif'); p.setAttribute('aria-selected', 'false'); });
+          document.querySelectorAll('.ws-panel').forEach(function (pn) { pn.classList.remove('aktif'); });
+          pill.classList.add('aktif');
+          pill.setAttribute('aria-selected', 'true');
+          var panel = document.getElementById(pill.getAttribute('data-panel'));
+          if (panel) panel.classList.add('aktif');
+        });
+      });
+
+      // Jam berjalan pada chip jadwal (diperbarui tiap 20 detik).
+      var jam = document.getElementById('wsJam');
+      if (jam) {
+        function segarkan() {
+          var d = new Date();
+          jam.textContent = String(d.getHours()).padStart(2, '0') + '.' + String(d.getMinutes()).padStart(2, '0');
+        }
+        segarkan();
+        setInterval(segarkan, 20000);
+      }
+    })();
+  </script>
 @endsection

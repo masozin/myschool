@@ -250,6 +250,39 @@
     .ws-footer-kontak svg{width:17px;height:17px;flex:none;margin-top:4px;color:var(--sky)}
     .ws-copy{border-top:1px solid rgba(255,255,255,.1);padding:20px 0;font-size:.87rem;color:#7e90b3;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between}
 
+    /* ── Jadwal hari ini ────────────────────────────────── */
+    .ws-jam-chip{display:inline-flex;align-items:center;gap:8px;background:#eef3fb;color:var(--navy-900);font-weight:800;font-size:.88rem;padding:8px 15px;border-radius:999px}
+    .ws-jam-chip i{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:wsKedip 1.6s infinite}
+    @keyframes wsKedip{0%,100%{opacity:1}50%{opacity:.3}}
+    .ws-jadwal{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-md);overflow:hidden}
+    .ws-pills{display:flex;gap:9px;flex-wrap:wrap;padding:20px 22px;border-bottom:1px solid var(--line);background:#fbfcfe}
+    .ws-pill{border:1.5px solid var(--line);background:#fff;color:var(--text);font-family:inherit;font-weight:700;font-size:.9rem;padding:9px 18px;border-radius:999px;cursor:pointer;transition:all .2s ease}
+    .ws-pill:hover{border-color:var(--primary);color:var(--primary)}
+    .ws-pill.aktif{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 8px 18px -8px rgba(29,92,191,.6)}
+    .ws-panel{display:none;padding:8px 22px 20px}
+    .ws-panel.aktif{display:block}
+    .ws-panel-head{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;padding:16px 2px 10px}
+    .ws-panel-head h3{color:var(--ink);font-size:1.12rem;letter-spacing:-.01em}
+    .ws-panel-head span{color:var(--muted);font-size:.9rem;font-weight:600}
+    .ws-row{display:flex;gap:16px;align-items:center;padding:12px 14px;border-radius:13px;border-left:4px solid transparent}
+    .ws-row + .ws-row{border-top:1px solid #f0f3f9}
+    .ws-row .ws-waktu{flex:none;width:118px;font-weight:800;color:var(--navy-900);font-size:.92rem;font-variant-numeric:tabular-nums}
+    .ws-row .ws-titik{flex:none;width:10px;height:10px;border-radius:50%;background:var(--sky)}
+    .ws-row .ws-isi{flex:1;min-width:0}
+    .ws-row .ws-isi strong{color:var(--ink);font-size:.99rem;display:block;line-height:1.35}
+    .ws-row .ws-isi span{color:var(--muted);font-size:.87rem}
+    .ws-row.istirahat{background:#faf7ec}
+    .ws-row.istirahat .ws-titik{background:var(--accent)}
+    .ws-row.istirahat .ws-isi strong{color:#8a6108;font-weight:700}
+    .ws-row.kegiatan .ws-titik{background:#22c55e}
+    .ws-row.berlangsung{background:linear-gradient(90deg,#eaf3ff,#f4f9ff);border-left-color:var(--primary)}
+    .ws-lencana-live{flex:none;background:#dc2626;color:#fff;font-size:.7rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
+    @media(max-width:560px){.ws-row .ws-waktu{width:96px;font-size:.85rem}.ws-panel{padding:6px 12px 16px}.ws-pills{padding:16px 14px}}
+    .ws-libur{background:linear-gradient(140deg,var(--navy-900),var(--primary));border-radius:20px;color:#fff;padding:44px 34px;text-align:center;box-shadow:var(--shadow-md)}
+    .ws-libur svg{width:54px;height:54px;margin:0 auto 16px;color:var(--accent)}
+    .ws-libur h3{font-size:1.55rem;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
+    .ws-libur p{opacity:.9;max-width:520px;margin:0 auto}
+
     /* ── Keunggulan ─────────────────────────────────────── */
     .ws-unggul{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
     @media(max-width:900px){.ws-unggul{grid-template-columns:repeat(2,1fr)}}
@@ -312,6 +345,10 @@
   <nav class="ws-nav @yield('nav-modifier')" id="wsNav">
     <div class="ws-container ws-nav-in">
       @isset($web)
+        {{-- Di landing sendiri, tautan seksi memakai jangkar murni (#...) agar
+             bergulir halus TANPA memuat ulang halaman; dari halaman lain
+             (berita) tautan harus alamat penuh + jangkar. --}}
+        @php $diLanding = request()->routeIs('web-sekolah.tampil'); @endphp
         <a class="ws-brand" href="{{ route('web-sekolah.tampil', $web->slug) }}">
           @if ($punyaLogo ?? false)
             <img src="{{ route('web-sekolah.logo', $web->slug) }}" alt="Logo {{ $namaSekolah }}">
@@ -321,11 +358,12 @@
           <span>{{ $namaSekolah }}<small>{{ $sekolah->jenjang }} &middot; Website Resmi</small></span>
         </a>
         <div class="ws-links">
-          <a href="{{ route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
-          <a href="{{ route('web-sekolah.tampil', $web->slug) }}#sambutan">Profil</a>
+          <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
+          <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
+          <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
           <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
-          <a href="{{ route('web-sekolah.tampil', $web->slug) }}#galeri">Galeri</a>
-          <a href="{{ route('web-sekolah.tampil', $web->slug) }}#kontak">Kontak</a>
+          <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
+          <a href="{{ $diLanding ? '#kontak' : route('web-sekolah.tampil', $web->slug) . '#kontak' }}">Kontak</a>
           @auth
             <a class="ws-btn" href="{{ route('home') }}">Dashboard</a>
           @else
@@ -351,11 +389,12 @@
     </div>
     @isset($web)
       <div class="ws-mobile" id="wsMobile">
-        <a href="{{ route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
-        <a href="{{ route('web-sekolah.tampil', $web->slug) }}#sambutan">Profil</a>
+        <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
+        <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
+        <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
         <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
-        <a href="{{ route('web-sekolah.tampil', $web->slug) }}#galeri">Galeri</a>
-        <a href="{{ route('web-sekolah.tampil', $web->slug) }}#kontak">Kontak</a>
+        <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
+        <a href="{{ $diLanding ? '#kontak' : route('web-sekolah.tampil', $web->slug) . '#kontak' }}">Kontak</a>
         @auth
           <a href="{{ route('home') }}">Dashboard</a>
         @else
@@ -389,11 +428,12 @@
           <div>
             <h4>Navigasi</h4>
             <ul>
-              <li><a href="{{ route('web-sekolah.tampil', $web->slug) }}">Beranda</a></li>
-              <li><a href="{{ route('web-sekolah.tampil', $web->slug) }}#sambutan">Sambutan Kepala Sekolah</a></li>
-              <li><a href="{{ route('web-sekolah.tampil', $web->slug) }}#visi-misi">Visi &amp; Misi</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal Hari Ini</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Sambutan Kepala Sekolah</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#visi-misi' : route('web-sekolah.tampil', $web->slug) . '#visi-misi' }}">Visi &amp; Misi</a></li>
               <li><a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita &amp; Pengumuman</a></li>
-              <li><a href="{{ route('web-sekolah.tampil', $web->slug) }}#galeri">Galeri Kegiatan</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri Kegiatan</a></li>
             </ul>
           </div>
           <div>
