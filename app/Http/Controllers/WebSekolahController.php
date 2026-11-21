@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\KalenderPendidikan;
+use App\Models\Ptk;
 use App\Models\SekolahLogo;
 use App\Models\Semester;
 use App\Models\WebBerita;
@@ -57,6 +59,24 @@ class WebSekolahController extends Controller
     $data['galeri'] = $web->sekolah->webGaleri()
       ->orderBy('urutan')
       ->latest('id')
+      ->take(12)
+      ->get();
+
+    // Agenda terdekat dari kalender pendidikan (kaldik bersifat global,
+    // berlaku untuk semua sekolah di instalasi ini). Yang sedang berjalan
+    // ikut tampil: batasnya tanggal_selesai, bukan tanggal_mulai.
+    $data['agenda'] = KalenderPendidikan::query()
+      ->whereDate('tanggal_selesai', '>=', now()->toDateString())
+      ->orderBy('tanggal_mulai')
+      ->take(5)
+      ->get();
+
+    // Dewan guru & tendik aktif sekolah ini. Kepala Sekolah paling depan,
+    // lalu Guru, lalu tendik lain; nama adalah data publik sekolah.
+    $data['dewanGuru'] = $web->sekolah->ptk()
+      ->where('status', 'aktif')
+      ->orderByRaw("CASE WHEN jabatan = 'Kepala Sekolah' THEN 0 WHEN jabatan = 'Guru' THEN 1 ELSE 2 END")
+      ->orderBy('nama_ptk')
       ->take(12)
       ->get();
 
@@ -134,6 +154,17 @@ class WebSekolahController extends Controller
     abort_if(!Storage::disk('public')->exists($galeri->foto), 404);
 
     return Storage::disk('public')->response($galeri->foto);
+  }
+
+  // Foto PTK untuk seksi Dewan Guru di landing page. Dialirkan lewat route
+  // (bukan asset('storage/...')) dengan alasan yang sama seperti foto lain:
+  // symlink public/storage tidak selalu ada di hosting bersama.
+  public function fotoPtk(Ptk $ptk)
+  {
+    abort_if(!$ptk->sekolah?->webSekolah?->tampilPublik(), 404);
+    abort_if(!$ptk->photo || !Storage::disk('public')->exists($ptk->photo), 404);
+
+    return Storage::disk('public')->response($ptk->photo);
   }
 
   // ── Helper ──────────────────────────────────────────────────────────

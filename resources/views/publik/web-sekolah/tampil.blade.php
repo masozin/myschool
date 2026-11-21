@@ -6,72 +6,91 @@
 @section('content')
   {{-- ── Hero ─────────────────────────────────────────────────────── --}}
   <header class="ws-hero">
-    <div class="ws-container ws-hero-grid">
-      <div>
+    @if ($web->foto_hero)
+      <div class="ws-hero-bg"><img src="{{ route('web-sekolah.foto-hero', $web->slug) }}" alt="" aria-hidden="true"></div>
+    @endif
+    <div class="ws-hero-glow"></div>
+    <div class="ws-container">
+      <div class="ws-hero-in">
+        <span class="ws-eyebrow"><i></i> Website Resmi Sekolah</span>
         <h1>{{ $namaSekolah }}</h1>
         @if ($web->tagline)
           <p class="ws-tagline">{{ $web->tagline }}</p>
+        @else
+          <p class="ws-tagline">Selamat datang di website resmi {{ $namaSekolah }} — pusat informasi, pengumuman, dan layanan daring bagi siswa, orang tua, dan masyarakat.</p>
         @endif
-        <p class="ws-meta">
-          NPSN {{ $sekolah->npsn }} &middot; {{ $sekolah->jenjang }}
-          @if ($web->akreditasi) &middot; Akreditasi {{ $web->akreditasi }} @endif
-          @if ($detail?->alamat_sekolah)
-            <br>{{ $detail->alamat_sekolah }}
-            @if ($detail->district) &middot; Kec. {{ $detail->district->name ?? '' }} @endif
-            @if ($detail->regency) &middot; {{ $detail->regency->name ?? '' }} @endif
+        <div class="ws-hero-chips">
+          <span class="ws-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg> NPSN {{ $sekolah->npsn }}</span>
+          <span class="ws-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9.5 12 4 2 9.5l10 5.5 10-5.5z"/><path d="M6 11.8V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.2"/></svg> {{ $sekolah->jenjang }}</span>
+          @if ($web->akreditasi)
+            <span class="ws-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-2 7 5.5-3 5.5 3-2-7"/></svg> Akreditasi {{ $web->akreditasi }}</span>
           @endif
-        </p>
+          @if ($web->tahun_berdiri)
+            <span class="ws-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Berdiri {{ $web->tahun_berdiri }}</span>
+          @endif
+        </div>
         <div class="ws-hero-cta">
-          <a class="ws-btn ws-btn-accent" href="{{ route('validasi-kelulusan.index') }}">Cek Kelulusan</a>
-          <a class="ws-btn ws-btn-outline" style="border-color:#fff;color:#fff!important" href="#kontak">Hubungi Sekolah</a>
+          <a class="ws-btn ws-btn-accent" href="{{ route('validasi-kelulusan.index') }}">Cek Kelulusan <span class="ws-arrow">&rarr;</span></a>
+          <a class="ws-btn ws-btn-ghost" href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita Terbaru</a>
         </div>
       </div>
-      @if ($web->foto_hero)
-        <div class="ws-hero-photo">
-          <img src="{{ route('web-sekolah.foto-hero', $web->slug) }}" alt="Foto {{ $namaSekolah }}">
-        </div>
-      @endif
     </div>
+    <div class="ws-hero-wave" aria-hidden="true"><svg viewBox="0 0 1440 56" preserveAspectRatio="none"><path d="M0 56h1440V28c-180 18-420 26-720 12C420 26 180 30 0 44v12z" fill="#f6f8fc"/></svg></div>
   </header>
 
   {{-- ── Statistik hidup ──────────────────────────────────────────── --}}
   <div class="ws-container">
     <div class="ws-stats">
-      <div class="ws-stat"><div class="ws-num">{{ number_format($statistik['siswa'], 0, ',', '.') }}</div><div class="ws-lbl">Siswa Aktif</div></div>
-      <div class="ws-stat"><div class="ws-num">{{ number_format($statistik['guru'], 0, ',', '.') }}</div><div class="ws-lbl">Guru</div></div>
-      <div class="ws-stat"><div class="ws-num">{{ number_format($statistik['ptk'], 0, ',', '.') }}</div><div class="ws-lbl">Guru &amp; Tendik</div></div>
-      <div class="ws-stat"><div class="ws-num">{{ number_format($statistik['rombel'], 0, ',', '.') }}</div><div class="ws-lbl">Rombongan Belajar</div></div>
+      <div class="ws-stat" data-reveal><div class="ws-num" data-count="{{ $statistik['siswa'] }}">0</div><div class="ws-lbl">Siswa Aktif</div></div>
+      <div class="ws-stat" data-reveal><div class="ws-num" data-count="{{ $statistik['guru'] }}">0</div><div class="ws-lbl">Guru</div></div>
+      <div class="ws-stat" data-reveal><div class="ws-num" data-count="{{ $statistik['ptk'] }}">0</div><div class="ws-lbl">Guru &amp; Tendik</div></div>
+      <div class="ws-stat" data-reveal><div class="ws-num" data-count="{{ $statistik['rombel'] }}">0</div><div class="ws-lbl">Rombongan Belajar</div></div>
     </div>
     @if ($semesterAktif)
-      <p style="text-align:center;color:var(--ws-muted);font-size:.88rem;margin-top:14px">
-        Data semester {{ $semesterAktif->semester }} {{ $semesterAktif->tahun_pelajaran }}
-      </p>
+      <p class="ws-stat-note">Data berjalan — semester {{ $semesterAktif->semester }} tahun pelajaran {{ $semesterAktif->tahun_pelajaran }}</p>
     @endif
   </div>
 
   {{-- ── Sambutan + Visi Misi ─────────────────────────────────────── --}}
   @if ($web->sambutan || $web->visi || $web->misi)
-    <section class="ws-section" id="sambutan">
-      <div class="ws-container ws-duo">
+    <section class="ws-section" id="sambutan" style="padding-bottom:70px">
+      <div class="ws-container">
+        <div class="ws-sec-head" data-reveal>
+          <span class="ws-eyebrow-sm">Profil Sekolah</span>
+          <h2>Mengenal {{ $namaSekolah }}</h2>
+        </div>
         @if ($web->sambutan)
-          <div class="ws-box">
-            <h3>Sambutan Kepala Sekolah</h3>
-            <p class="ws-pre">{{ $web->sambutan }}</p>
-            @if ($detail?->kepala_sekolah)
-              <p style="margin-top:16px"><strong>{{ $detail->kepala_sekolah }}</strong><br>
-                <span style="color:var(--ws-muted)">Kepala {{ $namaSekolah }}@if ($detail->nip) &middot; NIP {{ $detail->nip }} @endif</span></p>
-            @endif
+          <div class="ws-sambutan">
+            <aside class="ws-kepsek" data-reveal>
+              <svg class="ws-quote" viewBox="0 0 24 24" fill="currentColor"><path d="M10 7H6a3 3 0 0 0-3 3v7h7v-7H7c0-1.7 1.3-3 3-3V7zm11 0h-4a3 3 0 0 0-3 3v7h7v-7h-3c0-1.7 1.3-3 3-3V7z"/></svg>
+              <span class="ws-jabatan">Sambutan Kepala Sekolah</span>
+              @if ($detail?->kepala_sekolah)
+                <span class="ws-nama">{{ $detail->kepala_sekolah }}</span>
+                <span class="ws-nip">Kepala {{ $namaSekolah }}@if ($detail->nip) &middot; NIP {{ $detail->nip }} @endif</span>
+              @else
+                <span class="ws-nama">Kepala {{ $namaSekolah }}</span>
+              @endif
+            </aside>
+            <div class="ws-sambutan-teks" data-reveal>
+              <p class="ws-pre">{{ $web->sambutan }}</p>
+            </div>
           </div>
         @endif
         @if ($web->visi || $web->misi)
-          <div class="ws-box" id="visi-misi">
+          <div class="ws-visimisi" id="visi-misi">
             @if ($web->visi)
-              <h3>Visi</h3>
-              <p class="ws-pre" style="margin-bottom:18px">{{ $web->visi }}</p>
+              <div class="ws-vm" data-reveal>
+                <span class="ws-vm-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
+                <h3>Visi</h3>
+                <p class="ws-pre">{{ $web->visi }}</p>
+              </div>
             @endif
             @if ($web->misi)
-              <h3>Misi</h3>
-              <p class="ws-pre">{{ $web->misi }}</p>
+              <div class="ws-vm" data-reveal>
+                <span class="ws-vm-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 5h13l-2.5 4L17 13H4"/></svg></span>
+                <h3>Misi</h3>
+                <p class="ws-pre">{{ $web->misi }}</p>
+              </div>
             @endif
           </div>
         @endif
@@ -80,25 +99,34 @@
   @endif
 
   {{-- ── Berita terbaru ───────────────────────────────────────────── --}}
-  <section class="ws-section ws-section-alt">
+  <section class="ws-section ws-section-alt" style="padding-top:70px">
     <div class="ws-container">
-      <h2>Berita &amp; Pengumuman</h2>
-      <p class="ws-sub">Kabar terbaru dari {{ $namaSekolah }}.
-        <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Lihat semua berita →</a></p>
+      <div class="ws-sec-head" data-reveal style="display:flex;gap:20px;align-items:flex-end;max-width:none;flex-wrap:wrap">
+        <div style="flex:1;min-width:260px">
+          <span class="ws-eyebrow-sm">Kabar Sekolah</span>
+          <h2>Berita &amp; Pengumuman</h2>
+          <p>Informasi dan kegiatan terbaru dari {{ $namaSekolah }}.</p>
+        </div>
+        <a class="ws-btn ws-btn-outline" href="{{ route('web-sekolah.berita.index', $web->slug) }}">Semua Berita <span class="ws-arrow">&rarr;</span></a>
+      </div>
       @if ($beritaTerbaru->isEmpty())
         <div class="ws-empty">Belum ada berita yang diterbitkan.</div>
       @else
         <div class="ws-grid">
           @foreach ($beritaTerbaru as $b)
-            <article class="ws-card">
-              @if ($b->foto)
-                <img src="{{ route('web-sekolah.berita.foto', $b) }}" alt="{{ $b->judul }}">
-              @endif
+            <article class="ws-card" data-reveal>
+              <div class="ws-card-media">
+                @if ($b->foto)
+                  <img src="{{ route('web-sekolah.berita.foto', $b) }}" alt="{{ $b->judul }}" loading="lazy">
+                @else
+                  <span class="ws-nofoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.6-4.6a2 2 0 0 0-2.8 0L6 18"/></svg></span>
+                @endif
+                <span class="ws-datechip">{{ $b->diterbitkan_pada?->translatedFormat('d M Y') }}</span>
+              </div>
               <div class="ws-card-body">
-                <span class="ws-date">{{ $b->diterbitkan_pada?->translatedFormat('d F Y') }}</span>
-                <h3><a href="{{ route('web-sekolah.berita.tampil', [$web->slug, $b->slug]) }}" style="color:inherit">{{ $b->judul }}</a></h3>
+                <h3><a href="{{ route('web-sekolah.berita.tampil', [$web->slug, $b->slug]) }}">{{ $b->judul }}</a></h3>
                 <p>{{ $b->ringkasan }}</p>
-                <a href="{{ route('web-sekolah.berita.tampil', [$web->slug, $b->slug]) }}">Baca selengkapnya →</a>
+                <a class="ws-readmore" href="{{ route('web-sekolah.berita.tampil', [$web->slug, $b->slug]) }}">Baca selengkapnya <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
               </div>
             </article>
           @endforeach
@@ -109,16 +137,19 @@
 
   {{-- ── Galeri ───────────────────────────────────────────────────── --}}
   @if ($galeri->isNotEmpty())
-    <section class="ws-section" id="galeri">
+    <section class="ws-section" id="galeri" style="padding-top:70px">
       <div class="ws-container">
-        <h2>Galeri Kegiatan</h2>
-        <p class="ws-sub">Dokumentasi kegiatan {{ $namaSekolah }}.</p>
+        <div class="ws-sec-head" data-reveal>
+          <span class="ws-eyebrow-sm">Dokumentasi</span>
+          <h2>Galeri Kegiatan</h2>
+          <p>Momen dan aktivitas {{ $namaSekolah }} — ketuk foto untuk memperbesar.</p>
+        </div>
         <div class="ws-galeri">
           @foreach ($galeri as $g)
-            <figure>
+            <figure data-reveal>
               <img src="{{ route('web-sekolah.galeri.foto', $g) }}" alt="{{ $g->judul ?? 'Galeri ' . $namaSekolah }}" loading="lazy">
               @if ($g->judul)
-                <figcaption>{{ $g->judul }}</figcaption>
+                <figcaption>{{ $g->judul }}@if ($g->keterangan) — {{ $g->keterangan }} @endif</figcaption>
               @endif
             </figure>
           @endforeach
@@ -127,49 +158,178 @@
     </section>
   @endif
 
-  {{-- ── Layanan publik ───────────────────────────────────────────── --}}
-  <section class="ws-section ws-section-alt">
+  {{-- ── Keunggulan (dari data sekolah) ───────────────────────────── --}}
+  <section class="ws-section ws-section-alt" style="padding-top:70px;padding-bottom:70px">
     <div class="ws-container">
-      <h2>Layanan Publik</h2>
-      <p class="ws-sub">Layanan daring yang disediakan sekolah.</p>
-      <div class="ws-grid">
-        <div class="ws-card"><div class="ws-card-body">
-          <h3>🎓 Cek Kelulusan / SKHU</h3>
-          <p>Periksa keaslian dan data Surat Keterangan Hasil Ujian / kelulusan dengan NISN siswa.</p>
-          <a href="{{ route('validasi-kelulusan.index') }}">Buka layanan →</a>
-        </div></div>
-        <div class="ws-card"><div class="ws-card-body">
-          <h3>📰 Berita Sekolah</h3>
-          <p>Pengumuman, agenda, dan kabar kegiatan sekolah terbaru.</p>
-          <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Buka berita →</a>
-        </div></div>
-        <div class="ws-card"><div class="ws-card-body">
-          <h3>🔐 Portal myschool</h3>
-          <p>Masuk untuk guru, tenaga kependidikan, dan pengelola sekolah.</p>
-          <a href="{{ route('login') }}">Masuk →</a>
-        </div></div>
+      <div class="ws-sec-head" data-reveal>
+        <span class="ws-eyebrow-sm">Keunggulan</span>
+        <h2>Mengapa {{ $namaSekolah }}?</h2>
+      </div>
+      <div class="ws-unggul">
+        @if ($web->akreditasi)
+          <div class="ws-unggul-item" data-reveal>
+            <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-2 7 5.5-3 5.5 3-2-7"/></svg></span>
+            <div><h3>Terakreditasi {{ $web->akreditasi }}</h3><p>Mutu pendidikan teruji melalui akreditasi BAN-S/M.</p></div>
+          </div>
+        @endif
+        @if ($web->tahun_berdiri)
+          <div class="ws-unggul-item" data-reveal>
+            <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></span>
+            <div><h3>{{ date('Y') - $web->tahun_berdiri }} Tahun Mengabdi</h3><p>Berdiri sejak {{ $web->tahun_berdiri }}, melayani pendidikan di lingkungan sekitar.</p></div>
+          </div>
+        @endif
+        @if ($statistik['guru'] > 0)
+          <div class="ws-unggul-item" data-reveal>
+            <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <div><h3>Rasio Guru 1 : {{ max(1, (int) round($statistik['siswa'] / max(1, $statistik['guru']))) }}</h3><p>{{ $statistik['ptk'] }} guru &amp; tenaga kependidikan mendampingi {{ number_format($statistik['siswa'], 0, ',', '.') }} siswa.</p></div>
+          </div>
+        @endif
+        <div class="ws-unggul-item" data-reveal>
+          <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span>
+          <div><h3>Layanan Daring 24 Jam</h3><p>Cek kelulusan, berita, dan informasi sekolah dapat diakses kapan saja dari mana saja.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {{-- ── Agenda kalender pendidikan ───────────────────────────────── --}}
+  @if (($agenda ?? collect())->isNotEmpty())
+    <section class="ws-section" style="padding-top:70px">
+      <div class="ws-container">
+        <div class="ws-sec-head" data-reveal>
+          <span class="ws-eyebrow-sm">Kalender Pendidikan</span>
+          <h2>Agenda Terdekat</h2>
+          <p>Kegiatan dan hari libur pada kalender pendidikan yang sedang berjalan.</p>
+        </div>
+        <div class="ws-agenda">
+          @foreach ($agenda as $a)
+            <div class="ws-agenda-item" data-reveal>
+              <div class="ws-agenda-tgl">
+                <div class="ws-d">{{ $a->tanggal_mulai->format('d') }}</div>
+                <div class="ws-m">{{ $a->tanggal_mulai->translatedFormat('M') }}</div>
+              </div>
+              <div class="ws-agenda-isi">
+                <h3>{{ $a->kegiatan }}</h3>
+                <p>
+                  {{ $a->tanggal_mulai->translatedFormat('l, d F Y') }}
+                  @if ($a->tanggal_selesai && $a->tanggal_selesai->ne($a->tanggal_mulai))
+                    &ndash; {{ $a->tanggal_selesai->translatedFormat('l, d F Y') }}
+                  @endif
+                  &middot; {{ $a->jenis }}
+                </p>
+              </div>
+              @if ($a->is_libur)
+                <span class="ws-lencana ws-lencana-libur">Libur</span>
+              @else
+                <span class="ws-lencana ws-lencana-kegiatan">Kegiatan</span>
+              @endif
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </section>
+  @endif
+
+  {{-- ── Dewan guru & tendik ──────────────────────────────────────── --}}
+  @if (($dewanGuru ?? collect())->isNotEmpty())
+    <section class="ws-section ws-section-alt" style="padding-top:70px">
+      <div class="ws-container">
+        <div class="ws-sec-head" data-reveal>
+          <span class="ws-eyebrow-sm">Sumber Daya Manusia</span>
+          <h2>Guru &amp; Tenaga Kependidikan</h2>
+          <p>Pendidik dan tenaga kependidikan yang mengabdi di {{ $namaSekolah }}.</p>
+        </div>
+        <div class="ws-guru">
+          @foreach ($dewanGuru as $p)
+            <div class="ws-guru-card" data-reveal>
+              @if ($p->photo)
+                <img src="{{ route('web-sekolah.ptk.foto', $p) }}" alt="Foto {{ $p->nama_lengkap }}" loading="lazy" onerror="this.outerHTML = '<span class=&quot;ws-inisial&quot;>{{ strtoupper(substr($p->nama_ptk, 0, 1)) }}</span>'">
+              @else
+                <span class="ws-inisial">{{ strtoupper(substr($p->nama_ptk, 0, 1)) }}</span>
+              @endif
+              <h3>{{ $p->nama_lengkap }}</h3>
+              <p class="ws-jbt">{{ $p->jabatan }}</p>
+              @if ($p->jenis_kepegawaian)
+                <p class="ws-peg">{{ $p->jenis_kepegawaian }}</p>
+              @endif
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </section>
+  @endif
+
+  {{-- ── Layanan publik ───────────────────────────────────────────── --}}
+  <section class="ws-section" style="padding-top:70px">
+    <div class="ws-container">
+      <div class="ws-sec-head" data-reveal>
+        <span class="ws-eyebrow-sm">Layanan Publik</span>
+        <h2>Layanan Daring Sekolah</h2>
+        <p>Layanan yang dapat diakses masyarakat tanpa harus datang ke sekolah.</p>
+      </div>
+      <div class="ws-layanan">
+        <div class="ws-card" data-reveal>
+          <span class="ws-ikon ws-ikon-ambar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9.5 12 4 2 9.5l10 5.5 10-5.5z"/><path d="M6 11.8V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.2"/><path d="M22 9.5V16"/></svg></span>
+          <h3>Cek Kelulusan / SKHU</h3>
+          <p>Periksa keaslian dan data Surat Keterangan Hasil Ujian / kelulusan cukup dengan NISN siswa.</p>
+          <a class="ws-readmore" href="{{ route('validasi-kelulusan.index') }}">Buka layanan <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="ws-card" data-reveal>
+          <span class="ws-ikon ws-ikon-biru"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0V9"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg></span>
+          <h3>Berita Sekolah</h3>
+          <p>Pengumuman resmi, agenda, dan kabar kegiatan sekolah yang diterbitkan berkala.</p>
+          <a class="ws-readmore" href="{{ route('web-sekolah.berita.index', $web->slug) }}">Buka berita <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="ws-card" data-reveal>
+          <span class="ws-ikon ws-ikon-navy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+          <h3>Portal myschool</h3>
+          <p>Area masuk bagi guru, tenaga kependidikan, dan pengelola sekolah untuk layanan internal.</p>
+          <a class="ws-readmore" href="{{ route('login') }}">Masuk portal <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
       </div>
     </div>
   </section>
 
   {{-- ── Kontak ───────────────────────────────────────────────────── --}}
-  <section class="ws-section" id="kontak">
+  <section class="ws-section ws-section-alt" id="kontak" style="padding-top:70px">
     <div class="ws-container">
-      <h2>Kontak &amp; Lokasi</h2>
-      <p class="ws-sub">Silakan hubungi atau kunjungi kami.</p>
-      <div class="ws-box">
-        <p><strong>{{ $namaSekolah }}</strong></p>
-        @if ($detail?->alamat_sekolah)
-          <p>📍 {{ $detail->alamat_sekolah }}
-            @if ($detail->village) , {{ $detail->village->name ?? '' }} @endif
-            @if ($detail->district) , Kec. {{ $detail->district->name ?? '' }} @endif
-            @if ($detail->regency) , {{ $detail->regency->name ?? '' }} @endif
-            @if ($detail->province) , {{ $detail->province->name ?? '' }} @endif
-          </p>
-        @endif
-        @if ($detail?->no_telp) <p>📞 {{ $detail->no_telp }}</p> @endif
-        @if ($detail?->email) <p>✉️ <a href="mailto:{{ $detail->email }}">{{ $detail->email }}</a></p> @endif
-        @if ($detail?->kepala_sekolah) <p>👤 Kepala Sekolah: {{ $detail->kepala_sekolah }}</p> @endif
+      <div class="ws-sec-head" data-reveal>
+        <span class="ws-eyebrow-sm">Hubungi Kami</span>
+        <h2>Kontak &amp; Lokasi</h2>
+        <p>Silakan hubungi atau kunjungi kami pada hari dan jam kerja.</p>
+      </div>
+      <div class="ws-kontak">
+        <div class="ws-kontak-list" data-reveal>
+          @if ($detail?->alamat_sekolah)
+            <div class="ws-kontak-item">
+              <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+              <div><h4>Alamat</h4><p>{{ $detail->alamat_sekolah }}@if ($detail->village), {{ $detail->village->name ?? '' }}@endif @if ($detail->district), Kec. {{ $detail->district->name ?? '' }}@endif @if ($detail->regency), {{ $detail->regency->name ?? '' }}@endif @if ($detail->province), {{ $detail->province->name ?? '' }}@endif</p></div>
+            </div>
+          @endif
+          @if ($detail?->no_telp)
+            <div class="ws-kontak-item">
+              <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.13.96.36 1.9.7 2.8a2 2 0 0 1-.45 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.45c.9.34 1.84.57 2.8.7A2 2 0 0 1 22 16.9z"/></svg></span>
+              <div><h4>Telepon</h4><p>{{ $detail->no_telp }}</p></div>
+            </div>
+          @endif
+          @if ($detail?->email)
+            <div class="ws-kontak-item">
+              <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+              <div><h4>Surel</h4><p><a href="mailto:{{ $detail->email }}">{{ $detail->email }}</a></p></div>
+            </div>
+          @endif
+          @if ($detail?->kepala_sekolah)
+            <div class="ws-kontak-item">
+              <span class="ws-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+              <div><h4>Kepala Sekolah</h4><p>{{ $detail->kepala_sekolah }}@if ($detail->nip) &middot; NIP {{ $detail->nip }} @endif</p></div>
+            </div>
+          @endif
+        </div>
+        <aside class="ws-cta" data-reveal>
+          <h3>Perlu memeriksa kelulusan putra-putri Anda?</h3>
+          <p>Layanan cek kelulusan daring tersedia setiap saat — cukup siapkan NISN siswa, tanpa perlu datang ke sekolah.</p>
+          <a class="ws-btn ws-btn-accent" href="{{ route('validasi-kelulusan.index') }}">Cek Kelulusan Sekarang <span class="ws-arrow">&rarr;</span></a>
+        </aside>
       </div>
     </div>
   </section>

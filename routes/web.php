@@ -153,6 +153,7 @@ Route::controller(WebSekolahController::class)->group(function () {
   Route::get('/sekolah/{slugWeb}/logo', 'logo')->name('web-sekolah.logo');
   Route::get('/web-berita/{berita}/foto', 'fotoBerita')->name('web-sekolah.berita.foto');
   Route::get('/web-galeri/{galeri}/foto', 'fotoGaleri')->name('web-sekolah.galeri.foto');
+  Route::get('/web-ptk/{ptk}/foto', 'fotoPtk')->name('web-sekolah.ptk.foto');
 });
 
 /*
