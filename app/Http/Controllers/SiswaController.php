@@ -65,6 +65,34 @@ class SiswaController extends Controller
     return view('content.siswa.show', compact('siswa'));
   }
 
+  /**
+   * Alirkan berkas foto siswa untuk tampilan daftar (SKHU, SKL, Ijazah).
+   * SENGAJA lewat route, bukan asset('storage/...'): symlink
+   * public/storage tidak selalu ada (di hosting bersama memang tidak
+   * ada) sehingga foto tampil sebagai gambar pecah — akar yang sama
+   * seperti foto PTK (PtkController::foto).
+   *
+   * Beda dengan PTK: model Siswa TIDAK memakai SekolahScope, jadi
+   * route-model binding saja bisa membuka foto siswa sekolah lain.
+   * Karena itu di sini diperiksa registrasi siswa di sekolah konteks
+   * penampil (pola yang sama dipakai SkhuController/SklController:
+   * session admin_sekolah_id, kalau tidak ada pakai sekolah PTK).
+   * Admin tanpa sekolah konteks (memantau semua sekolah) lolos.
+   */
+  public function foto(Siswa $siswa)
+  {
+    $user = Auth::user();
+    $sekolahId = session('admin_sekolah_id') ?? $user?->ptk?->sekolah_id;
+
+    if ($sekolahId && ! $siswa->siswaRegistrasi()->where('sekolah_id', $sekolahId)->exists()) {
+      abort(403);
+    }
+
+    abort_if(! $siswa->photo || ! Storage::disk('public')->exists($siswa->photo), 404);
+
+    return Storage::disk('public')->response($siswa->photo);
+  }
+
   public function tabel(Request $request): JsonResponse
   {
     $user = Auth::user();

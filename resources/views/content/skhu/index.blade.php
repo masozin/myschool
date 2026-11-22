@@ -202,7 +202,7 @@
                   <!-- Kontainer Foto -->
                   <div class="avatar avatar-sm me-3">
                     @if ($siswa->photo)
-                      <img src="{{ asset('storage/' . $siswa->photo) }}" class="rounded-circle"
+                      <img src="{{ route('siswa.foto', $siswa->id) }}" class="rounded-circle"
                         style="object-fit: cover; width:32px; height:32px;">
                     @else
                       @php

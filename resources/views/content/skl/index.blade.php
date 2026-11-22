@@ -328,7 +328,7 @@
                   <div class="d-flex align-items-center gap-2">
                     <div class="avatar avatar-sm">
                       @if ($siswa->photo)
-                        <img src="{{ asset('storage/' . $siswa->photo) }}" class="rounded-circle"
+                        <img src="{{ route('siswa.foto', $siswa->id) }}" class="rounded-circle"
                           style="object-fit:cover;width:32px;height:32px;">
                       @else
                         <span

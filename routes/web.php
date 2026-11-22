@@ -321,6 +321,15 @@ Route::get('/ptk/{ptk}/foto', [PtkController::class, 'foto'])
   ->middleware('auth:sanctum')
   ->name('ptk.foto');
 
+// Foto siswa dialirkan lewat route yang sama polanya (daftar SKHU, SKL,
+// Ijazah memakai asset('storage/...') yang pecah di hosting tanpa
+// symlink). Di luar grup role siswa di bawah supaya Guru pun bisa
+// memuat avatar daftar; pembatasan sekolahnya ada di controller
+// (SiswaController::foto), karena model Siswa tidak memakai SekolahScope.
+Route::get('/siswa/{siswa}/foto', [SiswaController::class, 'foto'])
+  ->middleware('auth:sanctum')
+  ->name('siswa.foto');
+
 Route::controller(PtkController::class)
   ->prefix('ptk')
   ->name('ptk.')
