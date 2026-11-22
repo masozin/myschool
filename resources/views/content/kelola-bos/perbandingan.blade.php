@@ -57,7 +57,7 @@
             <select name="tahun" class="form-select">
               <option value="">Pilih tahun</option>
               @foreach ($daftarTahun as $th)
-                <option value="{{ $th }}" {{ (int) request('tahun') === $th ? 'selected' : '' }}>{{ $th }}</option>
+                <option value="{{ $th }}" {{ ($tahunTerpilih ?? null) === $th ? 'selected' : '' }}>{{ $th }}</option>
               @endforeach
             </select>
           </div>
@@ -67,7 +67,7 @@
               <option value="">Pilih sumber</option>
               @foreach ($daftarSumberDana as $sd)
                 <option value="{{ $sd->id_ref_sumber_dana }}"
-                  {{ (int) request('sumber_dana') === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
+                  {{ ($sumberTerpilih ?? null) === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
                   {{ $sd->nama_sumber_dana }}</option>
               @endforeach
             </select>
@@ -77,7 +77,7 @@
             <select name="versi_a" class="form-select">
               <option value="">Pilih versi</option>
               @foreach ($daftarVersi as $v)
-                <option value="{{ $v['id_arkas'] }}" {{ request('versi_a') === $v['id_arkas'] ? 'selected' : '' }}>
+                <option value="{{ $v['id_arkas'] }}" {{ ($versiATerpilih ?? '') === $v['id_arkas'] ? 'selected' : '' }}>
                   {{ $v['label'] }} ({{ $v['disetujui'] ? 'Disetujui' : 'Draf' }})</option>
               @endforeach
             </select>
@@ -87,7 +87,7 @@
             <select name="versi_b" class="form-select">
               <option value="">Pilih versi</option>
               @foreach ($daftarVersi as $v)
-                <option value="{{ $v['id_arkas'] }}" {{ request('versi_b') === $v['id_arkas'] ? 'selected' : '' }}>
+                <option value="{{ $v['id_arkas'] }}" {{ ($versiBTerpilih ?? '') === $v['id_arkas'] ? 'selected' : '' }}>
                   {{ $v['label'] }} ({{ $v['disetujui'] ? 'Disetujui' : 'Draf' }})</option>
               @endforeach
             </select>
@@ -96,8 +96,9 @@
             <button type="submit" class="btn btn-primary"><i class="icon-base ri ri-git-compare-line me-1"></i>Bandingkan</button>
           </div>
         </form>
-        <p class="text-muted small mb-0 mt-2">Pilih tahun &amp; sumber dana lalu klik Bandingkan sekali untuk memuat
-          daftar versinya, kemudian pilih Versi A dan Versi B dan klik Bandingkan lagi.</p>
+        <p class="text-muted small mb-0 mt-2">Bawaan: tahun berjalan, BOS Reguler, Versi A = versi terakhir
+          disetujui, Versi B = versi terbaru (termasuk draf yang sedang dikerjakan). Ubah pilihan di atas lalu
+          klik Bandingkan bila perlu.</p>
       </div>
     </div>
 

@@ -179,7 +179,7 @@
             <select name="tahun" class="form-select">
               <option value="">Semua tahun</option>
               @foreach ($daftarTahun as $th)
-                <option value="{{ $th }}" {{ (int) request('tahun') === $th ? 'selected' : '' }}>{{ $th }}</option>
+                <option value="{{ $th }}" {{ ($tahunTerpilih ?? null) === $th ? 'selected' : '' }}>{{ $th }}</option>
               @endforeach
             </select>
           </div>
@@ -189,12 +189,12 @@
               <option value="">Semua</option>
               @foreach ($daftarSumberDana as $sd)
                 <option value="{{ $sd->id_ref_sumber_dana }}"
-                  {{ (int) request('sumber_dana') === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
+                  {{ ($sumberTerpilih ?? null) === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
                   {{ $sd->nama_sumber_dana }}</option>
               @endforeach
             </select>
           </div>
-          @if (request()->filled('sumber_dana'))
+          @if (($sumberTerpilih ?? null) !== null)
             <div class="col-6 col-md-2">
               <label class="form-label">Versi RKAS</label>
               <select name="versi" class="form-select">

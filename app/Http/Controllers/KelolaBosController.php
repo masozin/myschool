@@ -27,6 +27,11 @@ use Illuminate\Support\Facades\Auth;
  * dari sini; ia datang dari agen sinkron di laptop ARKAS.
  * Satu-satunya penulisan adalah nama alias (Fase 1.7) —
  * lapisan kerja milik pengguna, terpisah dari cermin.
+ * Fase 1.10: Referensi Kegiatan dibatasi ke jenjang
+ * sekolah (dari pemakaian rapbs, cadangan jenjang
+ * tabel_sekolah) dan halaman-halaman dibuka dengan
+ * bawaan tahun berjalan + BOS Reguler + versi terakhir
+ * disetujui bila parameternya tidak dikirim.
  *
  * Operator Sekolah & Kepala Sekolah melihat sekolahnya;
  * Admin memantau lewat pemilih sekolah (pola Surat Keluar).
@@ -167,6 +172,110 @@ class KelolaBosController extends Controller
       ->get();
   }
 
+  // ── Bawaan halaman (Fase 1.10) ──────────────────────
+  //
+  // Halaman Kelola BOS dibuka dengan pilihan yang paling
+  // sering dipakai: tahun berjalan dan — untuk Kertas
+  // Kerja & Perbandingan — BOS Reguler serta versi
+  // terakhir disetujui. Bawaan hanya berlaku bila
+  // parameternya TIDAK dikirim sama sekali; pilihan
+  // eksplisit pengguna (termasuk memilih "semua" yang
+  // mengirim parameter kosong) selalu menang.
+
+  /** Tahun bawaan dari daftar tahun yang tersedia. */
+  private function tahunBawaan(array $daftarTahun): ?int
+  {
+    if (!$daftarTahun) {
+      return null;
+    }
+    $tahunIni = (int) now()->format('Y');
+    return in_array($tahunIni, $daftarTahun, true) ? $tahunIni : max($daftarTahun);
+  }
+
+  /**
+   * Tahun efektif sebuah halaman: nilai parameter bila
+   * diisi; null (semua tahun) bila parameter dikirim
+   * kosong secara eksplisit; bawaan bila parameter
+   * tidak dikirim sama sekali.
+   */
+  private function tahunEfektif(Request $request, array $daftarTahun): ?int
+  {
+    if ($request->filled('tahun')) {
+      return $request->integer('tahun');
+    }
+    if ($request->has('tahun')) {
+      return null;
+    }
+    return $this->tahunBawaan($daftarTahun);
+  }
+
+  /**
+   * Sumber dana bawaan untuk satu tahun dari kelompok
+   * versi: BOS Reguler (id_ref_sumber_dana 1) bila ada,
+   * selain itu sumber pertama yang tersedia tahun itu.
+   */
+  private function sumberBawaan(array $kelompok, ?int $tahun): ?int
+  {
+    $ada = [];
+    foreach ($kelompok as $k) {
+      if ($tahun !== null && $k['tahun'] !== $tahun) {
+        continue;
+      }
+      $ada[] = $k['sumber'];
+    }
+    if (!$ada) {
+      return null;
+    }
+    return in_array(1, $ada, true) ? 1 : $ada[0];
+  }
+
+  // ── Jenjang sekolah (Fase 1.10) ─────────────────────
+  //
+  // bentuk_pendidikan_id sekolah ini, untuk membatasi
+  // Referensi Kegiatan ke jenjangnya sendiri. Urutan
+  // penurunan:
+  //  1. Dari pemakaian nyata: varian ref_kode yang
+  //     benar-benar dipakai baris rapbs sekolah ini —
+  //     varian dibedakan lewat tahun anggaran baris
+  //     (id_ref_tahun_anggaran) dan sumber dana
+  //     anggarannya; bentuk yang paling banyak dipakai
+  //     menang. Ini bukti terkuat.
+  //  2. Cadangan: tabel_sekolah.jenjang dipetakan ke id
+  //     bentuk ARKAS — hanya pasangan yang terbukti dari
+  //     data ('SD' → 5). Jenjang lain sengaja TIDAK
+  //     dipetakan: ARKAS tidak menyediakan tabel padanan
+  //     dan id bentuknya belum terverifikasi.
+  //  3. Keduanya kosong → null (tanpa pembatasan).
+
+  private function bentukSekolah(int $sekolahId): ?int
+  {
+    $baris = BosRefKode::query()
+      ->from('bos_ref_kode as rk')
+      ->join('bos_rapbs as rp', function ($j) {
+        $j->on('rp.id_ref_kode', '=', 'rk.id_ref_kode')
+          ->on('rp.sekolah_id', '=', 'rk.sekolah_id')
+          ->on('rp.id_ref_tahun_anggaran', '=', 'rk.tahun');
+      })
+      ->join('bos_anggaran as ag', function ($j) {
+        $j->on('ag.id_arkas', '=', 'rp.id_anggaran_arkas')
+          ->on('ag.sekolah_id', '=', 'rp.sekolah_id')
+          ->on('ag.id_ref_sumber_dana', '=', 'rk.sumber_dana_id');
+      })
+      ->where('rk.sekolah_id', $sekolahId)
+      ->where('rp.soft_delete', false)
+      ->whereNotNull('rk.bentuk_pendidikan_id')
+      ->selectRaw('rk.bentuk_pendidikan_id as bentuk, COUNT(*) as terpakai')
+      ->groupBy('rk.bentuk_pendidikan_id')
+      ->orderByDesc('terpakai')
+      ->first();
+    if ($baris) {
+      return (int) $baris->bentuk;
+    }
+
+    $jenjang = strtoupper(trim((string) (Sekolah::find($sekolahId)?->jenjang ?? '')));
+    return ['SD' => 5][$jenjang] ?? null;
+  }
+
   // ── Versi kertas kerja ─────────────────────────────────
   //
   // Di ARKAS, setiap revisi RKAS adalah salinan utuh kertas
@@ -302,11 +411,22 @@ class KelolaBosController extends Controller
         'arah' => 'asc',
         'petaAlias' => [],
         'bisaTulisAlias' => false,
+        'tahunTerpilih' => null,
+        'sumberTerpilih' => null,
       ]);
     }
 
-    $tahunReq = $request->filled('tahun') ? $request->integer('tahun') : null;
-    $sumberReq = $request->filled('sumber_dana') ? $request->integer('sumber_dana') : null;
+    // Bawaan Fase 1.10: tanpa parameter tahun → tahun
+    // berjalan (cadangan tahun terbesar yang ada); tanpa
+    // parameter sumber dana → BOS Reguler bila ada pada
+    // tahun efektif. Parameter yang dikirim kosong secara
+    // eksplisit ("semua") tetap dihormati.
+    $daftarTahun = $this->daftarTahun($sekolahId);
+    $tahunReq = $this->tahunEfektif($request, $daftarTahun);
+    $kelompok = $this->kelompokVersi($sekolahId);
+    $sumberReq = $request->filled('sumber_dana')
+      ? $request->integer('sumber_dana')
+      : ($request->has('sumber_dana') ? null : $this->sumberBawaan($kelompok, $tahunReq));
     $versiParam = $request->filled('versi') ? (string) $request->input('versi') : null;
 
     // ── Tiga tampilan Kertas Kerja (Fase 1.8) ──
@@ -358,7 +478,6 @@ class KelolaBosController extends Controller
       $statusFilter = '';
     }
 
-    $kelompok = $this->kelompokVersi($sekolahId);
     $idsUtama = $this->pilihVersiIds($kelompok, $tahunReq, $sumberReq, $versiParam);
     // Ringkasan per sumber dana tidak ikut saringan sumber
     // dana, tetapi mengikuti pilihan versi & tahun.
@@ -602,7 +721,9 @@ class KelolaBosController extends Controller
       'baris' => $baris,
       'totalJumlah' => $totalJumlah,
       'ringkasan' => $ringkasan,
-      'daftarTahun' => $this->daftarTahun($sekolahId),
+      'daftarTahun' => $daftarTahun,
+      'tahunTerpilih' => $tahunReq,
+      'sumberTerpilih' => $sumberReq,
       'daftarSumberDana' => $this->daftarSumberDana($sekolahId),
       'daftarKegiatan' => $daftarKegiatan,
       'daftarVersi' => $this->pilihanVersi($kelompok, $tahunReq, $sumberReq),
@@ -633,18 +754,79 @@ class KelolaBosController extends Controller
       'daftarTahun' => $sekolahId ? $this->daftarTahun($sekolahId) : [],
       'daftarSumberDana' => $sekolahId ? $this->daftarSumberDana($sekolahId) : collect(),
       'daftarVersi' => [],
+      'tahunTerpilih' => null,
+      'sumberTerpilih' => null,
+      'versiATerpilih' => '',
+      'versiBTerpilih' => '',
     ];
     if (!$sekolahId) {
       return view('content.kelola-bos.perbandingan', $konteks + $kosong);
     }
 
-    $tahunReq = $request->filled('tahun') ? $request->integer('tahun') : null;
-    $sumberReq = $request->filled('sumber_dana') ? $request->integer('sumber_dana') : null;
+    // Bawaan Fase 1.10 sama seperti Kertas Kerja: tahun
+    // berjalan & BOS Reguler bila parameternya tidak
+    // dikirim sama sekali.
+    $tahunReq = $this->tahunEfektif($request, $kosong['daftarTahun']);
     $kelompok = $this->kelompokVersi($sekolahId);
+    $sumberReq = $request->filled('sumber_dana')
+      ? $request->integer('sumber_dana')
+      : ($request->has('sumber_dana') ? null : $this->sumberBawaan($kelompok, $tahunReq));
     $kosong['daftarVersi'] = $this->pilihanVersi($kelompok, $tahunReq, $sumberReq);
+    $kosong['tahunTerpilih'] = $tahunReq;
+    $kosong['sumberTerpilih'] = $sumberReq;
 
-    $idA = (string) $request->input('versi_a', '');
-    $idB = (string) $request->input('versi_b', '');
+    // Bawaan versi (Fase 1.10): A = versi disetujui
+    // terakhir pada (tahun, sumber) efektif; B = versi
+    // terbaru yang berbeda dari A — memunculkan draf
+    // yang sedang dikerjakan (mis. Revisi 3) — cadangan
+    // versi sebelum A, terakhir A itu sendiri. Bawaan
+    // hanya bila parameternya tidak dikirim sama sekali.
+    $grupScope = null;
+    foreach ($kelompok as $k) {
+      if (($tahunReq === null || $k['tahun'] === $tahunReq)
+        && ($sumberReq === null || $k['sumber'] === $sumberReq)) {
+        $grupScope = $k;
+        break;
+      }
+    }
+    if ($request->has('versi_a')) {
+      $idA = (string) $request->input('versi_a', '');
+    } else {
+      $idA = '';
+      if ($grupScope) {
+        $disetujui = $grupScope['versi']->filter(fn($a) => (int) $a->is_approve === 1)->last();
+        $pilihA = $disetujui ?: $grupScope['versi']->last();
+        $idA = $pilihA ? (string) $pilihA->id_arkas : '';
+      }
+    }
+    if ($request->has('versi_b')) {
+      $idB = (string) $request->input('versi_b', '');
+    } else {
+      // Kelompok pemilik A (bisa berbeda dari kelompok
+      // cakupan bila A dipilih eksplisit).
+      $grupB = $grupScope;
+      foreach ($kelompok as $k) {
+        if ($k['versi']->contains(fn($a) => (string) $a->id_arkas === $idA)) {
+          $grupB = $k;
+          break;
+        }
+      }
+      $idB = '';
+      if ($grupB) {
+        $daftar = $grupB['versi'];
+        $terbaru = $daftar->last();
+        if ($terbaru && (string) $terbaru->id_arkas !== $idA) {
+          $idB = (string) $terbaru->id_arkas;
+        } else {
+          $idx = $daftar->search(fn($a) => (string) $a->id_arkas === $idA);
+          $idB = ($idx !== false && $idx > 0)
+            ? (string) $daftar[$idx - 1]->id_arkas
+            : $idA;
+        }
+      }
+    }
+    $kosong['versiATerpilih'] = $idA;
+    $kosong['versiBTerpilih'] = $idB;
     if (!$idA || !$idB || $idA === $idB) {
       return view('content.kelola-bos.perbandingan', $konteks + $kosong);
     }
@@ -776,6 +958,7 @@ class KelolaBosController extends Controller
         'arah' => 'asc',
         'petaAlias' => [],
         'bisaTulisAlias' => false,
+        'tahunTerpilih' => null,
       ]);
     }
 
@@ -784,8 +967,12 @@ class KelolaBosController extends Controller
     $urutKunci = isset($kolomUrut[$urutReq]) ? $urutReq : 'nama';
     $arah = $this->arah($request);
 
+    $daftarTahun = BosRefAcuanBarang::where('sekolah_id', $sekolahId)
+      ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
     $baris = BosRefAcuanBarang::where('sekolah_id', $sekolahId)
-      ->when($request->filled('tahun'), fn($x) => $x->where('tahun', $request->integer('tahun')))
+      ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('blok'), fn($x) => $x->where('blok_id', 'like', $request->input('blok') . '%'))
       ->when($request->filled('cari'), function ($x) use ($request) {
         $cari = '%' . $request->input('cari') . '%';
@@ -802,8 +989,8 @@ class KelolaBosController extends Controller
 
     return view('content.kelola-bos.referensi-barang', $konteks + [
       'baris' => $baris,
-      'daftarTahun' => BosRefAcuanBarang::where('sekolah_id', $sekolahId)
-        ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all(),
+      'daftarTahun' => $daftarTahun,
+      'tahunTerpilih' => $tahunEfektif,
       'daftarBlok' => BosRefAcuanBarang::where('sekolah_id', $sekolahId)
         ->distinct()->orderBy('blok_id')->pluck('blok_id')->all(),
       'urut' => $urutKunci,
@@ -824,15 +1011,35 @@ class KelolaBosController extends Controller
       return view('content.kelola-bos.referensi-kegiatan', $konteks + [
         'baris' => null,
         'daftarTahun' => [],
+        'tahunTerpilih' => null,
+        'bentukSekolah' => null,
+        'terbatasJenjang' => false,
       ]);
     }
 
+    $daftarTahun = BosRefKode::where('sekolah_id', $sekolahId)
+      ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
+    // Pembatasan jenjang (Fase 1.10): secara bawaan
+    // hanya varian bentuk pendidikan sekolah ini yang
+    // tampil — kode milik jenjang lain atau program
+    // Banpem khusus (mis. kode alat olahraga untuk
+    // jenjang lain) tidak lagi mengotori daftar.
+    // ?jenjang=semua menonaktifkan pembatasan. Cermin
+    // sendiri tetap lengkap; ini murni saringan tampil.
+    $bentuk = $this->bentukSekolah($sekolahId);
+    $terbatasJenjang = $bentuk !== null && $request->input('jenjang') !== 'semua';
+
     // ref_kode tersimpan per varian (sumber dana/bentuk);
     // untuk referensi cukup tampilkan baris unik per
-    // (id_kode, uraian, level, tahun).
+    // (id_kode, uraian, level, tahun). Saringan bentuk
+    // diterapkan SEBELUM pengelompokan agar kelompok
+    // menyusut ke varian sekolah ini.
     $baris = BosRefKode::where('sekolah_id', $sekolahId)
       ->whereNotNull('id_kode')
-      ->when($request->filled('tahun'), fn($x) => $x->where('tahun', $request->integer('tahun')))
+      ->when($terbatasJenjang, fn($x) => $x->where('bentuk_pendidikan_id', $bentuk))
+      ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('cari'), function ($x) use ($request) {
         $cari = '%' . $request->input('cari') . '%';
         $x->where(function ($y) use ($cari) {
@@ -849,8 +1056,10 @@ class KelolaBosController extends Controller
 
     return view('content.kelola-bos.referensi-kegiatan', $konteks + [
       'baris' => $baris,
-      'daftarTahun' => BosRefKode::where('sekolah_id', $sekolahId)
-        ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all(),
+      'daftarTahun' => $daftarTahun,
+      'tahunTerpilih' => $tahunEfektif,
+      'bentukSekolah' => $bentuk,
+      'terbatasJenjang' => $terbatasJenjang,
     ]);
   }
 
@@ -865,11 +1074,16 @@ class KelolaBosController extends Controller
       return view('content.kelola-bos.referensi-rekening', $konteks + [
         'baris' => null,
         'daftarTahun' => [],
+        'tahunTerpilih' => null,
       ]);
     }
 
+    $daftarTahun = BosRefRekening::where('sekolah_id', $sekolahId)
+      ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
     $baris = BosRefRekening::where('sekolah_id', $sekolahId)
-      ->when($request->filled('tahun'), fn($x) => $x->where('tahun', $request->integer('tahun')))
+      ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('cari'), function ($x) use ($request) {
         $cari = '%' . $request->input('cari') . '%';
         $x->where(function ($y) use ($cari) {
@@ -884,8 +1098,8 @@ class KelolaBosController extends Controller
 
     return view('content.kelola-bos.referensi-rekening', $konteks + [
       'baris' => $baris,
-      'daftarTahun' => BosRefRekening::where('sekolah_id', $sekolahId)
-        ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all(),
+      'daftarTahun' => $daftarTahun,
+      'tahunTerpilih' => $tahunEfektif,
     ]);
   }
 
@@ -907,6 +1121,7 @@ class KelolaBosController extends Controller
         'arah' => 'desc',
         'petaAlias' => [],
         'bisaTulisAlias' => false,
+        'tahunTerpilih' => null,
       ]);
     }
 
@@ -923,8 +1138,23 @@ class KelolaBosController extends Controller
       ->where('bos_kas_umum.sekolah_id', $sekolahId)
       ->where('bos_kas_umum.soft_delete', false);
 
-    $saring = function ($q) use ($request) {
-      $q->when($request->filled('tahun'), fn($x) => $x->whereYear('bos_kas_umum.tanggal_transaksi', $request->integer('tahun')))
+    // Bawaan tahun (Fase 1.10): tahun berjalan bila ada
+    // transaksi tahun itu, selain itu tahun terbesar.
+    $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+    $daftarTahun = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->selectRaw(($driver === 'mysql'
+        ? 'YEAR(tanggal_transaksi)'
+        : "CAST(strftime('%Y', tanggal_transaksi) AS INTEGER)") . ' as tahun')
+      ->distinct()
+      ->orderByDesc('tahun')
+      ->pluck('tahun')
+      ->map(fn($t) => (int) $t)
+      ->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
+    $saring = function ($q) use ($request, $tahunEfektif) {
+      $q->when($tahunEfektif !== null, fn($x) => $x->whereYear('bos_kas_umum.tanggal_transaksi', $tahunEfektif))
         ->when($request->filled('bulan'), fn($x) => $x->whereMonth('bos_kas_umum.tanggal_transaksi', $request->integer('bulan')))
         ->when($request->filled('jenis'), fn($x) => $x->where('bos_kas_umum.id_ref_bku', $request->integer('jenis')))
         ->when($request->filled('rekening'), fn($x) => $x->where('bos_kas_umum.kode_rekening', $request->input('rekening')))
@@ -954,7 +1184,6 @@ class KelolaBosController extends Controller
 
     // Nama rekening dipilih per tahun transaksi lewat subquery
     // (satu kode rekening punya nama per tahun di ref ARKAS).
-    $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
     $tahunTransaksi = $driver === 'mysql'
       ? 'YEAR(bos_kas_umum.tanggal_transaksi)'
       : "CAST(strftime('%Y', bos_kas_umum.tanggal_transaksi) AS INTEGER)";
@@ -975,17 +1204,6 @@ class KelolaBosController extends Controller
       ->orderByDesc('bos_kas_umum.id')
       ->paginate(25)
       ->withQueryString();
-
-    $daftarTahun = BosKasUmum::where('sekolah_id', $sekolahId)
-      ->where('soft_delete', false)
-      ->selectRaw(($driver === 'mysql'
-        ? 'YEAR(tanggal_transaksi)'
-        : "CAST(strftime('%Y', tanggal_transaksi) AS INTEGER)") . ' as tahun')
-      ->distinct()
-      ->orderByDesc('tahun')
-      ->pluck('tahun')
-      ->map(fn($t) => (int) $t)
-      ->all();
 
     $daftarJenis = BosRefBku::where('sekolah_id', $sekolahId)
       ->whereIn('id_ref_bku', function ($q) use ($sekolahId) {
@@ -1010,6 +1228,7 @@ class KelolaBosController extends Controller
       'baris' => $baris,
       'totalNominal' => $totalNominal,
       'daftarTahun' => $daftarTahun,
+      'tahunTerpilih' => $tahunEfektif,
       'daftarJenis' => $daftarJenis,
       'daftarRekening' => $daftarRekening,
       'urut' => $urutKunci,

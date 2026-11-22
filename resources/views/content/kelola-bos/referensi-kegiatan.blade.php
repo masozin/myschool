@@ -47,12 +47,15 @@
     <div class="card mb-4">
       <div class="card-body py-3">
         <form method="GET" action="{{ url('/kelola-bos/referensi/kegiatan') }}" class="row g-3 align-items-end">
+          @if (request('jenjang') === 'semua')
+            <input type="hidden" name="jenjang" value="semua">
+          @endif
           <div class="col-6 col-md-2">
             <label class="form-label">Tahun</label>
             <select name="tahun" class="form-select">
               <option value="">Semua tahun</option>
               @foreach ($daftarTahun as $th)
-                <option value="{{ $th }}" {{ (int) request('tahun') === $th ? 'selected' : '' }}>{{ $th }}</option>
+                <option value="{{ $th }}" {{ ($tahunTerpilih ?? null) === $th ? 'selected' : '' }}>{{ $th }}</option>
               @endforeach
             </select>
           </div>
@@ -68,6 +71,21 @@
         </form>
       </div>
     </div>
+
+    {{-- Keterangan pembatasan jenjang (Fase 1.10) --}}
+    @if ($terbatasJenjang ?? false)
+      <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <span><i class="icon-base ri ri-filter-3-line me-1"></i>Menampilkan kode sesuai jenjang sekolah ini.</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['jenjang' => 'semua', 'page' => null]) }}">Tampilkan
+          semua jenjang</a>
+      </div>
+    @elseif (($bentukSekolah ?? null) !== null)
+      <div class="alert alert-secondary d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <span><i class="icon-base ri ri-filter-off-line me-1"></i>Menampilkan kode semua jenjang.</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['jenjang' => null, 'page' => null]) }}">Hanya
+          jenjang sekolah ini</a>
+      </div>
+    @endif
 
     <div class="card">
       <div class="table-responsive">
