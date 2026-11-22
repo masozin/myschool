@@ -12,6 +12,7 @@ use Spatie\Permission\Models\Role;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class PtkController extends Controller
 {
@@ -53,7 +54,9 @@ class PtkController extends Controller
       'nama_ptk'      => 'required|string|max:255',
       'gelar_depan'   => 'nullable|string|max:50',
       'gelar_belakang' => 'nullable|string|max:100',
+      'tempat_lahir'  => 'nullable|string|max:100',
       'tanggal_lahir' => 'nullable|date',
+      'photo'         => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip',
       'jenis_kelamin' => 'required|in:L,P',
@@ -87,11 +90,19 @@ class PtkController extends Controller
 
     $validated = $request->validate($rules);
 
+    // Foto disimpan di folder yang sama dengan unggahan lewat profil
+    // (UserController): ptk_photos di disk public.
+    $pathFoto = $request->hasFile('photo')
+      ? $request->file('photo')->store('ptk_photos', 'public')
+      : null;
+
     Ptk::create([
       'nama_ptk'      => $validated['nama_ptk'],
       'gelar_depan'   => $validated['gelar_depan'] ?? null,
       'gelar_belakang' => $validated['gelar_belakang'] ?? null,
+      'tempat_lahir'  => $validated['tempat_lahir'] ?? null,
       'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
+      'photo'         => $pathFoto,
       'kode'          => $validated['kode'] ?? null,
       'nip'           => $validated['nip'],
       'jenis_kelamin' => $validated['jenis_kelamin'],
@@ -121,7 +132,10 @@ class PtkController extends Controller
       'nama_ptk'      => 'required|string|max:255',
       'gelar_depan'   => 'nullable|string|max:50',
       'gelar_belakang' => 'nullable|string|max:100',
+      'tempat_lahir'  => 'nullable|string|max:100',
       'tanggal_lahir' => 'nullable|date',
+      'photo'         => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+      'hapus_photo'   => 'nullable|boolean',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip,' . $id,
       'jenis_kelamin' => 'required|in:L,P',
@@ -151,7 +165,23 @@ class PtkController extends Controller
     // Simpan jabatan lama sebelum diupdate untuk pengecekan
     $jabatanLama = $ptk->jabatan;
 
+    // Foto & hapus_photo ditangani manual di bawah, bukan mass-update.
+    $fileFoto = $request->file('photo');
+    $hapusFoto = $request->boolean('hapus_photo');
+    unset($validated['photo'], $validated['hapus_photo']);
+
     $ptk->update($validated);
+
+    // Ganti foto: berkas lama dihapus, berkas baru disimpan ke folder
+    // yang sama dengan unggahan profil (ptk_photos di disk public).
+    // Tanpa berkas baru + centang hapus_photo: foto dikosongkan.
+    if ($fileFoto || $hapusFoto) {
+      if ($ptk->photo && Storage::disk('public')->exists($ptk->photo)) {
+        Storage::disk('public')->delete($ptk->photo);
+      }
+      $ptk->photo = $fileFoto ? $fileFoto->store('ptk_photos', 'public') : null;
+      $ptk->save();
+    }
 
     // 2. Sinkronisasi Role jika PTK sudah punya akun
     if ($ptk->user_id && $jabatanLama !== $validated['jabatan']) {
@@ -172,6 +202,20 @@ class PtkController extends Controller
       'message' => 'Data PTK berhasil diperbarui.',
       'data'    => $ptk
     ]);
+  }
+
+  /**
+   * Alirkan berkas foto PTK untuk tampilan (avatar navbar, profil,
+   * pratinjau form). SENGAJA lewat route, bukan asset('storage/...'):
+   * symlink public/storage tidak selalu ada (di hosting bersama memang
+   * tidak ada) sehingga foto tampil sebagai gambar pecah. Pola yang sama
+   * seperti SekolahLogoController::lihat dan foto-foto Web Sekolah.
+   */
+  public function foto(Ptk $ptk)
+  {
+    abort_if(!$ptk->photo || !Storage::disk('public')->exists($ptk->photo), 404);
+
+    return Storage::disk('public')->response($ptk->photo);
   }
 
   public function destroy($id)

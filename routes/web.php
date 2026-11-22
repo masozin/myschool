@@ -306,6 +306,14 @@ Route::controller(MapelMasterController::class)
 | PTK
 |--------------------------------------------------------------------------
 */
+// Foto PTK dialirkan lewat route untuk SEMUA pengguna yang sudah login
+// (avatar navbar tampil juga untuk Guru) — jadi route ini di luar grup
+// role Admin|Operator Sekolah di bawah. SekolahScope pada model tetap
+// membatasi PTK yang bisa diakses sesuai sekolah pengguna.
+Route::get('/ptk/{ptk}/foto', [PtkController::class, 'foto'])
+  ->middleware('auth:sanctum')
+  ->name('ptk.foto');
+
 Route::controller(PtkController::class)
   ->prefix('ptk')
   ->name('ptk.')

@@ -49,7 +49,7 @@
           <a class="nav-link dropdown-toggle hide-arrow" href="javascript:void(0);" data-bs-toggle="dropdown">
             <div class="avatar avatar-online">
               <img
-                src="{{ Auth::user()->ptk && Auth::user()->ptk->photo ? asset('storage/' . Auth::user()->ptk->photo) : asset('assets/img/avatars/1.png') }}"
+                src="{{ Auth::user()->ptk && Auth::user()->ptk->photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}"
                 alt="avatar" class="rounded-circle" />
             </div>
           </a>
@@ -61,7 +61,7 @@
                   <div class="flex-shrink-0 me-2">
                     <div class="avatar avatar-online">
                       <img
-                        src="{{ Auth::user()->ptk && Auth::user()->ptk->photo ? asset('storage/' . Auth::user()->ptk->photo) : asset('assets/img/avatars/1.png') }}"
+                        src="{{ Auth::user()->ptk && Auth::user()->ptk->photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}"
                         alt="alt" class="w-px-40 h-auto rounded-circle" />
                     </div>
                   </div>

@@ -48,7 +48,7 @@
               @php
                 $avatarPath =
                     $user->Ptk && $user->Ptk->photo
-                        ? asset('storage/' . $user->Ptk->photo)
+                        ? route('ptk.foto', $user->Ptk)
                         : asset('assets/img/avatars/1.png');
               @endphp
               <img class="img-fluid rounded mb-4 object-fit-cover" src="{{ $avatarPath }}" height="120" width="120"

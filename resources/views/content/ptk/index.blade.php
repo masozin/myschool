@@ -82,6 +82,12 @@
         </div>
 
         <div class="form-floating form-floating-outline mb-5">
+          <input type="text" class="form-control" id="tempat_lahir" name="tempat_lahir"
+            placeholder="Tempat Lahir" maxlength="100" />
+          <label for="tempat_lahir">Tempat Lahir (opsional)</label>
+        </div>
+
+        <div class="form-floating form-floating-outline mb-5">
           <input type="date" class="form-control" id="tanggal_lahir" name="tanggal_lahir" />
           <label for="tanggal_lahir">Tanggal Lahir (opsional, untuk ucapan ulang tahun)</label>
         </div>
@@ -116,6 +122,22 @@
 
           </select>
           <label for="jenis_kepegawaian">Jenis kepegawaian</label>
+        </div>
+
+        <div class="mb-5">
+          <label class="form-label" for="photo">Foto PTK (opsional, JPG/PNG maks 2 MB)</label>
+          <div class="d-flex align-items-start gap-3">
+            <img id="photo-preview" src="{{ asset('assets/img/avatars/1.png') }}"
+              class="rounded object-fit-cover" width="72" height="72" alt="Pratinjau foto PTK" />
+            <div class="flex-grow-1">
+              <input type="file" class="form-control" id="photo" name="photo" accept="image/png,image/jpeg" />
+              <div class="form-check mt-2" id="hapus-photo-wrap" style="display: none">
+                <input class="form-check-input" type="checkbox" id="hapus_photo" name="hapus_photo" value="1" />
+                <label class="form-check-label" for="hapus_photo">Hapus foto saat ini saat disimpan</label>
+              </div>
+              <small class="text-muted">Foto tampil di profil pengguna, navbar, dan website sekolah.</small>
+            </div>
+          </div>
         </div>
 
         @hasrole('Admin')
@@ -550,6 +572,13 @@
         });
       }
 
+      // Pratinjau langsung saat berkas foto dipilih di form PTK
+      document.getElementById('photo').addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+          document.getElementById('photo-preview').src = URL.createObjectURL(this.files[0]);
+        }
+      });
+
       // 4. Event Delegation
       document.addEventListener('click', async function(e) {
         // Tombol Tambah (Pastikan tombol di card-header punya class atau ID ini)
@@ -558,6 +587,8 @@
           formPtk.reset();
           fv.resetForm(true);
           judulForm.innerHTML = 'Tambah PTK Baru';
+          document.getElementById('photo-preview').src = '{{ asset('assets/img/avatars/1.png') }}';
+          document.getElementById('hapus-photo-wrap').style.display = 'none';
         }
 
         // Tombol Edit
@@ -582,7 +613,21 @@
             document.getElementById('nama_ptk').value = data.nama_ptk;
             document.getElementById('gelar_depan').value = data.gelar_depan || '';
             document.getElementById('gelar_belakang').value = data.gelar_belakang || '';
+            document.getElementById('tempat_lahir').value = data.tempat_lahir || '';
             document.getElementById('tanggal_lahir').value = data.tanggal_lahir ? String(data.tanggal_lahir).slice(0, 10) : '';
+
+            // Foto: pratinjau dari route aliran + opsi hapus bila ada foto
+            const pratinjauFoto = document.getElementById('photo-preview');
+            const bungkusHapus = document.getElementById('hapus-photo-wrap');
+            document.getElementById('photo').value = '';
+            document.getElementById('hapus_photo').checked = false;
+            if (data.photo) {
+              pratinjauFoto.src = '/ptk/' + data.id + '/foto';
+              bungkusHapus.style.display = '';
+            } else {
+              pratinjauFoto.src = '{{ asset('assets/img/avatars/1.png') }}';
+              bungkusHapus.style.display = 'none';
+            }
             document.getElementById('nip').value = data.nip || '';
             document.getElementById('kode').value = data.kode || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';

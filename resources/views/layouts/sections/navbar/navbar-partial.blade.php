@@ -92,7 +92,7 @@
           @php
             $photo = Auth::user()?->ptk?->photo;
           @endphp
-          <img src="{{ $photo ? asset('storage/' . $photo) : asset('assets/img/avatars/1.png') }}" alt="avatar"
+          <img src="{{ $photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}" alt="avatar"
             class="rounded-circle" />
         </div>
       </a>
@@ -106,7 +106,7 @@
                   @php
                     $photo = Auth::user()?->ptk?->photo;
                   @endphp
-                  <img src="{{ $photo ? asset('storage/' . $photo) : asset('assets/img/avatars/1.png') }}"
+                  <img src="{{ $photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}"
                     alt="avatar" class="rounded-circle" />
                 </div>
               </div>
