@@ -3,15 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Cermin read-only ref_kode ARKAS (kegiatan). */
+/** Cermin read-only GLOBAL (satu salinan semua sekolah) — ref_kode ARKAS (kegiatan). */
 class BosRefKode extends Model
 {
   protected $table = 'bos_ref_kode';
 
   protected $fillable = [
-    'sekolah_id',
     'id_arkas',
     'id_ref_kode',
     'id_kode',
@@ -27,8 +25,4 @@ class BosRefKode extends Model
     'arkas_last_update' => 'datetime',
   ];
 
-  public function sekolah(): BelongsTo
-  {
-    return $this->belongsTo(Sekolah::class, 'sekolah_id');
-  }
 }

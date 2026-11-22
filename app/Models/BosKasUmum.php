@@ -61,8 +61,7 @@ class BosKasUmum extends Model
 
   public function jenisBku(): BelongsTo
   {
-    return $this->belongsTo(BosRefBku::class, 'id_ref_bku', 'id_ref_bku')
-      ->where('bos_ref_bku.sekolah_id', $this->sekolah_id);
+    return $this->belongsTo(BosRefBku::class, 'id_ref_bku', 'id_ref_bku');
   }
 
   public function nota(): BelongsTo

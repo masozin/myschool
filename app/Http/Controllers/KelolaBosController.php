@@ -258,7 +258,6 @@ class KelolaBosController extends Controller
       ->from('bos_ref_kode as rk')
       ->join('bos_rapbs as rp', function ($j) {
         $j->on('rp.id_ref_kode', '=', 'rk.id_ref_kode')
-          ->on('rp.sekolah_id', '=', 'rk.sekolah_id')
           ->on('rp.id_ref_tahun_anggaran', '=', 'rk.tahun');
       })
       ->join('bos_anggaran as ag', function ($j) {
@@ -266,7 +265,7 @@ class KelolaBosController extends Controller
           ->on('ag.sekolah_id', '=', 'rp.sekolah_id')
           ->on('ag.id_ref_sumber_dana', '=', 'rk.sumber_dana_id');
       })
-      ->where('rk.sekolah_id', $sekolahId)
+      ->where('rp.sekolah_id', $sekolahId)
       ->where('rp.soft_delete', false)
       ->whereNotNull('rk.bentuk_pendidikan_id')
       ->selectRaw('rk.bentuk_pendidikan_id as bentuk, COUNT(*) as terpakai')
@@ -535,9 +534,9 @@ class KelolaBosController extends Controller
     // & id_kode-nya sama, jadi join memakai subquery
     // distinct agar baris rapbs tidak berlipat.
     $refKodeDistinct = BosRefKode::query()
-      ->select('sekolah_id', 'id_ref_kode', 'tahun')
+      ->select('id_ref_kode', 'tahun')
       ->selectRaw('MIN(id_kode) as id_kode, MIN(uraian_kode) as uraian_kode')
-      ->groupBy('sekolah_id', 'id_ref_kode', 'tahun');
+      ->groupBy('id_ref_kode', 'tahun');
 
     $dasar = fn() => BosRapbs::query()
       ->from('bos_rapbs')
@@ -547,12 +546,10 @@ class KelolaBosController extends Controller
       })
       ->leftJoinSub($refKodeDistinct, 'bos_ref_kode', function ($j) {
         $j->on('bos_ref_kode.id_ref_kode', '=', 'bos_rapbs.id_ref_kode')
-          ->on('bos_ref_kode.sekolah_id', '=', 'bos_rapbs.sekolah_id')
           ->on('bos_ref_kode.tahun', '=', 'bos_rapbs.id_ref_tahun_anggaran');
       })
       ->leftJoin('bos_ref_rekening', function ($j) {
         $j->on('bos_ref_rekening.kode_rekening', '=', 'bos_rapbs.kode_rekening')
-          ->on('bos_ref_rekening.sekolah_id', '=', 'bos_rapbs.sekolah_id')
           ->on('bos_ref_rekening.tahun', '=', 'bos_rapbs.id_ref_tahun_anggaran');
       })
       ->where('bos_rapbs.sekolah_id', $sekolahId)
@@ -752,7 +749,7 @@ class KelolaBosController extends Controller
       ->paginate(25)
       ->withQueryString();
 
-    $daftarKegiatan = BosRefKode::where('sekolah_id', $sekolahId)
+    $daftarKegiatan = BosRefKode::query()
       ->whereNotNull('id_ref_kode')
       ->whereIn('id_ref_kode', function ($q) use ($sekolahId) {
         $q->select('id_ref_kode')->from('bos_rapbs')
@@ -908,16 +905,14 @@ class KelolaBosController extends Controller
     $aggB = $agregat($idB);
 
     $tahunBanding = (int) $versiA->tahun_anggaran;
-    $petaKegiatan = BosRefKode::where('sekolah_id', $sekolahId)
-      ->where('tahun', $tahunBanding)
+    $petaKegiatan = BosRefKode::where('tahun', $tahunBanding)
       ->whereNotNull('id_ref_kode')
       ->select('id_ref_kode')
       ->selectRaw('MIN(id_kode) as id_kode, MIN(uraian_kode) as uraian_kode')
       ->groupBy('id_ref_kode')
       ->get()
       ->keyBy('id_ref_kode');
-    $petaRekening = BosRefRekening::where('sekolah_id', $sekolahId)
-      ->where('tahun', $tahunBanding)
+    $petaRekening = BosRefRekening::where('tahun', $tahunBanding)
       ->pluck('nama_rekening', 'kode_rekening');
 
     $hitung = ['berubah' => 0, 'baru' => 0, 'hilang' => 0, 'tetap' => 0];
@@ -1016,7 +1011,7 @@ class KelolaBosController extends Controller
     $urutKunci = isset($kolomUrut[$urutReq]) ? $urutReq : 'nama';
     $arah = $this->arah($request);
 
-    $daftarTahun = BosRefAcuanBarang::where('sekolah_id', $sekolahId)
+    $daftarTahun = BosRefAcuanBarang::query()
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
@@ -1029,7 +1024,7 @@ class KelolaBosController extends Controller
     $rekeningTerpakai = $this->rekeningTerpakai($sekolahId);
     $terbatasRekening = $rekeningTerpakai !== [] && $request->input('semua') !== '1';
 
-    $baris = BosRefAcuanBarang::where('sekolah_id', $sekolahId)
+    $baris = BosRefAcuanBarang::query()
       ->when($terbatasRekening, fn($x) => $x->whereIn('kode_rekening', $rekeningTerpakai))
       ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('blok'), fn($x) => $x->where('blok_id', 'like', $request->input('blok') . '%'))
@@ -1050,7 +1045,7 @@ class KelolaBosController extends Controller
       'baris' => $baris,
       'daftarTahun' => $daftarTahun,
       'tahunTerpilih' => $tahunEfektif,
-      'daftarBlok' => BosRefAcuanBarang::where('sekolah_id', $sekolahId)
+      'daftarBlok' => BosRefAcuanBarang::query()
         ->distinct()->orderBy('blok_id')->pluck('blok_id')->all(),
       'urut' => $urutKunci,
       'arah' => $arah,
@@ -1080,7 +1075,7 @@ class KelolaBosController extends Controller
       ]);
     }
 
-    $daftarTahun = BosRefKode::where('sekolah_id', $sekolahId)
+    $daftarTahun = BosRefKode::query()
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
@@ -1105,7 +1100,7 @@ class KelolaBosController extends Controller
     // (id_kode, uraian, level, tahun). Saringan bentuk
     // & sumber diterapkan SEBELUM pengelompokan agar
     // kelompok menyusut ke varian sekolah ini.
-    $baris = BosRefKode::where('sekolah_id', $sekolahId)
+    $baris = BosRefKode::query()
       ->whereNotNull('id_kode')
       ->when($terbatasJenjang, fn($x) => $x->where('bentuk_pendidikan_id', $bentuk))
       ->when($terbatasSumber, fn($x) => $x->whereIn('sumber_dana_id', $sumberSet))
@@ -1152,7 +1147,7 @@ class KelolaBosController extends Controller
       ]);
     }
 
-    $daftarTahun = BosRefRekening::where('sekolah_id', $sekolahId)
+    $daftarTahun = BosRefRekening::query()
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
@@ -1163,7 +1158,7 @@ class KelolaBosController extends Controller
     $rekeningTerpakai = $this->rekeningTerpakai($sekolahId);
     $terbatasRekening = $rekeningTerpakai !== [] && $request->input('semua') !== '1';
 
-    $baris = BosRefRekening::where('sekolah_id', $sekolahId)
+    $baris = BosRefRekening::query()
       ->when($terbatasRekening, fn($x) => $x->whereIn('kode_rekening', $rekeningTerpakai))
       ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('cari'), function ($x) use ($request) {
@@ -1212,8 +1207,7 @@ class KelolaBosController extends Controller
     $dasar = fn() => BosKasUmum::query()
       ->from('bos_kas_umum')
       ->leftJoin('bos_ref_bku', function ($j) {
-        $j->on('bos_ref_bku.id_ref_bku', '=', 'bos_kas_umum.id_ref_bku')
-          ->on('bos_ref_bku.sekolah_id', '=', 'bos_kas_umum.sekolah_id');
+        $j->on('bos_ref_bku.id_ref_bku', '=', 'bos_kas_umum.id_ref_bku');
       })
       ->leftJoin('bos_kas_nota', function ($j) {
         $j->on('bos_kas_nota.id_arkas', '=', 'bos_kas_umum.id_kas_nota')
@@ -1280,8 +1274,7 @@ class KelolaBosController extends Controller
         'bos_kas_nota.nama_toko',
       ])
       ->selectRaw("(SELECT nama_rekening FROM bos_ref_rekening r
-        WHERE r.sekolah_id = bos_kas_umum.sekolah_id
-          AND r.kode_rekening = bos_kas_umum.kode_rekening
+        WHERE r.kode_rekening = bos_kas_umum.kode_rekening
           AND r.tahun = {$tahunTransaksi}
         LIMIT 1) as nama_rekening")
       ->orderBy($urut ?? 'bos_kas_umum.tanggal_transaksi', $urut ? $arah : 'desc')
@@ -1289,7 +1282,7 @@ class KelolaBosController extends Controller
       ->paginate(25)
       ->withQueryString();
 
-    $daftarJenis = BosRefBku::where('sekolah_id', $sekolahId)
+    $daftarJenis = BosRefBku::query()
       ->whereIn('id_ref_bku', function ($q) use ($sekolahId) {
         $q->select('id_ref_bku')->from('bos_kas_umum')
           ->where('sekolah_id', $sekolahId)->distinct();
@@ -1297,7 +1290,7 @@ class KelolaBosController extends Controller
       ->orderBy('nama_bku')
       ->get();
 
-    $daftarRekening = BosRefRekening::where('sekolah_id', $sekolahId)
+    $daftarRekening = BosRefRekening::query()
       ->whereIn('kode_rekening', function ($q) use ($sekolahId) {
         $q->select('kode_rekening')->from('bos_kas_umum')
           ->where('sekolah_id', $sekolahId)

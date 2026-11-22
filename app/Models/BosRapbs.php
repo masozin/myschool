@@ -63,7 +63,6 @@ class BosRapbs extends Model
 
   public function kegiatan(): BelongsTo
   {
-    return $this->belongsTo(BosRefKode::class, 'id_ref_kode', 'id_arkas')
-      ->where('bos_ref_kode.sekolah_id', $this->sekolah_id);
+    return $this->belongsTo(BosRefKode::class, 'id_ref_kode', 'id_arkas');
   }
 }

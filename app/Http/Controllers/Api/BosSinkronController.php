@@ -28,11 +28,15 @@ use Illuminate\Support\Facades\Schema;
  *   POST /api/bos/sinkron/{tabel}
  *   { "agen_versi": "4.0.0", "baris": [ { "id_arkas": "...", ... } ] }
  *
- * Setiap baris di-upsert berdasarkan (sekolah_id, id_arkas);
- * sekolah_id TIDAK dipercaya dari kiriman — ia berasal dari
- * token (BosSinkronTokenMiddleware). Hanya kolom fillable
- * model yang diterima; kolom lain dibuang diam-diam. Satu
- * baris bos_sinkron_log ditulis per permintaan.
+ * Setiap baris tabel sekolah di-upsert berdasarkan
+ * (sekolah_id, id_arkas); sekolah_id TIDAK dipercaya
+ * dari kiriman — ia berasal dari token
+ * (BosSinkronTokenMiddleware). Enam tabel referensi
+ * bersifat GLOBAL (Fase 1.13): di-upsert berdasarkan
+ * id_arkas saja dan dibagikan ke semua sekolah. Hanya
+ * kolom fillable model yang diterima; kolom lain
+ * dibuang diam-diam. Satu baris bos_sinkron_log
+ * ditulis per permintaan.
  *
  * Fase 1.5: penyimpanan memakai upsert massal (satu query
  * per potongan 500 baris) menggantikan updateOrCreate per
@@ -65,6 +69,20 @@ class BosSinkronController extends Controller
   private const POTONGAN = 500;
 
   /**
+   * Slug tabel referensi GLOBAL (Fase 1.13): satu salinan
+   * bersama untuk semua sekolah — penyimpanan dan sidik
+   * jari cek tidak dilingkupkan ke sekolah token.
+   */
+  private const TABEL_GLOBAL = [
+    'ref-periode',
+    'ref-rekening',
+    'ref-kode',
+    'ref-bku',
+    'ref-acuan-barang',
+    'ref-satuan',
+  ];
+
+  /**
    * Sidik jari cermin untuk sinkron delta (Fase 1.9).
    *
    *   GET /api/bos/sinkron/cek
@@ -81,7 +99,13 @@ class BosSinkronController extends Controller
 
     $hasil = [];
     foreach ($this->tabel as $slug => $model) {
-      $query = $model::where('sekolah_id', $sekolahId);
+      // Tabel referensi global: sidik jari dihitung dari
+      // salinan bersama, bukan salinan sekolah ini — agen
+      // sekolah kedua yang katalognya sama akan melihat
+      // sidik jari yang cocok dan melewati tabel-tabel ini.
+      $query = in_array($slug, self::TABEL_GLOBAL, true)
+        ? $model::query()
+        : $model::where('sekolah_id', $sekolahId);
       // bos_ref_satuan tidak punya kolom arkas_last_update
       // (satu-satunya cermin tanpa kolom itu): sidik jarinya
       // cukup jumlah baris, maks_update selalu null.
@@ -118,6 +142,8 @@ class BosSinkronController extends Controller
       'baris.*.id_arkas' => 'required|string|max:60',
     ]);
 
+    $global = in_array($tabel, self::TABEL_GLOBAL, true);
+
     // Baris dibaca mentah dari request: validate() hanya
     // mengembalikan kunci yang tercakup aturan, sedangkan
     // kolom cermin lain (nama_bku, uraian, ...) harus lolos
@@ -137,7 +163,9 @@ class BosSinkronController extends Controller
       $atribut = array_intersect_key($barisMentah, array_flip($fillable));
       unset($atribut['sekolah_id']);
       $atribut = $this->normalkanNilai($atribut, $casts);
-      $atribut['sekolah_id'] = $sekolahId;
+      if (!$global) {
+        $atribut['sekolah_id'] = $sekolahId;
+      }
       $atribut['created_at'] = $sekarang;
       $atribut['updated_at'] = $sekarang;
       // Kunci ganda dalam satu kiriman: yang terakhir menang.
@@ -153,9 +181,10 @@ class BosSinkronController extends Controller
     $kolomPerbarui = array_values(array_diff($fillable, ['sekolah_id', 'id_arkas']));
     $kolomPerbarui[] = 'updated_at';
 
+    $kunciUpsert = $global ? ['id_arkas'] : ['sekolah_id', 'id_arkas'];
     foreach (array_chunk($siap, self::POTONGAN) as $potongan) {
       if ($potongan) {
-        $model::upsert($potongan, ['sekolah_id', 'id_arkas'], $kolomPerbarui);
+        $model::upsert($potongan, $kunciUpsert, $kolomPerbarui);
       }
     }
 

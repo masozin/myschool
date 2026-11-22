@@ -50,7 +50,6 @@ class BosRapbsPeriode extends Model
 
   public function periode(): BelongsTo
   {
-    return $this->belongsTo(BosRefPeriode::class, 'id_periode', 'id_periode')
-      ->where('bos_ref_periode.sekolah_id', $this->sekolah_id);
+    return $this->belongsTo(BosRefPeriode::class, 'id_periode', 'id_periode');
   }
 }
