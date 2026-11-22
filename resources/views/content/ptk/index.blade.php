@@ -287,10 +287,23 @@
               defaultContent: ''
             },
             {
-              targets: 1, // Gabungkan Nama & NIP
+              targets: 1, // Gabungkan Foto/Inisial, Nama & NIP
               render: function(data, type, full) {
-                return `<div><span class="fw-medium">${full.nama_lengkap || full.nama_ptk}</span><br><small class="text-muted">${full.nip ||
-      '-'}</small></div>`;
+                const nama = full.nama_lengkap || full.nama_ptk || '-';
+                if (type !== 'display') {
+                  return nama;
+                }
+                let avatar;
+                if (full.photo) {
+                  avatar = `<img src="/ptk/${full.id}/foto" alt="" class="rounded-circle flex-shrink-0" style="width:38px;height:38px;object-fit:cover">`;
+                } else {
+                  const kata = (full.nama_ptk || '?').trim().split(/\s+/);
+                  const inisial = ((kata[0] || '?').charAt(0) + (kata.length > 1 ? kata[kata.length - 1].charAt(0) : '')).toUpperCase();
+                  const palet = ['#7367f0', '#28c76f', '#ff9f43', '#ea5455', '#00cfe8', '#1d5cbf'];
+                  const warna = palet[(full.id || 0) % palet.length];
+                  avatar = `<span class="flex-shrink-0" style="width:38px;height:38px;border-radius:50%;background:${warna};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">${inisial}</span>`;
+                }
+                return `<div class="d-flex align-items-center gap-2">${avatar}<div><span class="fw-medium">${nama}</span><br><small class="text-muted">${full.nip || '-'}</small></div></div>`;
               }
             },
             {

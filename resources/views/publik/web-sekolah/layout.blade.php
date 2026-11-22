@@ -76,6 +76,9 @@
     .ws-links a:hover{background:rgba(255,255,255,.14);color:#fff}
     .ws-nav.is-solid .ws-links a,.ws-nav.scrolled .ws-links a{color:var(--text)}
     .ws-nav.is-solid .ws-links a:hover,.ws-nav.scrolled .ws-links a:hover{background:#eef3fb;color:var(--primary)}
+    .ws-links a.aktif{background:rgba(255,255,255,.16);color:#fff}
+    .ws-nav.is-solid .ws-links a.aktif,.ws-nav.scrolled .ws-links a.aktif{background:#eef3fb;color:var(--primary)}
+    .ws-mobile a.aktif{color:var(--primary)}
     .ws-links a.ws-btn{padding:10px 22px;margin-left:8px}
     .ws-links a.ws-btn,.ws-links a.ws-btn:hover{color:#fff!important;background:var(--primary)}
     .ws-burger{display:none;margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;width:44px;height:44px;align-items:center;justify-content:center;cursor:pointer;color:#fff}
@@ -563,6 +566,30 @@
         });
       }, { threshold: 0.4 });
       document.querySelectorAll('[data-count]').forEach(function (el) { countIO.observe(el); });
+
+      // Scrollspy: tandai tautan nav yang seksinya sedang terlihat.
+      // Hanya tautan jangkar murni (#...) yang dipetakan — tautan itu
+      // hanya ada di landing, jadi di halaman lain blok ini diam.
+      var petaSpy = {};
+      document.querySelectorAll('.ws-links a[href^="#"], .ws-mobile a[href^="#"]').forEach(function (a) {
+        var id = a.getAttribute('href').slice(1);
+        if (id) (petaSpy[id] = petaSpy[id] || []).push(a);
+      });
+      var idSpy = Object.keys(petaSpy);
+      if (idSpy.length) {
+        var spyIO = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            idSpy.forEach(function (id) {
+              petaSpy[id].forEach(function (a) { a.classList.toggle('aktif', id === e.target.id); });
+            });
+          });
+        }, { rootMargin: '-38% 0px -55% 0px' });
+        idSpy.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) spyIO.observe(el);
+        });
+      }
 
       var lb = document.getElementById('wsLightbox');
       var lbImg = document.getElementById('wsLightboxImg');

@@ -93,7 +93,7 @@
             $photo = Auth::user()?->ptk?->photo;
           @endphp
           <img src="{{ $photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}" alt="avatar"
-            class="rounded-circle" />
+            class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" />
         </div>
       </a>
       <ul class="dropdown-menu dropdown-menu-end mt-3 py-2">
@@ -107,7 +107,7 @@
                     $photo = Auth::user()?->ptk?->photo;
                   @endphp
                   <img src="{{ $photo ? route('ptk.foto', Auth::user()->ptk) : asset('assets/img/avatars/1.png') }}"
-                    alt="avatar" class="rounded-circle" />
+                    alt="avatar" class="rounded-circle" style="width: 100%; height: 100%; object-fit: cover;" />
                 </div>
               </div>
               <div class="flex-grow-1">
