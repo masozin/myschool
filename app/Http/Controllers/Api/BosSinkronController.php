@@ -19,6 +19,7 @@ use App\Models\BosSinkronLog;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Penerima sinkronisasi Kelola BOS.
@@ -62,6 +63,46 @@ class BosSinkronController extends Controller
 
   /** Ukuran potongan per query upsert. */
   private const POTONGAN = 500;
+
+  /**
+   * Sidik jari cermin untuk sinkron delta (Fase 1.9).
+   *
+   *   GET /api/bos/sinkron/cek
+   *
+   * Agen membandingkan jumlah baris + arkas_last_update
+   * maksimum per tabel dengan keadaan database ARKAS lokal;
+   * tabel yang sama persis dilewati, sisanya dikirim delta.
+   * Jawaban: peta slug → { jumlah, maks_update }.
+   */
+  public function cek(Request $request): JsonResponse
+  {
+    $sekolahId = (int) $request->attributes->get('bos_sekolah_id');
+    abort_unless($sekolahId, 401);
+
+    $hasil = [];
+    foreach ($this->tabel as $slug => $model) {
+      $query = $model::where('sekolah_id', $sekolahId);
+      // bos_ref_satuan tidak punya kolom arkas_last_update
+      // (satu-satunya cermin tanpa kolom itu): sidik jarinya
+      // cukup jumlah baris, maks_update selalu null.
+      if (Schema::hasColumn((new $model)->getTable(), 'arkas_last_update')) {
+        $agregat = $query
+          ->selectRaw('COUNT(*) AS jumlah, MAX(arkas_last_update) AS maks_update')
+          ->first();
+        $maks = $agregat->maks_update !== null ? (string) $agregat->maks_update : null;
+        $jumlah = (int) ($agregat->jumlah ?? 0);
+      } else {
+        $jumlah = $query->count();
+        $maks = null;
+      }
+      $hasil[$slug] = [
+        'jumlah' => $jumlah,
+        'maks_update' => $maks,
+      ];
+    }
+
+    return response()->json($hasil);
+  }
 
   public function simpan(Request $request, string $tabel): JsonResponse
   {
