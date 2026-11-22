@@ -47,6 +47,9 @@
     <div class="card mb-4">
       <div class="card-body py-3">
         <form method="GET" action="{{ url('/kelola-bos/referensi/rekening') }}" class="row g-3 align-items-end">
+          @if (request('semua') === '1')
+            <input type="hidden" name="semua" value="1">
+          @endif
           <div class="col-6 col-md-2">
             <label class="form-label">Tahun</label>
             <select name="tahun" class="form-select">
@@ -68,6 +71,21 @@
         </form>
       </div>
     </div>
+
+    {{-- Keterangan pembatasan rekening (Fase 1.11) --}}
+    @if ($terbatasRekening ?? false)
+      <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <span><i class="icon-base ri ri-filter-3-line me-1"></i>Menampilkan rekening yang dipakai sekolah ini.</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['semua' => '1', 'page' => null]) }}">Tampilkan
+          semua rekening</a>
+      </div>
+    @elseif ($bisaDibatasiRekening ?? false)
+      <div class="alert alert-secondary d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <span><i class="icon-base ri ri-filter-off-line me-1"></i>Menampilkan semua rekening.</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['semua' => null, 'page' => null]) }}">Hanya
+          rekening yang dipakai sekolah ini</a>
+      </div>
+    @endif
 
     <div class="card">
       <div class="table-responsive">

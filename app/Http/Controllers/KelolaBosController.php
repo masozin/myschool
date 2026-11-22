@@ -276,6 +276,48 @@ class KelolaBosController extends Controller
     return ['SD' => 5][$jenjang] ?? null;
   }
 
+  // ── Lingkup referensi (Fase 1.11) ───────────────────
+  //
+  // Halaman referensi dibatasi ke yang benar-benar bisa
+  // dibelanjakan sekolah ini: kegiatan menurut jenjang
+  // (Fase 1.10) DAN sumber dananya; barang & rekening
+  // menurut rekening yang pernah dipakai kertas
+  // kerjanya. Cermin tetap lengkap — semua ini murni
+  // saringan tampil, dan selalu ada jalan melepasnya
+  // (?semua=1).
+
+  /**
+   * Sumber dana yang dimiliki sekolah ini: sumber dari
+   * anggarannya pada tahun terpilih; bila tahun itu
+   * tidak punya anggaran, sumber dari semua tahun.
+   * Hasil kosong berarti tanpa pembatasan sumber.
+   */
+  private function sumberSekolah(int $sekolahId, ?int $tahun): array
+  {
+    $ambil = fn(?int $th) => BosAnggaran::where('sekolah_id', $sekolahId)
+      ->when($th !== null, fn($x) => $x->where('tahun_anggaran', $th))
+      ->distinct()->pluck('id_ref_sumber_dana')
+      ->map(fn($s) => (int) $s)->all();
+    $sumber = $tahun !== null ? $ambil($tahun) : [];
+    return $sumber ?: $ambil(null);
+  }
+
+  /**
+   * Kode rekening yang pernah dipakai baris kertas
+   * kerja sekolah ini, semua tahun. Baris ter-soft-
+   * delete ikut dihitung: pada cermin ARKAS, soft-
+   * delete di rapbs umumnya menandai salinan versi
+   * yang tergantikan — rekeningnya tetap pernah resmi
+   * dianggarkan sekolah ini. Hasil kosong berarti
+   * tanpa pembatasan rekening.
+   */
+  private function rekeningTerpakai(int $sekolahId): array
+  {
+    return BosRapbs::where('sekolah_id', $sekolahId)
+      ->whereNotNull('kode_rekening')
+      ->distinct()->pluck('kode_rekening')->all();
+  }
+
   // ── Versi kertas kerja ─────────────────────────────────
   //
   // Di ARKAS, setiap revisi RKAS adalah salinan utuh kertas
@@ -959,6 +1001,8 @@ class KelolaBosController extends Controller
         'petaAlias' => [],
         'bisaTulisAlias' => false,
         'tahunTerpilih' => null,
+        'terbatasRekening' => false,
+        'bisaDibatasiRekening' => false,
       ]);
     }
 
@@ -971,7 +1015,17 @@ class KelolaBosController extends Controller
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
+    // Pembatasan rekening (Fase 1.11): secara bawaan
+    // hanya barang pada rekening yang pernah dipakai
+    // kertas kerja sekolah ini yang tampil — katalog
+    // SSH nasional memuat barang semua sektor (sapi,
+    // perahu, bioflok) yang tidak pernah bisa
+    // dibelanjakan sekolah. ?semua=1 menonaktifkannya.
+    $rekeningTerpakai = $this->rekeningTerpakai($sekolahId);
+    $terbatasRekening = $rekeningTerpakai !== [] && $request->input('semua') !== '1';
+
     $baris = BosRefAcuanBarang::where('sekolah_id', $sekolahId)
+      ->when($terbatasRekening, fn($x) => $x->whereIn('kode_rekening', $rekeningTerpakai))
       ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('blok'), fn($x) => $x->where('blok_id', 'like', $request->input('blok') . '%'))
       ->when($request->filled('cari'), function ($x) use ($request) {
@@ -997,6 +1051,8 @@ class KelolaBosController extends Controller
       'arah' => $arah,
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('nama_barang')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
+      'terbatasRekening' => $terbatasRekening,
+      'bisaDibatasiRekening' => $rekeningTerpakai !== [],
     ]);
   }
 
@@ -1014,6 +1070,8 @@ class KelolaBosController extends Controller
         'tahunTerpilih' => null,
         'bentukSekolah' => null,
         'terbatasJenjang' => false,
+        'terbatasLingkup' => false,
+        'bisaDibatasi' => false,
       ]);
     }
 
@@ -1021,24 +1079,31 @@ class KelolaBosController extends Controller
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
-    // Pembatasan jenjang (Fase 1.10): secara bawaan
-    // hanya varian bentuk pendidikan sekolah ini yang
-    // tampil — kode milik jenjang lain atau program
-    // Banpem khusus (mis. kode alat olahraga untuk
-    // jenjang lain) tidak lagi mengotori daftar.
-    // ?jenjang=semua menonaktifkan pembatasan. Cermin
-    // sendiri tetap lengkap; ini murni saringan tampil.
+    // Pembatasan jenjang (Fase 1.10) + sumber dana
+    // (Fase 1.11): secara bawaan hanya varian bentuk
+    // pendidikan sekolah ini DAN sumber dana yang
+    // dimiliki sekolah ini (dari anggarannya) yang
+    // tampil — kode milik jenjang lain, program Banpem
+    // khusus, atau sumber dana yang tidak dimiliki
+    // sekolah tidak lagi mengotori daftar. ?semua=1
+    // menonaktifkan keduanya (?jenjang=semua tetap
+    // diterima sebagai aliasnya). Cermin sendiri tetap
+    // lengkap; ini murni saringan tampil.
     $bentuk = $this->bentukSekolah($sekolahId);
-    $terbatasJenjang = $bentuk !== null && $request->input('jenjang') !== 'semua';
+    $sumberSet = $this->sumberSekolah($sekolahId, $tahunEfektif);
+    $tampilkanSemua = $request->input('semua') === '1' || $request->input('jenjang') === 'semua';
+    $terbatasJenjang = $bentuk !== null && !$tampilkanSemua;
+    $terbatasSumber = $sumberSet !== [] && !$tampilkanSemua;
 
     // ref_kode tersimpan per varian (sumber dana/bentuk);
     // untuk referensi cukup tampilkan baris unik per
     // (id_kode, uraian, level, tahun). Saringan bentuk
-    // diterapkan SEBELUM pengelompokan agar kelompok
-    // menyusut ke varian sekolah ini.
+    // & sumber diterapkan SEBELUM pengelompokan agar
+    // kelompok menyusut ke varian sekolah ini.
     $baris = BosRefKode::where('sekolah_id', $sekolahId)
       ->whereNotNull('id_kode')
       ->when($terbatasJenjang, fn($x) => $x->where('bentuk_pendidikan_id', $bentuk))
+      ->when($terbatasSumber, fn($x) => $x->whereIn('sumber_dana_id', $sumberSet))
       ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('cari'), function ($x) use ($request) {
         $cari = '%' . $request->input('cari') . '%';
@@ -1060,6 +1125,8 @@ class KelolaBosController extends Controller
       'tahunTerpilih' => $tahunEfektif,
       'bentukSekolah' => $bentuk,
       'terbatasJenjang' => $terbatasJenjang,
+      'terbatasLingkup' => $terbatasJenjang || $terbatasSumber,
+      'bisaDibatasi' => $bentuk !== null || $sumberSet !== [],
     ]);
   }
 
@@ -1075,6 +1142,8 @@ class KelolaBosController extends Controller
         'baris' => null,
         'daftarTahun' => [],
         'tahunTerpilih' => null,
+        'terbatasRekening' => false,
+        'bisaDibatasiRekening' => false,
       ]);
     }
 
@@ -1082,7 +1151,15 @@ class KelolaBosController extends Controller
       ->distinct()->orderByDesc('tahun')->pluck('tahun')->map(fn($t) => (int) $t)->all();
     $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
 
+    // Pembatasan rekening (Fase 1.11): sama seperti
+    // Referensi Barang — secara bawaan hanya rekening
+    // yang pernah dipakai kertas kerja sekolah ini.
+    // ?semua=1 menonaktifkannya.
+    $rekeningTerpakai = $this->rekeningTerpakai($sekolahId);
+    $terbatasRekening = $rekeningTerpakai !== [] && $request->input('semua') !== '1';
+
     $baris = BosRefRekening::where('sekolah_id', $sekolahId)
+      ->when($terbatasRekening, fn($x) => $x->whereIn('kode_rekening', $rekeningTerpakai))
       ->when($tahunEfektif !== null, fn($x) => $x->where('tahun', $tahunEfektif))
       ->when($request->filled('cari'), function ($x) use ($request) {
         $cari = '%' . $request->input('cari') . '%';
@@ -1100,6 +1177,8 @@ class KelolaBosController extends Controller
       'baris' => $baris,
       'daftarTahun' => $daftarTahun,
       'tahunTerpilih' => $tahunEfektif,
+      'terbatasRekening' => $terbatasRekening,
+      'bisaDibatasiRekening' => $rekeningTerpakai !== [],
     ]);
   }
 

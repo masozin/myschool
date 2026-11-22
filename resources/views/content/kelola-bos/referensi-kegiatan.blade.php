@@ -47,8 +47,8 @@
     <div class="card mb-4">
       <div class="card-body py-3">
         <form method="GET" action="{{ url('/kelola-bos/referensi/kegiatan') }}" class="row g-3 align-items-end">
-          @if (request('jenjang') === 'semua')
-            <input type="hidden" name="jenjang" value="semua">
+          @if (request('semua') === '1' || request('jenjang') === 'semua')
+            <input type="hidden" name="semua" value="1">
           @endif
           <div class="col-6 col-md-2">
             <label class="form-label">Tahun</label>
@@ -72,18 +72,20 @@
       </div>
     </div>
 
-    {{-- Keterangan pembatasan jenjang (Fase 1.10) --}}
-    @if ($terbatasJenjang ?? false)
+    {{-- Keterangan pembatasan jenjang & sumber dana (Fase 1.10 + 1.11) --}}
+    @if ($terbatasLingkup ?? false)
       <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-        <span><i class="icon-base ri ri-filter-3-line me-1"></i>Menampilkan kode sesuai jenjang sekolah ini.</span>
-        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['jenjang' => 'semua', 'page' => null]) }}">Tampilkan
-          semua jenjang</a>
+        <span><i class="icon-base ri ri-filter-3-line me-1"></i>Menampilkan kode sesuai jenjang &amp; sumber dana
+          sekolah ini.</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['semua' => '1', 'jenjang' => null, 'page' => null]) }}">Tampilkan
+          semua</a>
       </div>
-    @elseif (($bentukSekolah ?? null) !== null)
+    @elseif ($bisaDibatasi ?? false)
       <div class="alert alert-secondary d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-        <span><i class="icon-base ri ri-filter-off-line me-1"></i>Menampilkan kode semua jenjang.</span>
-        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['jenjang' => null, 'page' => null]) }}">Hanya
-          jenjang sekolah ini</a>
+        <span><i class="icon-base ri ri-filter-off-line me-1"></i>Menampilkan semua kode (semua jenjang &amp; sumber
+          dana).</span>
+        <a class="alert-link" href="{{ request()->fullUrlWithQuery(['semua' => null, 'jenjang' => null, 'page' => null]) }}">Hanya
+          yang bisa dibelanjakan sekolah ini</a>
       </div>
     @endif
 
