@@ -837,8 +837,9 @@ Route::controller(SuratKeluarController::class)
 | (rapbs) dan BKU (kas_umum), disinkronkan agen dari laptop
 | ARKAS lewat /api/bos/sinkron. Operator Sekolah & Kepala
 | Sekolah melihat sekolahnya, Admin memantau per sekolah
-| terpilih. Cermin bersifat hanya baca; satu-satunya
-| penulisan adalah nama alias tampilan (Fase 1.7).
+| terpilih. Cermin bersifat hanya baca; penulisannya
+| hanya lapisan kerja: nama alias tampilan (Fase 1.7)
+| dan token agen sinkron (Fase 1.12).
 */
 Route::controller(KelolaBosController::class)
   ->prefix('kelola-bos')
@@ -861,6 +862,14 @@ Route::controller(KelolaBosController::class)
     // BOS; lapisan kerja pengguna, bukan data cermin ARKAS.
     // Kepala Sekolah hanya membaca, jadi tidak ikut di sini.
     Route::post('/alias', 'simpanAlias')->name('alias.simpan')
+      ->middleware('role:Admin|Operator Sekolah');
+    // Token sinkron (Fase 1.12) — pembuatan token agen
+    // dari web; penulisan lapisan kerja kedua. Kepala
+    // Sekolah tidak mengelola kunci akses, jadi halaman
+    // maupun aksinya tertutup untuknya.
+    Route::get('/token', 'token')->name('token')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/token/buat', 'tokenBuat')->name('token.buat')
       ->middleware('role:Admin|Operator Sekolah');
   });
 

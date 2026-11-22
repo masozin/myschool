@@ -12,9 +12,11 @@ use App\Models\BosRefBku;
 use App\Models\BosRefKode;
 use App\Models\BosRefRekening;
 use App\Models\BosSinkronLog;
+use App\Models\BosSinkronToken;
 use App\Models\Sekolah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 /**
  * Kelola BOS (fitur: kelola-bos) — tampilan read-only cermin
@@ -27,6 +29,9 @@ use Illuminate\Support\Facades\Auth;
  * dari sini; ia datang dari agen sinkron di laptop ARKAS.
  * Satu-satunya penulisan adalah nama alias (Fase 1.7) —
  * lapisan kerja milik pengguna, terpisah dari cermin.
+ * Fase 1.12 menambah satu penulisan lagi yang juga
+ * lapisan kerja: pembuatan token agen sinkron dari web
+ * (sebelumnya hanya lewat perintah `bos:token`).
  * Fase 1.10: Referensi Kegiatan dibatasi ke jenjang
  * sekolah (dari pemakaian rapbs, cadangan jenjang
  * tabel_sekolah) dan halaman-halaman dibuka dengan
@@ -1315,5 +1320,55 @@ class KelolaBosController extends Controller
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
     ]);
+  }
+
+  // ── Token sinkron (Fase 1.12, lapisan kerja) ──────────
+  //
+  // Token adalah kunci agen sinkron di laptop ARKAS.
+  // Yang disimpan di database hanya hash sha256-nya;
+  // token asli ditampilkan SEKALI sesudah dibuat (lewat
+  // flash session) dan tidak bisa dilihat lagi — lupa
+  // berarti buat ulang, dan pembuatan ulang mencabut
+  // token lama seketika. Pembuatan di sini persis
+  // meniru perintah `bos:token` (Str::random(48) +
+  // updateOrCreate hash + terakhir_dipakai direset).
+
+  /** Halaman status token agen sinkron sekolah ini. */
+  public function token(Request $request)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+
+    $tokenBaris = $sekolahId
+      ? BosSinkronToken::where('sekolah_id', $sekolahId)->first()
+      : null;
+
+    return view('content.kelola-bos.token', $konteks + [
+      'tokenBaris' => $tokenBaris,
+    ]);
+  }
+
+  /**
+   * Buat / buat ulang token. Token asli hanya hidup di
+   * flash session satu kali tampil; tidak pernah
+   * ditulis ke database, log, atau tempat lain.
+   */
+  public function tokenBuat(Request $request)
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return back()->with('error', 'Konteks sekolah belum dipilih — token tidak dibuat.');
+    }
+
+    $token = Str::random(48);
+
+    BosSinkronToken::updateOrCreate(
+      ['sekolah_id' => $sekolahId],
+      ['token_hash' => hash('sha256', $token), 'terakhir_dipakai' => null]
+    );
+
+    return redirect()->route('kelola-bos.token')
+      ->with('token_baru', $token)
+      ->with('success', 'Token sinkron baru dibuat untuk sekolah ini. Salin dan simpan sekarang — token tidak akan ditampilkan lagi.');
   }
 }

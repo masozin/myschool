@@ -358,6 +358,15 @@
             "Operator Sekolah",
             "Kepala Sekolah"
           ]
+        },
+        {
+          "url": "/kelola-bos/token",
+          "name": "Token Sinkron",
+          "slug": "kelola-bos.token",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
         }
       ]
     },
