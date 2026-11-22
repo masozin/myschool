@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Sekolah;
 use App\Models\WebBerita;
+use App\Models\WebDokumen;
 use App\Models\WebGaleri;
 use App\Models\WebSekolah;
 use Illuminate\Http\Request;
@@ -261,5 +262,98 @@ class WebSekolahKelolaController extends Controller
 
     return redirect()->route('web-sekolah.kelola.galeri.index')
       ->with('success', 'Foto galeri berhasil dihapus.');
+  }
+
+  // ── Dokumen Publik ────────────────────────────────────────────────
+  // Sertifikat akreditasi, KOSP, RKT, RKJM, RKAS, dll. Berkas di disk
+  // public, dialirkan ke publik lewat WebSekolahController (lihat/unduh).
+
+  public function dokumenIndex()
+  {
+    $sekolah = $this->sekolahSaya();
+    $dokumen = $sekolah->webDokumen()
+      ->orderByRaw("CASE kategori WHEN 'akreditasi' THEN 0 WHEN 'kurikulum' THEN 1 WHEN 'perencanaan' THEN 2 WHEN 'kalender' THEN 3 ELSE 4 END")
+      ->orderByDesc('tahun')
+      ->orderBy('judul')
+      ->get();
+
+    return view('content.web-sekolah.dokumen-index', compact('sekolah', 'dokumen'));
+  }
+
+  public function dokumenStore(Request $request)
+  {
+    $sekolah = $this->sekolahSaya();
+
+    $data = $request->validate([
+      'judul' => ['required', 'string', 'max:255'],
+      'kategori' => ['required', Rule::in(array_keys(WebDokumen::KATEGORI))],
+      'tahun' => ['nullable', 'integer', 'min:1990', 'max:2100'],
+      'keterangan' => ['nullable', 'string', 'max:255'],
+      'berkas' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+    ]);
+
+    $file = $request->file('berkas');
+    $path = $file->store("web-sekolah/{$sekolah->id}/dokumen", 'public');
+
+    WebDokumen::create([
+      'sekolah_id' => $sekolah->id,
+      'judul' => $data['judul'],
+      'kategori' => $data['kategori'],
+      'tahun' => $data['tahun'] ?? null,
+      'keterangan' => $data['keterangan'] ?? null,
+      'berkas' => $path,
+      'nama_berkas' => $file->getClientOriginalName(),
+      'ukuran' => $file->getSize(),
+      'is_tampil' => $request->boolean('is_tampil'),
+    ]);
+
+    return redirect()->route('web-sekolah.kelola.dokumen.index')
+      ->with('success', 'Dokumen berhasil ditambahkan.');
+  }
+
+  public function dokumenUpdate(Request $request, WebDokumen $dokumen)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($dokumen->sekolah_id !== $sekolah->id, 404);
+
+    $data = $request->validate([
+      'judul' => ['required', 'string', 'max:255'],
+      'kategori' => ['required', Rule::in(array_keys(WebDokumen::KATEGORI))],
+      'tahun' => ['nullable', 'integer', 'min:1990', 'max:2100'],
+      'keterangan' => ['nullable', 'string', 'max:255'],
+      'berkas' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+    ]);
+
+    $dokumen->judul = $data['judul'];
+    $dokumen->kategori = $data['kategori'];
+    $dokumen->tahun = $data['tahun'] ?? null;
+    $dokumen->keterangan = $data['keterangan'] ?? null;
+    $dokumen->is_tampil = $request->boolean('is_tampil');
+
+    // Ganti berkas hanya bila ada unggahan baru; berkas lama dihapus.
+    if ($request->hasFile('berkas')) {
+      Storage::disk('public')->delete($dokumen->berkas);
+      $file = $request->file('berkas');
+      $dokumen->berkas = $file->store("web-sekolah/{$sekolah->id}/dokumen", 'public');
+      $dokumen->nama_berkas = $file->getClientOriginalName();
+      $dokumen->ukuran = $file->getSize();
+    }
+
+    $dokumen->save();
+
+    return redirect()->route('web-sekolah.kelola.dokumen.index')
+      ->with('success', 'Dokumen berhasil diperbarui.');
+  }
+
+  public function dokumenDestroy(WebDokumen $dokumen)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($dokumen->sekolah_id !== $sekolah->id, 404);
+
+    Storage::disk('public')->delete($dokumen->berkas);
+    $dokumen->delete();
+
+    return redirect()->route('web-sekolah.kelola.dokumen.index')
+      ->with('success', 'Dokumen berhasil dihapus.');
   }
 }

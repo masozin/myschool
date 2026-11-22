@@ -250,6 +250,27 @@
     .ws-footer-kontak svg{width:17px;height:17px;flex:none;margin-top:4px;color:var(--sky)}
     .ws-copy{border-top:1px solid rgba(255,255,255,.1);padding:20px 0;font-size:.87rem;color:#7e90b3;display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between}
 
+    /* ── Dokumen publik ─────────────────────────────────── */
+    .ws-doc-group{margin-bottom:30px}
+    .ws-doc-group:last-child{margin-bottom:0}
+    .ws-doc-title{font-size:1.05rem;color:var(--ink);margin-bottom:13px;display:flex;align-items:center;gap:10px}
+    .ws-doc-title::after{content:"";flex:1;height:1px;background:var(--line)}
+    .ws-doc-list{display:flex;flex-direction:column;gap:10px}
+    .ws-doc-item{display:flex;align-items:center;gap:15px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px 18px;box-shadow:var(--shadow-sm)}
+    .ws-doc-icon{flex:none;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+    .ws-doc-icon svg{width:22px;height:22px}
+    .ws-doc-icon.is-pdf{background:#fdecec;color:#c23333}
+    .ws-doc-icon.is-img{background:#e8f1fd;color:var(--primary)}
+    .ws-doc-main{flex:1;min-width:0}
+    .ws-doc-main strong{display:block;color:var(--ink);font-size:.99rem;line-height:1.35}
+    .ws-doc-main small{color:var(--muted);font-size:.86rem}
+    .ws-doc-actions{flex:none;display:flex;gap:8px}
+    .ws-doc-btn{display:inline-flex;align-items:center;padding:8px 16px;border-radius:999px;border:1.5px solid var(--line);color:var(--text);font-weight:700;font-size:.87rem;text-decoration:none;transition:all .2s ease}
+    .ws-doc-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .ws-doc-btn.is-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+    .ws-doc-btn.is-primary:hover{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
+    @media (max-width:640px){.ws-doc-item{flex-wrap:wrap}.ws-doc-actions{width:100%}.ws-doc-btn{flex:1;justify-content:center}}
+
     /* ── Jadwal hari ini ────────────────────────────────── */
     .ws-jam-chip{display:inline-flex;align-items:center;gap:8px;background:#eef3fb;color:var(--navy-900);font-weight:800;font-size:.88rem;padding:8px 15px;border-radius:999px}
     .ws-jam-chip i{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:wsKedip 1.6s infinite}
@@ -360,6 +381,7 @@
         <div class="ws-links">
           <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
           <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
+          <a href="{{ $diLanding ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen</a>
           <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
           <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
           <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
@@ -391,6 +413,7 @@
       <div class="ws-mobile" id="wsMobile">
         <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
         <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
+        <a href="{{ $diLanding ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen</a>
         <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
         <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
         <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
@@ -430,6 +453,7 @@
             <ul>
               <li><a href="{{ ($diLanding ?? false) ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal Hari Ini</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen Publik</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Sambutan Kepala Sekolah</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#visi-misi' : route('web-sekolah.tampil', $web->slug) . '#visi-misi' }}">Visi &amp; Misi</a></li>
               <li><a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita &amp; Pengumuman</a></li>

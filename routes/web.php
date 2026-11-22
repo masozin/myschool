@@ -152,6 +152,8 @@ Route::controller(WebSekolahController::class)->group(function () {
   Route::get('/sekolah/{slugWeb}/logo', 'logo')->name('web-sekolah.logo');
   Route::get('/web-berita/{berita}/foto', 'fotoBerita')->name('web-sekolah.berita.foto');
   Route::get('/web-galeri/{galeri}/foto', 'fotoGaleri')->name('web-sekolah.galeri.foto');
+  Route::get('/web-dokumen/{dokumen}/lihat', 'dokumenLihat')->name('web-sekolah.dokumen.lihat');
+  Route::get('/web-dokumen/{dokumen}/unduh', 'dokumenUnduh')->name('web-sekolah.dokumen.unduh');
   Route::get('/web-ptk/{ptk}/foto', 'fotoPtk')->name('web-sekolah.ptk.foto');
 });
 
@@ -179,6 +181,11 @@ Route::controller(WebSekolahKelolaController::class)
     Route::post('/galeri', 'galeriStore')->name('galeri.store');
     Route::put('/galeri/{galeri}', 'galeriUpdate')->name('galeri.update');
     Route::delete('/galeri/{galeri}', 'galeriDestroy')->name('galeri.destroy');
+
+    Route::get('/dokumen', 'dokumenIndex')->name('dokumen.index');
+    Route::post('/dokumen', 'dokumenStore')->name('dokumen.store');
+    Route::put('/dokumen/{dokumen}', 'dokumenUpdate')->name('dokumen.update');
+    Route::delete('/dokumen/{dokumen}', 'dokumenDestroy')->name('dokumen.destroy');
   });
 
 /*

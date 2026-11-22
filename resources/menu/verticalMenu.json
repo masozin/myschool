@@ -396,6 +396,14 @@
           "roles": [
             "Operator Sekolah"
           ]
+        },
+        {
+          "url": "/web-sekolah/dokumen",
+          "name": "Dokumen Publik",
+          "slug": "web-sekolah.kelola.dokumen.index",
+          "roles": [
+            "Operator Sekolah"
+          ]
         }
       ]
     },

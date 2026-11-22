@@ -289,6 +289,49 @@
     </section>
   @endif
 
+  {{-- ── Dokumen publik ─────────────────────────────────────────── --}}
+  @if (($dokumenPublik ?? collect())->isNotEmpty())
+    <section class="ws-section" id="dokumen" style="padding-top:70px;padding-bottom:80px">
+      <div class="ws-container">
+        <div class="ws-sec-head" data-reveal>
+          <span class="ws-eyebrow-sm">Informasi Resmi</span>
+          <h2>Dokumen Publik</h2>
+          <p>Dokumen resmi {{ $namaSekolah }} yang dapat dilihat dan diunduh oleh publik.</p>
+        </div>
+        @foreach ($dokumenPublik as $kategori => $daftar)
+          <div class="ws-doc-group" data-reveal>
+            <h3 class="ws-doc-title">{{ \App\Models\WebDokumen::KATEGORI[$kategori] ?? 'Lainnya' }}</h3>
+            <div class="ws-doc-list">
+              @foreach ($daftar as $d)
+                <div class="ws-doc-item">
+                  <span class="ws-doc-icon {{ $d->isPdf() ? 'is-pdf' : 'is-img' }}">
+                    @if ($d->isPdf())
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14h6M9 17h4"/></svg>
+                    @else
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-4 4 3 3-2 4 3"/></svg>
+                    @endif
+                  </span>
+                  <div class="ws-doc-main">
+                    <strong>{{ $d->judul }}</strong>
+                    <small>
+                      @if ($d->tahun) Tahun {{ $d->tahun }} @endif
+                      @if ($d->ukuranTampil()) &middot; {{ $d->ukuranTampil() }} @endif
+                      @if ($d->keterangan) &middot; {{ $d->keterangan }} @endif
+                    </small>
+                  </div>
+                  <div class="ws-doc-actions">
+                    <a class="ws-doc-btn" href="{{ route('web-sekolah.dokumen.lihat', $d) }}" target="_blank" rel="noopener">Lihat</a>
+                    <a class="ws-doc-btn is-primary" href="{{ route('web-sekolah.dokumen.unduh', $d) }}">Unduh</a>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          </div>
+        @endforeach
+      </div>
+    </section>
+  @endif
+
   {{-- ── Dewan guru & tendik ──────────────────────────────────────── --}}
   @if (($dewanGuru ?? collect())->isNotEmpty())
     <section class="ws-section ws-section-alt" style="padding-top:70px">

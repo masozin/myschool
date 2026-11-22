@@ -11,6 +11,7 @@ use App\Models\Sekolah;
 use App\Models\SekolahLogo;
 use App\Models\Semester;
 use App\Models\WebBerita;
+use App\Models\WebDokumen;
 use App\Models\WebGaleri;
 use App\Models\WebSekolah;
 use Illuminate\Support\Facades\Storage;
@@ -76,6 +77,19 @@ class WebSekolahController extends Controller
 
     // Jadwal pelajaran HARI INI per rombel untuk seksi publik di landing.
     $data['jadwalHariIni'] = $this->jadwalHariIni($web->sekolah, $data['semesterAktif']);
+
+    // Dokumen publik (akreditasi, KOSP, RKT/RKJM, dst.) yang ditandai
+    // tampil, dikelompokkan per kategori mengikuti urutan WebDokumen::KATEGORI.
+    $urutanKategori = array_flip(array_keys(WebDokumen::KATEGORI));
+    $data['dokumenPublik'] = $web->sekolah->webDokumen()
+      ->where('is_tampil', true)
+      ->get()
+      ->sortBy(fn($d) => [
+        $urutanKategori[$d->kategori] ?? 99,
+        -($d->tahun ?? 0),
+        strtolower($d->judul),
+      ])
+      ->groupBy('kategori');
 
     return view('publik.web-sekolah.tampil', $data);
   }
@@ -162,6 +176,31 @@ class WebSekolahController extends Controller
     abort_if(!$ptk->photo || !Storage::disk('public')->exists($ptk->photo), 404);
 
     return Storage::disk('public')->response($ptk->photo);
+  }
+
+  // ── Dokumen publik: lihat (inline di browser) & unduh ─────────────
+  // Hanya dokumen yang ditandai tampil pada web yang tampil publik.
+  // Dokumen yang disembunyikan operator TIDAK bisa diakses dari sini.
+
+  public function dokumenLihat(WebDokumen $dokumen)
+  {
+    abort_if(!$dokumen->is_tampil, 404);
+    abort_if(!$dokumen->sekolah?->webSekolah?->tampilPublik(), 404);
+    abort_if(!Storage::disk('public')->exists($dokumen->berkas), 404);
+
+    return Storage::disk('public')->response($dokumen->berkas);
+  }
+
+  public function dokumenUnduh(WebDokumen $dokumen)
+  {
+    abort_if(!$dokumen->is_tampil, 404);
+    abort_if(!$dokumen->sekolah?->webSekolah?->tampilPublik(), 404);
+    abort_if(!Storage::disk('public')->exists($dokumen->berkas), 404);
+
+    return Storage::disk('public')->download(
+      $dokumen->berkas,
+      $dokumen->nama_berkas ?: basename($dokumen->berkas)
+    );
   }
 
   // ── Jadwal pelajaran hari ini (publik) ─────────────────────────────
