@@ -62,50 +62,93 @@ return new class extends Migration
   public function up(): void
   {
     foreach ($this->tabelRef as $tabel) {
-      if (!Schema::hasTable($tabel) || !Schema::hasColumn($tabel, 'sekolah_id')) {
+      if (!Schema::hasTable($tabel)) {
         continue;
       }
 
-      $this->dedupe($tabel);
+      if (Schema::hasColumn($tabel, 'sekolah_id')) {
+        $this->dedupe($tabel);
 
-      if ($tabel === 'bos_ref_kode') {
-        DB::table($tabel)->whereNull('id_kode')->delete();
+        if ($tabel === 'bos_ref_kode') {
+          DB::table($tabel)->whereNull('id_kode')->delete();
+        }
+
+        // (1) Foreign key DULU. MySQL menolak membuang indeks
+        // yang masih menopang sebuah FK (error 1553 "Cannot
+        // drop index ... needed in a foreign key constraint")
+        // — versi awal migrasi ini membuang indeks lebih dulu
+        // dan gagal di bos_ref_bku pada MySQL Mark 2026-11-23.
+        foreach (Schema::getForeignKeys($tabel) as $fk) {
+          if (in_array('sekolah_id', $fk['columns'] ?? [], true)) {
+            $namaFk = $fk['name'] ?? null;
+            Schema::table($tabel, function (Blueprint $t) use ($namaFk) {
+              if ($namaFk) {
+                $t->dropForeign($namaFk);
+              } else {
+                $t->dropForeign(['sekolah_id']);
+              }
+            });
+          }
+        }
+
+        // (2) Buang semua indeks (termasuk unik) yang memuat
+        // sekolah_id, apa pun namanya.
+        foreach (Schema::getIndexes($tabel) as $indeks) {
+          if (($indeks['type'] ?? null) === 'primary') {
+            continue;
+          }
+          if (in_array('sekolah_id', $indeks['columns'] ?? [], true)) {
+            $nama = $indeks['name'];
+            Schema::table($tabel, function (Blueprint $t) use ($indeks, $nama) {
+              if (!empty($indeks['unique'])) {
+                $t->dropUnique($nama);
+              } else {
+                $t->dropIndex($nama);
+              }
+            });
+          }
+        }
+
+        // (3) Terakhir kolomnya.
+        Schema::table($tabel, function (Blueprint $t) {
+          $t->dropColumn('sekolah_id');
+        });
       }
 
-      // Buang semua indeks (termasuk unik) yang memuat
-      // sekolah_id, apa pun namanya.
-      foreach (Schema::getIndexes($tabel) as $indeks) {
-        if (($indeks['type'] ?? null) === 'primary') {
-          continue;
-        }
-        if (in_array('sekolah_id', $indeks['columns'] ?? [], true)) {
-          $nama = $indeks['name'];
-          Schema::table($tabel, function (Blueprint $t) use ($indeks, $nama) {
-            if (!empty($indeks['unique'])) {
-              $t->dropUnique($nama);
-            } else {
-              $t->dropIndex($nama);
-            }
+      // Langkah penutup di luar blok sekolah_id dan selalu
+      // diperiksa keberadaannya: bila migrate sebelumnya
+      // berhenti di tengah satu tabel (kolom sudah terbuang
+      // tetapi unik/indeks baru belum dibuat), menjalankan
+      // ulang migrasi ini melengkapinya, bukan mengulang dari
+      // nol atau gagal karena objek sudah ada.
+      if (!$this->punyaIndeks($tabel, ['id_arkas'], true)) {
+        Schema::table($tabel, function (Blueprint $t) {
+          $t->unique('id_arkas');
+        });
+      }
+      foreach ($this->indeksBaru[$tabel] as $kolom) {
+        if (!$this->punyaIndeks($tabel, $kolom, false)) {
+          Schema::table($tabel, function (Blueprint $t) use ($kolom) {
+            $t->index($kolom);
           });
         }
       }
-
-      Schema::table($tabel, function (Blueprint $t) {
-        $t->dropForeign(['sekolah_id']);
-      });
-      Schema::table($tabel, function (Blueprint $t) {
-        $t->dropColumn('sekolah_id');
-      });
-
-      Schema::table($tabel, function (Blueprint $t) {
-        $t->unique('id_arkas');
-      });
-      foreach ($this->indeksBaru[$tabel] as $kolom) {
-        Schema::table($tabel, function (Blueprint $t) use ($kolom) {
-          $t->index($kolom);
-        });
-      }
     }
+  }
+
+  /** Sudah adakah indeks dengan kolom persis ini? */
+  private function punyaIndeks(string $tabel, array $kolom, bool $harusUnik): bool
+  {
+    foreach (Schema::getIndexes($tabel) as $indeks) {
+      if (($indeks['columns'] ?? []) !== $kolom) {
+        continue;
+      }
+      if ($harusUnik && empty($indeks['unique'])) {
+        continue;
+      }
+      return true;
+    }
+    return false;
   }
 
   public function down(): void
