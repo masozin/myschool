@@ -260,12 +260,13 @@ class WebSekolahKelolaController extends Controller
     $sekolah = $this->sekolahSaya();
 
     $request->validate([
-      'foto' => ['required', 'array', 'min:1'],
+      'foto' => ['required', 'array', 'min:1', 'max:20'],
       'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
       'judul' => ['nullable', 'string', 'max:255'],
       'kegiatan_id' => ['nullable', 'integer', Rule::exists('tabel_web_galeri_kegiatan', 'id')->where('sekolah_id', $sekolah->id)],
       'kegiatan_baru' => ['nullable', 'string', 'max:255'],
     ], [
+      'foto.max' => 'Sekali unggah maksimal 20 foto — sisanya bisa ditambahkan lagi sesudahnya.',
       'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
       'foto.*.mimes' => 'Format foto harus JPG, PNG, atau WebP.',
     ]);
@@ -343,9 +344,10 @@ class WebSekolahKelolaController extends Controller
       'tanggal' => ['nullable', 'date'],
       'keterangan' => ['nullable', 'string'],
       'judul' => ['nullable', 'string', 'max:255'],
-      'foto' => ['nullable', 'array'],
+      'foto' => ['nullable', 'array', 'max:20'],
       'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
     ], [
+      'foto.max' => 'Sekali unggah maksimal 20 foto — sisanya bisa ditambahkan lagi sesudahnya.',
       'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
     ]);
 

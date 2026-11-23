@@ -108,7 +108,7 @@
   <div class="modal fade" id="modalAlbumBaru" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
-        <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.store') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.store') }}" enctype="multipart/form-data" class="form-unggah-progres">
           @csrf
           <div class="modal-header">
             <h5 class="modal-title">Tambah Album Baru</h5>
@@ -132,7 +132,7 @@
                 <label class="form-label" for="album-foto">Foto untuk Album Ini (boleh banyak, bisa juga diisi nanti)</label>
                 <input type="file" id="album-foto" name="foto[]" class="form-control kompres-foto" data-maks="1600"
                   data-pratinjau="#pratinjauAlbumBaru" accept=".png,.jpg,.jpeg,.webp" multiple>
-                <small class="text-muted">Pratinjau muncul di bawah sebelum diunggah. Foto dikompresi dulu di browser, lalu diperiksa ulang di server.</small>
+                <small class="text-muted">Pratinjau muncul di bawah sebelum diunggah. Foto dikompresi dulu di browser, lalu diperiksa ulang di server. Maksimal 20 foto sekali unggah.</small>
                 <div id="pratinjauAlbumBaru" class="d-flex flex-wrap gap-2 mt-2"></div>
               </div>
               <div class="col-12">
@@ -152,4 +152,5 @@
 
   @include('_partials.kompres-foto-js')
   @include('_partials.pratinjau-foto-js')
+  @include('_partials.unggah-progres-js')
 @endsection

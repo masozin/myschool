@@ -102,9 +102,11 @@ class KompresGambar
     $tinggi = imagesy($sumber);
     $skala = min(1.0, $maksSisi / max($lebar, $tinggi));
 
-    // JPEG yang sudah cukup kecil tidak perlu di-encode ulang —
-    // hasilnya hanya akan lebih buruk / lebih besar.
-    if ($skala >= 1.0 && $info[2] === IMAGETYPE_JPEG && $file->getSize() <= 1_500_000) {
+    // Berkas yang dimensinya sudah pas dan ukurannya kecil tidak
+    // perlu di-encode ulang — hasilnya hanya akan lebih buruk /
+    // lebih besar, dan di shared hosting ini menghemat CPU server
+    // (kasus umum: foto yang sudah dikompresi browser lebih dulu).
+    if ($skala >= 1.0 && $file->getSize() <= 1_500_000) {
       imagedestroy($sumber);
       return null;
     }

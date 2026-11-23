@@ -63,10 +63,10 @@
   <div class="card mb-4">
     <div class="card-header border-bottom">
       <h5 class="card-title mb-0">Tambah Foto{{ $kegiatan ? ' ke Album Ini' : '' }}</h5>
-      <small class="text-muted">Pilih foto dari file manager — pratinjaunya muncul dulu di bawah, periksa, baru klik Unggah. Foto dikompresi di browser lalu diperiksa ulang di server (maks 10 MB per foto).</small>
+      <small class="text-muted">Pilih foto dari file manager — pratinjaunya muncul dulu di bawah, periksa, baru klik Unggah. Foto dikompresi di browser lalu diperiksa ulang di server (maks 10 MB per foto, maksimal 20 foto sekali unggah — sisanya bisa ditambahkan lagi sesudahnya).</small>
     </div>
     <div class="card-body">
-      <form method="POST" action="{{ route('web-sekolah.kelola.galeri.store') }}" enctype="multipart/form-data" class="row g-3">
+      <form method="POST" action="{{ route('web-sekolah.kelola.galeri.store') }}" enctype="multipart/form-data" class="row g-3 form-unggah-progres">
         @csrf
         @if ($kegiatan)
           <input type="hidden" name="kegiatan_id" value="{{ $kegiatan->id }}">
@@ -140,4 +140,5 @@
 
   @include('_partials.kompres-foto-js')
   @include('_partials.pratinjau-foto-js')
+  @include('_partials.unggah-progres-js')
 @endsection

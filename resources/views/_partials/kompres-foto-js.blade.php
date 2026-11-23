@@ -81,11 +81,15 @@
           input.insertAdjacentElement('afterend', status);
         }
         tombol.forEach(function(t) { t.disabled = true; });
+        input.dataset.kompresBerjalan = '1';
         status.textContent = 'Mengompresi foto di browser…';
 
         let totalAwal = 0, totalBaru = 0;
         const hasil = [];
+        let ke = 0;
         for (const berkas of berkasAwal) {
+          ke++;
+          status.textContent = 'Mengompresi foto ' + ke + ' dari ' + berkasAwal.length + ' di browser…';
           totalAwal += berkas.size;
           if (berkas.type && berkas.type.indexOf('image/') === 0) {
             const terkompres = await kompresSatu(berkas, maks);
@@ -101,9 +105,10 @@
         hasil.forEach(function(f) { dt.items.add(f); });
         input.files = dt.files;
         tombol.forEach(function(t) { t.disabled = false; });
+        delete input.dataset.kompresBerjalan;
         status.textContent = totalBaru < totalAwal ?
           'Foto terkompresi: ' + (totalAwal / 1048576).toFixed(1) + ' MB → ' + (totalBaru / 1048576).toFixed(2) + ' MB. Klik tombol kirim untuk melanjutkan.' :
-          '';
+          berkasAwal.length + ' foto siap diunggah.';
       });
     });
   })();
