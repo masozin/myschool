@@ -208,15 +208,51 @@ class WebSekolahKelolaController extends Controller
   public function galeriIndex()
   {
     $sekolah = $this->sekolahSaya();
-    $galeri = $sekolah->webGaleri()->orderBy('urutan')->latest('id')->get();
+    // Halaman galeri kini berbentuk DAFTAR ALBUM (permintaan Mark
+    // 2026-11-23): tiap album tampil dengan beberapa foto pratinjau;
+    // menambah/mengelola foto dilakukan di halaman edit albumnya.
     $daftarKegiatan = $sekolah->webGaleriKegiatan()
       ->withCount('galeri')
+      ->with(['galeri' => fn ($q) => $q->orderBy('urutan')->latest('id')])
       ->orderByRaw('tanggal IS NULL')
       ->orderByDesc('tanggal')
       ->latest('id')
       ->get();
+    $fotoLainnya = $sekolah->webGaleri()
+      ->whereNull('kegiatan_id')
+      ->orderBy('urutan')
+      ->latest('id')
+      ->get();
 
-    return view('content.web-sekolah.galeri-index', compact('sekolah', 'galeri', 'daftarKegiatan'));
+    return view('content.web-sekolah.galeri-index', compact('sekolah', 'daftarKegiatan', 'fotoLainnya'));
+  }
+
+  /** Halaman kelola satu album: rincian album + unggah & atur fotonya. */
+  public function albumEdit(WebGaleriKegiatan $kegiatan)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($kegiatan->sekolah_id !== $sekolah->id, 404);
+
+    $foto = $kegiatan->galeri()->get();
+    $daftarKegiatan = $sekolah->webGaleriKegiatan()->orderBy('nama')->get();
+
+    return view('content.web-sekolah.galeri-album-edit', compact('sekolah', 'kegiatan', 'foto', 'daftarKegiatan'));
+  }
+
+  /** Halaman kelola foto tanpa album ("Foto Lainnya"). */
+  public function tanpaAlbum()
+  {
+    $sekolah = $this->sekolahSaya();
+
+    $kegiatan = null;
+    $foto = $sekolah->webGaleri()
+      ->whereNull('kegiatan_id')
+      ->orderBy('urutan')
+      ->latest('id')
+      ->get();
+    $daftarKegiatan = $sekolah->webGaleriKegiatan()->orderBy('nama')->get();
+
+    return view('content.web-sekolah.galeri-album-edit', compact('sekolah', 'kegiatan', 'foto', 'daftarKegiatan'));
   }
 
   public function galeriStore(Request $request)
@@ -258,7 +294,12 @@ class WebSekolahKelolaController extends Controller
       ]);
     }
 
-    return redirect()->route('web-sekolah.kelola.galeri.index')
+    if ($kegiatanId) {
+      return redirect()->route('web-sekolah.kelola.galeri.album.edit', $kegiatanId)
+        ->with('success', 'Foto galeri berhasil diunggah.');
+    }
+
+    return redirect()->route('web-sekolah.kelola.galeri.tanpa-album')
       ->with('success', 'Foto galeri berhasil diunggah.');
   }
 
@@ -276,7 +317,7 @@ class WebSekolahKelolaController extends Controller
 
     $galeri->update($data);
 
-    return redirect()->route('web-sekolah.kelola.galeri.index')
+    return redirect()->back(302, [], route('web-sekolah.kelola.galeri.index'))
       ->with('success', 'Foto galeri berhasil diperbarui.');
   }
 
@@ -288,7 +329,7 @@ class WebSekolahKelolaController extends Controller
     Storage::disk('public')->delete($galeri->foto);
     $galeri->delete();
 
-    return redirect()->route('web-sekolah.kelola.galeri.index')
+    return redirect()->back(302, [], route('web-sekolah.kelola.galeri.index'))
       ->with('success', 'Foto galeri berhasil dihapus.');
   }
 
@@ -301,11 +342,29 @@ class WebSekolahKelolaController extends Controller
       'nama' => ['required', 'string', 'max:255'],
       'tanggal' => ['nullable', 'date'],
       'keterangan' => ['nullable', 'string'],
+      'judul' => ['nullable', 'string', 'max:255'],
+      'foto' => ['nullable', 'array'],
+      'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
+    ], [
+      'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
     ]);
 
-    $sekolah->webGaleriKegiatan()->create($data);
+    $kegiatan = $sekolah->webGaleriKegiatan()->create(collect($data)->only(['nama', 'tanggal', 'keterangan'])->all());
 
-    return redirect()->route('web-sekolah.kelola.galeri.index')
+    if ($request->hasFile('foto')) {
+      $urutan = (int) ($sekolah->webGaleri()->max('urutan') ?? 0);
+      foreach ($request->file('foto') as $file) {
+        WebGaleri::create([
+          'sekolah_id' => $sekolah->id,
+          'kegiatan_id' => $kegiatan->id,
+          'judul' => $data['judul'] ?? null,
+          'foto' => KompresGambar::simpan($file, "web-sekolah/{$sekolah->id}/galeri", 1600),
+          'urutan' => ++$urutan,
+        ]);
+      }
+    }
+
+    return redirect()->route('web-sekolah.kelola.galeri.album.edit', $kegiatan)
       ->with('success', 'Album kegiatan berhasil dibuat.');
   }
 
@@ -322,7 +381,7 @@ class WebSekolahKelolaController extends Controller
 
     $kegiatan->update($data);
 
-    return redirect()->route('web-sekolah.kelola.galeri.index')
+    return redirect()->route('web-sekolah.kelola.galeri.album.edit', $kegiatan)
       ->with('success', 'Album kegiatan berhasil diperbarui.');
   }
 

@@ -16,150 +16,140 @@
     </div>
   @endif
 
-  <div class="card mb-4">
-    <div class="card-header border-bottom">
-      <h5 class="card-title mb-0">Unggah Foto Galeri</h5>
-      <small class="text-muted">{{ $sekolah->detailTerbaru->nama_sekolah ?? '' }} — bisa pilih banyak foto sekaligus, maks 10 MB per foto dan otomatis dikompresi saat tersimpan.</small>
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <div>
+      <h4 class="mb-1">Galeri — Album Kegiatan</h4>
+      <small class="text-muted">{{ $sekolah->detailTerbaru->nama_sekolah ?? '' }} — foto dikelompokkan per album kegiatan. Klik “Edit Album” untuk menambah &amp; mengelola foto di dalamnya.</small>
     </div>
-    <div class="card-body">
-      <form method="POST" action="{{ route('web-sekolah.kelola.galeri.store') }}" enctype="multipart/form-data" class="row g-3">
-        @csrf
-        <div class="col-12 col-md-6">
-          <label class="form-label" for="foto">Foto *</label>
-          <input type="file" id="foto" name="foto[]" class="form-control kompres-foto" data-maks="1600" accept=".png,.jpg,.jpeg,.webp" multiple required>
-          <small class="text-muted">Foto dikompresi dulu di browser (lebih cepat &amp; hemat kuota), lalu diperiksa ulang di server.</small>
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label" for="judul">Judul Bersama (opsional)</label>
-          <input type="text" id="judul" name="judul" class="form-control" maxlength="255" placeholder="mis. Upacara Hari Guru 2026">
-        </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label" for="kegiatan_id">Masuk Album Kegiatan</label>
-          <select id="kegiatan_id" name="kegiatan_id" class="form-select">
-            <option value="">— Tanpa album (Foto Lainnya) —</option>
-            @foreach ($daftarKegiatan as $k)
-              <option value="{{ $k->id }}">{{ $k->nama }}{{ $k->tanggal ? ' (' . $k->tanggal->format('d/m/Y') . ')' : '' }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label" for="kegiatan_baru">atau Buat Album Baru</label>
-          <input type="text" id="kegiatan_baru" name="kegiatan_baru" class="form-control" maxlength="255" placeholder="mis. Lomba 17 Agustus 2026">
-          <small class="text-muted">Bila diisi, pilihan album di kiri diabaikan. Tanggal &amp; keterangan album bisa dilengkapi di kartu Album Kegiatan di bawah.</small>
-        </div>
-        <div class="col-12 col-md-2 d-flex align-items-end">
-          <button type="submit" class="btn btn-primary w-100">Unggah</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div class="card mb-4">
-    <div class="card-header border-bottom">
-      <h5 class="card-title mb-0">Album Kegiatan</h5>
-      <small class="text-muted">Foto galeri dikelompokkan per kegiatan. Di web publik, album tampil sebagai kartu dengan foto sampul; pengunjung mengkliknya untuk melihat semua foto kegiatan itu. Menghapus album tidak menghapus foto — foto kembali menjadi tanpa album.</small>
-    </div>
-    <div class="card-body">
-      <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.store') }}" class="row g-3 mb-2">
-        @csrf
-        <div class="col-12 col-md-5">
-          <label class="form-label" for="album-nama">Nama Album Baru *</label>
-          <input type="text" id="album-nama" name="nama" class="form-control" maxlength="255" required placeholder="mis. Upacara HUT RI 2026">
-        </div>
-        <div class="col-12 col-md-3">
-          <label class="form-label" for="album-tanggal">Tanggal Kegiatan</label>
-          <input type="date" id="album-tanggal" name="tanggal" class="form-control">
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label" for="album-keterangan">Keterangan (opsional)</label>
-          <input type="text" id="album-keterangan" name="keterangan" class="form-control" placeholder="mis. Diikuti seluruh siswa & guru">
-        </div>
-        <div class="col-12">
-          <button type="submit" class="btn btn-outline-primary">Buat Album</button>
-        </div>
-      </form>
-
-      @forelse ($daftarKegiatan as $k)
-        <div class="border rounded p-3 mb-2">
-          <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.update', $k) }}" class="row g-2 align-items-end">
-            @csrf @method('PUT')
-            <div class="col-12 col-md-4">
-              <label class="form-label small mb-1">Nama Album <span class="badge bg-label-info">{{ $k->galeri_count }} foto</span></label>
-              <input type="text" name="nama" class="form-control form-control-sm" maxlength="255" required value="{{ $k->nama }}">
-            </div>
-            <div class="col-6 col-md-2">
-              <label class="form-label small mb-1">Tanggal</label>
-              <input type="date" name="tanggal" class="form-control form-control-sm" value="{{ $k->tanggal?->format('Y-m-d') }}">
-            </div>
-            <div class="col-6 col-md-4">
-              <label class="form-label small mb-1">Keterangan</label>
-              <input type="text" name="keterangan" class="form-control form-control-sm" value="{{ $k->keterangan }}" placeholder="Keterangan">
-            </div>
-            <div class="col-12 col-md-2">
-              <button type="submit" class="btn btn-sm btn-outline-primary w-100">Simpan Album</button>
-            </div>
-          </form>
-          <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.destroy', $k) }}" class="mt-2"
-            onsubmit="return confirm('Hapus album ini? Foto-fotonya TIDAK ikut terhapus, hanya menjadi tanpa album.')">
-            @csrf @method('DELETE')
-            <button type="submit" class="btn btn-sm btn-outline-danger">Hapus Album</button>
-          </form>
-        </div>
-      @empty
-        <p class="text-muted mb-0">Belum ada album — buat lewat formulir di atas, atau langsung dari formulir unggah foto.</p>
-      @endforelse
-    </div>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAlbumBaru">
+      <i class="ri ri-add-line me-1"></i> Tambah Album Baru
+    </button>
   </div>
 
   <div class="row g-4">
-    @forelse ($galeri as $g)
-      <div class="col-12 col-sm-6 col-lg-4">
+    @foreach ($daftarKegiatan as $k)
+      <div class="col-12 col-md-6 col-xl-4">
         <div class="card h-100">
-          <img src="{{ route('web-sekolah.galeri.foto', $g) }}" alt="{{ $g->judul ?? 'Foto galeri' }}"
-            style="height:190px;object-fit:cover" class="card-img-top">
           <div class="card-body">
-            <form method="POST" action="{{ route('web-sekolah.kelola.galeri.update', $g) }}" class="row g-2">
-              @csrf @method('PUT')
-              <div class="col-12">
-                <input type="text" name="judul" class="form-control form-control-sm" maxlength="255"
-                  value="{{ $g->judul }}" placeholder="Judul foto">
-              </div>
-              <div class="col-8">
-                <input type="text" name="keterangan" class="form-control form-control-sm" maxlength="255"
-                  value="{{ $g->keterangan }}" placeholder="Keterangan">
-              </div>
-              <div class="col-4">
-                <input type="number" name="urutan" class="form-control form-control-sm" min="0"
-                  value="{{ $g->urutan }}" title="Urutan tampil">
-              </div>
-              <div class="col-12">
-                <select name="kegiatan_id" class="form-select form-select-sm" title="Album kegiatan foto ini">
-                  <option value="">— Tanpa album —</option>
-                  @foreach ($daftarKegiatan as $k)
-                    <option value="{{ $k->id }}" @selected($g->kegiatan_id === $k->id)>{{ $k->nama }}</option>
-                  @endforeach
-                </select>
-              </div>
-              <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-sm btn-outline-primary flex-grow-1">Simpan</button>
-              </div>
-            </form>
-            <form method="POST" action="{{ route('web-sekolah.kelola.galeri.destroy', $g) }}" class="mt-2"
-              onsubmit="return confirm('Hapus foto ini dari galeri?')">
-              @csrf @method('DELETE')
-              <button type="submit" class="btn btn-sm btn-outline-danger w-100">Hapus Foto</button>
-            </form>
+            <div class="d-flex gap-2 mb-3">
+              @forelse ($k->galeri->take(4) as $gf)
+                <img src="{{ route('web-sekolah.galeri.foto', $gf) }}" alt="{{ $gf->judul ?? $k->nama }}"
+                  style="width:64px;height:64px;object-fit:cover;border-radius:10px">
+              @empty
+                <div class="d-flex align-items-center justify-content-center text-muted"
+                  style="width:64px;height:64px;border:1px dashed #cbd5e1;border-radius:10px">
+                  <i class="ri ri-image-line ri-lg"></i>
+                </div>
+              @endforelse
+              @if ($k->galeri_count > 4)
+                <div class="d-flex align-items-center justify-content-center bg-label-secondary fw-semibold"
+                  style="width:64px;height:64px;border-radius:10px">+{{ $k->galeri_count - 4 }}</div>
+              @endif
+            </div>
+            <h5 class="card-title mb-1">{{ $k->nama }}</h5>
+            <p class="text-muted small mb-2">
+              @if ($k->tanggal)<i class="ri ri-calendar-line me-1"></i>{{ $k->tanggal->translatedFormat('d F Y') }} &middot; @endif
+              <span class="badge bg-label-info">{{ $k->galeri_count }} foto</span>
+            </p>
+            @if ($k->keterangan)
+              <p class="small mb-3">{{ \Illuminate\Support\Str::limit($k->keterangan, 110) }}</p>
+            @endif
+            <div class="d-flex gap-2">
+              <a href="{{ route('web-sekolah.kelola.galeri.album.edit', $k) }}" class="btn btn-sm btn-primary flex-grow-1">
+                <i class="ri ri-edit-line me-1"></i> Edit Album
+              </a>
+              <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.destroy', $k) }}"
+                onsubmit="return confirm('Hapus album ini? Foto-fotonya TIDAK ikut terhapus, hanya menjadi tanpa album.')">
+                @csrf @method('DELETE')
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus album"><i class="ri ri-delete-bin-line"></i></button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    @empty
-      <div class="col-12">
-        <div class="card"><div class="card-body text-center text-muted py-4">
-          Galeri masih kosong — unggah foto kegiatan pertama lewat formulir di atas.
-        </div></div>
+    @endforeach
+
+    {{-- Foto tanpa album --}}
+    <div class="col-12 col-md-6 col-xl-4">
+      <div class="card h-100" style="border-style:dashed">
+        <div class="card-body">
+          <div class="d-flex gap-2 mb-3">
+            @forelse ($fotoLainnya->take(4) as $gf)
+              <img src="{{ route('web-sekolah.galeri.foto', $gf) }}" alt="{{ $gf->judul ?? 'Foto lainnya' }}"
+                style="width:64px;height:64px;object-fit:cover;border-radius:10px">
+            @empty
+              <div class="d-flex align-items-center justify-content-center text-muted"
+                style="width:64px;height:64px;border:1px dashed #cbd5e1;border-radius:10px">
+                <i class="ri ri-image-line ri-lg"></i>
+              </div>
+            @endforelse
+            @if ($fotoLainnya->count() > 4)
+              <div class="d-flex align-items-center justify-content-center bg-label-secondary fw-semibold"
+                style="width:64px;height:64px;border-radius:10px">+{{ $fotoLainnya->count() - 4 }}</div>
+            @endif
+          </div>
+          <h5 class="card-title mb-1">Foto Lainnya</h5>
+          <p class="text-muted small mb-3">Foto yang belum masuk album mana pun. <span class="badge bg-label-secondary">{{ $fotoLainnya->count() }} foto</span></p>
+          <a href="{{ route('web-sekolah.kelola.galeri.tanpa-album') }}" class="btn btn-sm btn-outline-primary w-100">
+            <i class="ri ri-edit-line me-1"></i> Kelola Foto Lainnya
+          </a>
+        </div>
       </div>
-    @endforelse
+    </div>
+  </div>
+
+  @if ($daftarKegiatan->isEmpty())
+    <div class="card mt-4"><div class="card-body text-center text-muted py-4">
+      Belum ada album kegiatan — klik “Tambah Album Baru” untuk membuat album pertama dan langsung mengisinya dengan foto.
+    </div></div>
+  @endif
+
+  {{-- Modal tambah album baru (sekalian mengisi foto) --}}
+  <div class="modal fade" id="modalAlbumBaru" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <form method="POST" action="{{ route('web-sekolah.kelola.galeri.kegiatan.store') }}" enctype="multipart/form-data">
+          @csrf
+          <div class="modal-header">
+            <h5 class="modal-title">Tambah Album Baru</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="album-nama">Nama Album / Kegiatan *</label>
+                <input type="text" id="album-nama" name="nama" class="form-control" maxlength="255" required placeholder="mis. Upacara HUT RI 2026">
+              </div>
+              <div class="col-12 col-md-5">
+                <label class="form-label" for="album-tanggal">Tanggal Kegiatan</label>
+                <input type="date" id="album-tanggal" name="tanggal" class="form-control">
+              </div>
+              <div class="col-12 col-md-7">
+                <label class="form-label" for="album-keterangan">Keterangan (opsional)</label>
+                <input type="text" id="album-keterangan" name="keterangan" class="form-control" placeholder="mis. Diikuti seluruh siswa & guru">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="album-foto">Foto untuk Album Ini (boleh banyak, bisa juga diisi nanti)</label>
+                <input type="file" id="album-foto" name="foto[]" class="form-control kompres-foto" data-maks="1600"
+                  data-pratinjau="#pratinjauAlbumBaru" accept=".png,.jpg,.jpeg,.webp" multiple>
+                <small class="text-muted">Pratinjau muncul di bawah sebelum diunggah. Foto dikompresi dulu di browser, lalu diperiksa ulang di server.</small>
+                <div id="pratinjauAlbumBaru" class="d-flex flex-wrap gap-2 mt-2"></div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="album-judul">Judul Bersama Foto (opsional)</label>
+                <input type="text" id="album-judul" name="judul" class="form-control" maxlength="255" placeholder="Judul yang sama untuk semua foto di atas">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary">Buat Album</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   @include('_partials.kompres-foto-js')
+  @include('_partials.pratinjau-foto-js')
 @endsection

@@ -180,6 +180,8 @@ Route::controller(WebSekolahKelolaController::class)
 
     Route::get('/galeri', 'galeriIndex')->name('galeri.index');
     Route::post('/galeri', 'galeriStore')->name('galeri.store');
+    Route::get('/galeri/album/{kegiatan}/edit', 'albumEdit')->name('galeri.album.edit');
+    Route::get('/galeri/tanpa-album', 'tanpaAlbum')->name('galeri.tanpa-album');
     Route::post('/galeri/kegiatan', 'kegiatanStore')->name('galeri.kegiatan.store');
     Route::put('/galeri/kegiatan/{kegiatan}', 'kegiatanUpdate')->name('galeri.kegiatan.update');
     Route::delete('/galeri/kegiatan/{kegiatan}', 'kegiatanDestroy')->name('galeri.kegiatan.destroy');
