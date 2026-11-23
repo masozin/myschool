@@ -3,6 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Mode gelap: terapkan pilihan tersimpan (atau preferensi sistem)
+    // SEBELUM halaman digambar agar tidak berkedip terang dulu.
+    (function () {
+      try {
+        var t = localStorage.getItem('ws-tema');
+        if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+        if (t === 'dark') document.documentElement.setAttribute('data-tema', 'dark');
+      } catch (e) { /* abaikan */ }
+    })();
+  </script>
   <title>@yield('title', $namaSekolah ?? 'Web Sekolah')</title>
   <meta name="description" content="@yield('meta_description', 'Website resmi ' . ($namaSekolah ?? 'sekolah'))">
   <meta property="og:title" content="@yield('title', $namaSekolah ?? 'Web Sekolah')">
@@ -39,6 +50,34 @@
       --shadow-lg:0 30px 60px -18px rgba(10,36,80,.28);
       --radius:18px;
     }
+    /* ── Mode gelap: aktif bila <html data-tema="dark"> ── */
+    :root[data-tema="dark"]{
+      color-scheme:dark;
+      --ink:#eef3fc;--text:#c3cfe2;--muted:#8fa1bd;
+      --line:#22345c;--bg:#081226;--card:#0e1e3d;
+      --shadow-sm:0 2px 10px rgba(0,0,0,.35);
+      --shadow-md:0 14px 34px -12px rgba(0,0,0,.5);
+      --shadow-lg:0 30px 60px -18px rgba(0,0,0,.6);
+    }
+    :root[data-tema="dark"] .ws-section-alt{background:#0b1a36}
+    :root[data-tema="dark"] .ws-nav.is-solid,:root[data-tema="dark"] .ws-nav.scrolled{background:rgba(8,18,38,.92)}
+    :root[data-tema="dark"] .ws-nav.is-solid .ws-links a:hover,:root[data-tema="dark"] .ws-nav.scrolled .ws-links a:hover,
+    :root[data-tema="dark"] .ws-nav.is-solid .ws-links a.aktif,:root[data-tema="dark"] .ws-nav.scrolled .ws-links a.aktif{background:rgba(255,255,255,.09)}
+    :root[data-tema="dark"] .ws-nav.is-solid .ws-burger,:root[data-tema="dark"] .ws-nav.scrolled .ws-burger,
+    :root[data-tema="dark"] .ws-nav.is-solid .ws-tema,:root[data-tema="dark"] .ws-nav.scrolled .ws-tema{background:rgba(255,255,255,.08)}
+    :root[data-tema="dark"] .ws-mobile{background:var(--card)}
+    :root[data-tema="dark"] .ws-mobile a{border-bottom-color:var(--line)}
+    :root[data-tema="dark"] .ws-article,:root[data-tema="dark"] .ws-empty,
+    :root[data-tema="dark"] .ws-pagination a,:root[data-tema="dark"] .ws-pagination span,
+    :root[data-tema="dark"] .ws-pill{background:var(--card)}
+    :root[data-tema="dark"] .ws-pills{background:#0b1a36}
+    /* ── Tombol saklar tema ── */
+    .ws-tema{margin-left:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex:none}
+    .ws-tema svg{width:20px;height:20px}
+    .ws-tema .ikon-matahari{display:none}
+    :root[data-tema="dark"] .ws-tema .ikon-matahari{display:block}
+    :root[data-tema="dark"] .ws-tema .ikon-bulan{display:none}
+    .ws-nav.is-solid .ws-tema,.ws-nav.scrolled .ws-tema{background:#eef3fb;border-color:var(--line);color:var(--ink)}
     *{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
     body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;color:var(--text);background:var(--bg);line-height:1.65;font-size:16px;-webkit-font-smoothing:antialiased}
@@ -429,12 +468,12 @@
           @else
             <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9.5 12 4 2 9.5l10 5.5 10-5.5z"/><path d="M6 11.8V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.2"/><path d="M22 9.5V16"/></svg></span>
           @endif
-          <span>{{ $namaSekolah }}<small>{{ $sekolah->jenjang }} &middot; Website Resmi</small></span>
+          <span>{{ $namaSekolah }}<small>{{ $sekolah->npsn ? 'NPSN ' . $sekolah->npsn : $sekolah->jenjang . ' · Laman Sekolah' }}</small></span>
         </a>
         <div class="ws-links">
           <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
           <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
-          <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
+          <a href="{{ $diLanding ? '#berita' : route('web-sekolah.tampil', $web->slug) . '#berita' }}">Berita</a>
           <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
           <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
           <a href="{{ $diLanding ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen</a>
@@ -461,12 +500,16 @@
           @endauth
         </div>
       @endisset
+        <button class="ws-tema" id="wsTema" type="button" aria-label="Aktifkan mode gelap atau terang" title="Mode gelap / terang">
+          <svg class="ikon-bulan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="ikon-matahari" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
     </div>
     @isset($web)
       <div class="ws-mobile" id="wsMobile">
         <a href="{{ $diLanding ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a>
         <a href="{{ $diLanding ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Profil</a>
-        <a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita</a>
+        <a href="{{ $diLanding ? '#berita' : route('web-sekolah.tampil', $web->slug) . '#berita' }}">Berita</a>
         <a href="{{ $diLanding ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri</a>
         <a href="{{ $diLanding ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal</a>
         <a href="{{ $diLanding ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen</a>
@@ -493,7 +536,7 @@
               @else
                 <span class="ws-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 9.5 12 4 2 9.5l10 5.5 10-5.5z"/><path d="M6 11.8V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.2"/><path d="M22 9.5V16"/></svg></span>
               @endif
-              <span>{{ $namaSekolah }}<small>{{ $sekolah->jenjang }} &middot; Website Resmi</small></span>
+              <span>{{ $namaSekolah }}<small>{{ $sekolah->npsn ? 'NPSN ' . $sekolah->npsn : $sekolah->jenjang . ' · Laman Sekolah' }}</small></span>
             </span>
             <p>{{ $web->tagline ?? 'Website resmi ' . $namaSekolah . ' — pusat informasi, pengumuman, dan layanan daring sekolah.' }}</p>
             <p style="margin-top:12px">NPSN {{ $sekolah->npsn }}
@@ -507,7 +550,7 @@
               <li><a href="{{ ($diLanding ?? false) ? '#beranda' : route('web-sekolah.tampil', $web->slug) }}">Beranda</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#sambutan' : route('web-sekolah.tampil', $web->slug) . '#sambutan' }}">Sambutan Kepala Sekolah</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#visi-misi' : route('web-sekolah.tampil', $web->slug) . '#visi-misi' }}">Visi &amp; Misi</a></li>
-              <li><a href="{{ route('web-sekolah.berita.index', $web->slug) }}">Berita &amp; Pengumuman</a></li>
+              <li><a href="{{ ($diLanding ?? false) ? '#berita' : route('web-sekolah.tampil', $web->slug) . '#berita' }}">Berita &amp; Pengumuman</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#galeri' : route('web-sekolah.tampil', $web->slug) . '#galeri' }}">Galeri Kegiatan</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#jadwal' : route('web-sekolah.tampil', $web->slug) . '#jadwal' }}">Jadwal Hari Ini</a></li>
               <li><a href="{{ ($diLanding ?? false) ? '#dokumen' : route('web-sekolah.tampil', $web->slug) . '#dokumen' }}">Dokumen Publik</a></li>
@@ -674,6 +717,23 @@
     })();
   </script>
   @yield('page-script')
+  <script>
+    // Saklar mode gelap/terang: simpan pilihan pengunjung.
+    (function () {
+      var tombol = document.getElementById('wsTema');
+      if (!tombol) return;
+      tombol.addEventListener('click', function () {
+        var gelap = document.documentElement.getAttribute('data-tema') === 'dark';
+        if (gelap) {
+          document.documentElement.removeAttribute('data-tema');
+          try { localStorage.setItem('ws-tema', 'light'); } catch (e) { /* abaikan */ }
+        } else {
+          document.documentElement.setAttribute('data-tema', 'dark');
+          try { localStorage.setItem('ws-tema', 'dark'); } catch (e) { /* abaikan */ }
+        }
+      });
+    })();
+  </script>
   <script>
     // Lipat teks panjang (sambutan/visi/misi): bila isi melewati batas
     // tinggi, potong dengan gradasi + tombol "Lihat Selengkapnya".

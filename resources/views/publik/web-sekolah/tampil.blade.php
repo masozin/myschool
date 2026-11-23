@@ -1,6 +1,6 @@
 @extends('publik.web-sekolah.layout')
 
-@section('title', $namaSekolah . ' — Website Resmi')
+@section('title', $namaSekolah . ' — Laman Sekolah')
 @section('meta_description', 'Website resmi ' . $namaSekolah . ', NPSN ' . $sekolah->npsn)
 
 @section('content')
@@ -12,7 +12,7 @@
     <div class="ws-hero-glow"></div>
     <div class="ws-container">
       <div class="ws-hero-in">
-        <span class="ws-eyebrow"><i></i> Website Resmi Sekolah</span>
+        <span class="ws-eyebrow"><i></i> Laman Sekolah</span>
         <h1>{{ $namaSekolah }}</h1>
         @if ($web->tagline)
           <p class="ws-tagline">{{ $web->tagline }}</p>
@@ -99,7 +99,7 @@
   @endif
 
   {{-- ── Berita terbaru ───────────────────────────────────────────── --}}
-  <section class="ws-section ws-section-alt" style="padding-top:70px">
+  <section class="ws-section ws-section-alt" id="berita" style="padding-top:70px">
     <div class="ws-container">
       <div class="ws-sec-head" data-reveal style="display:flex;gap:20px;align-items:flex-end;max-width:none;flex-wrap:wrap">
         <div style="flex:1;min-width:260px">
