@@ -10,6 +10,7 @@ use App\Models\Rombel;
 use App\Models\Sekolah;
 use App\Models\SekolahLogo;
 use App\Models\Semester;
+use App\Models\Siswa;
 use App\Models\WebBerita;
 use App\Models\WebDokumen;
 use App\Models\WebGaleri;
@@ -509,14 +510,22 @@ class WebSekolahController extends Controller
     $detail = $sekolah->detailTerbaru;
     $semesterAktif = Semester::where('is_active', true)->first();
 
-    // Statistik mengikuti cara hitung DashboardController (non-Admin)
-    // supaya angka publik sama dengan angka dashboard internal.
-    $jumlahSiswa = $sekolah->siswaRegistrasi()->where('status', 'aktif')->count();
+    // Statistik mengikuti definisi baku DashboardController supaya angka
+    // publik sama dengan angka dashboard internal: siswa aktif =
+    // registrasi TERBARU berstatus 'aktif' di sekolah ini; PTK hanya
+    // yang statusnya 'aktif'; Tendik termasuk jabatan kosong supaya
+    // Guru + Tendik selalu sama dengan Total PTK.
+    $jumlahSiswa = Siswa::whereHas('registrasiTerbaru', function ($q) use ($sekolah) {
+      $q->where('status', 'aktif')->where('sekolah_id', $sekolah->id);
+    })->count();
     $jumlahRombel = $sekolah->rombel()
       ->when($semesterAktif, fn($q) => $q->where('semester_id', $semesterAktif->id))
       ->count();
-    $jumlahGuru = $sekolah->ptk()->where('jabatan', 'Guru')->count();
-    $jumlahTendik = $sekolah->ptk()->where('jabatan', '!=', 'Guru')->count();
+    $ptkAktif = $sekolah->ptk()->where('status', 'aktif');
+    $jumlahGuru = (clone $ptkAktif)->where('jabatan', 'Guru')->count();
+    $jumlahTendik = (clone $ptkAktif)
+      ->where(fn($q) => $q->where('jabatan', '!=', 'Guru')->orWhereNull('jabatan'))
+      ->count();
 
     return [
       'web' => $web,

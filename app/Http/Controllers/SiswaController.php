@@ -718,35 +718,27 @@ class SiswaController extends Controller
   {
     $user = Auth::user();
 
-    $query = Siswa::query()->whereHas('siswaRegistrasi', function ($q) {
-      $q->where('status', 'aktif');
-    });
+    // Definisi baku yang sama dengan DashboardController: siswa aktif =
+    // registrasi TERBARU berstatus 'aktif' (di sekolah pengguna; Admin
+    // boleh membatasi lewat parameter sekolah_id). Tingkat diambil dari
+    // registrasi terbaru itu juga, bukan dari registrasi aktif mana pun.
+    $sekolahId = $user->hasRole('Admin')
+      ? ($request->filled('sekolah_id') ? $request->integer('sekolah_id') : null)
+      : $user->ptk?->sekolah_id;
 
-    if ($user->hasRole('Admin')) {
-      if ($request->filled('sekolah_id')) {
-        $query->whereHas('siswaRegistrasi', function ($q) use ($request) {
-          $q->where('sekolah_id', $request->integer('sekolah_id'))
-            ->where('status', 'aktif');
-        });
-      }
-    } else {
-      $query->whereHas('siswaRegistrasi', function ($q) use ($user) {
-        $q->where('sekolah_id', $user->ptk->sekolah_id)
-          ->where('status', 'aktif');
-      });
-    }
-
-    $query->with(['siswaRegistrasi' => function ($q) {
-      $q->where('status', 'aktif')->latest();
-    }]);
-
-    $siswaRecords = $query->get();
+    $siswaRecords = Siswa::query()
+      ->whereHas('registrasiTerbaru', function ($q) use ($sekolahId) {
+        $q->where('status', 'aktif')
+          ->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId));
+      })
+      ->with('registrasiTerbaru')
+      ->get();
 
     $pivot = []; // [tingkat][usia] = count
     $usiaSet = [];
 
     foreach ($siswaRecords as $siswa) {
-      $registrasi = $siswa->siswaRegistrasi->first();
+      $registrasi = $siswa->registrasiTerbaru;
       if (!$registrasi || !$registrasi->tingkat || !$siswa->tgl_lahir) continue;
 
       $tingkat = $registrasi->tingkat;
@@ -797,13 +789,24 @@ class SiswaController extends Controller
     $user = Auth::user();
     $isAdmin = $user->hasRole('Admin');
     $sekolahId = $isAdmin ? null : $user->ptk?->sekolah?->id;
-    $semesterId = session('semester_id');
+    // Semester tampilan: pilihan sesi, cadangan semester aktif (sama
+    // seperti DashboardController).
+    $semesterId = session('semester_id')
+      ?: Semester::where('is_active', true)->value('id');
 
     $agamaList = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya'];
 
-    $semesterAktifId = Semester::where('is_active', true)->value('id');
+    // SELALU hanya siswa aktif menurut definisi baku (registrasi terbaru
+    // aktif) — versi lama hanya menyaring bila semester sesi = semester
+    // aktif, sehingga di semester lain siswa keluar/lulus ikut terhitung.
+    // Untuk Admin tanpa konteks sekolah, saringan sekolah pada registrasi
+    // dilewati; untuk pengguna sekolah, registrasi terbarunya juga harus
+    // berada di sekolah ini.
     $anggota = RombelAnggota::with(['siswa:id,agama', 'rombel:id,tingkat,sekolah_id,semester_id'])
-      ->when($semesterAktifId && (int) $semesterId === (int) $semesterAktifId, fn($q) => $q->whereHas('siswa.registrasiTerbaru', fn($qr) => $qr->where('status', 'aktif')))
+      ->whereHas('siswa.registrasiTerbaru', function ($q) use ($sekolahId) {
+        $q->where('status', 'aktif')
+          ->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId));
+      })
       ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId) {
         $q->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId))
           ->when($semesterId, fn($qq) => $qq->where('semester_id', $semesterId));
@@ -813,19 +816,31 @@ class SiswaController extends Controller
     $rows = [];
     $colTotals = array_fill_keys($agamaList, 0);
     $grandTotal = 0;
+    $sudahDihitung = [];
 
     foreach ($anggota as $a) {
-      if (!$a->rombel) continue;
+      if (!$a->rombel || !$a->siswa) continue;
       $tingkat = $a->rombel->tingkat;
-      $agama = $a->siswa->agama ?? 'Lainnya';
+
+      // Satu siswa paling banyak dihitung satu kali per tingkat.
+      $kunci = $tingkat . ':' . $a->siswa_id;
+      if (isset($sudahDihitung[$kunci])) continue;
+      $sudahDihitung[$kunci] = true;
+
+      // Nilai agama di luar daftar baku (kosong / ejaan lain) masuk
+      // 'Lainnya', supaya total baris selalu sama dengan jumlah kolom.
+      $agama = trim((string) ($a->siswa->agama ?? ''));
+      if (!in_array($agama, $agamaList, true)) {
+        $agama = 'Lainnya';
+      }
 
       if (!isset($rows[$tingkat])) {
         $rows[$tingkat] = ['tingkat' => $tingkat, 'cells' => array_fill_keys($agamaList, 0), 'total' => 0];
       }
 
-      $rows[$tingkat]['cells'][$agama] = ($rows[$tingkat]['cells'][$agama] ?? 0) + 1;
+      $rows[$tingkat]['cells'][$agama]++;
       $rows[$tingkat]['total']++;
-      $colTotals[$agama] = ($colTotals[$agama] ?? 0) + 1;
+      $colTotals[$agama]++;
       $grandTotal++;
     }
 
