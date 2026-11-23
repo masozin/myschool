@@ -344,6 +344,7 @@ class WebSekolahKelolaController extends Controller
       'tanggal' => ['nullable', 'date'],
       'keterangan' => ['nullable', 'string'],
       'judul' => ['nullable', 'string', 'max:255'],
+      'is_tampil' => ['nullable', 'boolean'],
       'foto' => ['nullable', 'array', 'max:20'],
       'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
     ], [
@@ -351,7 +352,7 @@ class WebSekolahKelolaController extends Controller
       'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
     ]);
 
-    $kegiatan = $sekolah->webGaleriKegiatan()->create(collect($data)->only(['nama', 'tanggal', 'keterangan'])->all());
+    $kegiatan = $sekolah->webGaleriKegiatan()->create(collect($data)->only(['nama', 'tanggal', 'keterangan', 'is_tampil'])->all());
 
     if ($request->hasFile('foto')) {
       $urutan = (int) ($sekolah->webGaleri()->max('urutan') ?? 0);
@@ -379,6 +380,7 @@ class WebSekolahKelolaController extends Controller
       'nama' => ['required', 'string', 'max:255'],
       'tanggal' => ['nullable', 'date'],
       'keterangan' => ['nullable', 'string'],
+      'is_tampil' => ['nullable', 'boolean'],
     ]);
 
     $kegiatan->update($data);

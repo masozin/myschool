@@ -50,6 +50,7 @@
             <p class="text-muted small mb-2">
               @if ($k->tanggal)<i class="ri ri-calendar-line me-1"></i>{{ $k->tanggal->translatedFormat('d F Y') }} &middot; @endif
               <span class="badge bg-label-info">{{ $k->galeri_count }} foto</span>
+              @if (!$k->is_tampil)<span class="badge bg-label-warning">Tidak tampil di web</span>@endif
             </p>
             @if ($k->keterangan)
               <p class="small mb-3">{{ \Illuminate\Support\Str::limit($k->keterangan, 110) }}</p>
@@ -127,6 +128,13 @@
               <div class="col-12 col-md-7">
                 <label class="form-label" for="album-keterangan">Keterangan (opsional)</label>
                 <input type="text" id="album-keterangan" name="keterangan" class="form-control" placeholder="mis. Diikuti seluruh siswa & guru">
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="album-is-tampil">Tampil di Halaman Web</label>
+                <select id="album-is-tampil" name="is_tampil" class="form-select">
+                  <option value="1" selected>Tampilkan — album &amp; fotonya terlihat pengunjung</option>
+                  <option value="0">Sembunyikan — hanya terlihat di halaman kelola</option>
+                </select>
               </div>
               <div class="col-12">
                 <label class="form-label" for="album-foto">Foto untuk Album Ini (boleh banyak, bisa juga diisi nanti)</label>

@@ -18,10 +18,12 @@ class WebGaleriKegiatan extends Model
     'nama',
     'tanggal',
     'keterangan',
+    'is_tampil',
   ];
 
   protected $casts = [
     'tanggal' => 'date',
+    'is_tampil' => 'boolean',
   ];
 
   public function sekolah(): BelongsTo

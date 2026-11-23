@@ -55,6 +55,7 @@ class WebSekolahController extends Controller
     // Galeri tampil berkelompok: kartu album kegiatan (dengan foto
     // sampul + jumlah foto) lebih dulu, lalu foto tanpa album.
     $data['albumGaleri'] = $web->sekolah->webGaleriKegiatan()
+      ->where('is_tampil', true)
       ->withCount('galeri')
       ->with(['galeri' => fn ($q) => $q->orderBy('urutan')->latest('id')])
       ->orderByRaw('tanggal IS NULL')
@@ -178,6 +179,7 @@ class WebSekolahController extends Controller
   {
     $web = $this->cariWebPublik($slugWeb);
     abort_if($kegiatan->sekolah_id !== $web->sekolah_id, 404);
+    abort_if(!$kegiatan->is_tampil, 404);
 
     $data = $this->dataSekolah($web);
     $data['kegiatan'] = $kegiatan;
@@ -189,6 +191,9 @@ class WebSekolahController extends Controller
   public function fotoGaleri(WebGaleri $galeri)
   {
     abort_if(!$galeri->sekolah?->webSekolah?->tampilPublik(), 404);
+    // Foto milik album yang disembunyikan ikut tidak tampil,
+    // termasuk bila alamat fotonya dibuka langsung.
+    abort_if($galeri->kegiatan && !$galeri->kegiatan->is_tampil, 404);
     abort_if(!Storage::disk('public')->exists($galeri->foto), 404);
 
     return Storage::disk('public')->response($galeri->foto);
