@@ -20,18 +20,21 @@
   - Bila JS mati, textarea tampil biasa seperti sebelumnya.
 --}}
 <style>
-  .tk-bungkus{border:1px solid #d9dee3;border-radius:.5rem;background:#fff;overflow:hidden}
+  /* Warna mengikuti variabel tema Bootstrap template (data-bs-theme
+     terang/gelap di <html>) — JANGAN kunci warna terang di sini,
+     editor harus ikut mode gelap area kelola seperti form lain. */
+  .tk-bungkus{border:1px solid var(--bs-border-color,#d9dee3);border-radius:.5rem;background:var(--bs-body-bg,#fff);overflow:hidden}
   .tk-bungkus:focus-within{border-color:#696cff;box-shadow:0 0 0 .2rem rgba(105,108,255,.14)}
-  .tk-bilah{display:flex;flex-wrap:wrap;gap:.3rem;padding:.45rem .5rem;border-bottom:1px solid #e7e9ed;background:#f8f9fb}
-  .tk-tombol{border:1px solid #d9dee3;background:#fff;border-radius:.375rem;padding:.22rem .6rem;font-size:.85rem;line-height:1.45;cursor:pointer;color:#3a4452}
-  .tk-tombol:hover{background:#eef0ff;border-color:#b7baff}
-  .tk-pemisah{width:1px;background:#dfe3e8;margin:.15rem .2rem}
-  .tk-sunting{min-height:150px;max-height:440px;overflow:auto;padding:.75rem .95rem;line-height:1.7;color:#212529}
+  .tk-bilah{display:flex;flex-wrap:wrap;gap:.3rem;padding:.45rem .5rem;border-bottom:1px solid var(--bs-border-color,#e7e9ed);background:var(--bs-tertiary-bg,#f8f9fb)}
+  .tk-tombol{border:1px solid var(--bs-border-color,#d9dee3);background:var(--bs-body-bg,#fff);border-radius:.375rem;padding:.22rem .6rem;font-size:.85rem;line-height:1.45;cursor:pointer;color:var(--bs-body-color,#3a4452)}
+  .tk-tombol:hover{background:var(--bs-secondary-bg,#eef0ff)}
+  .tk-pemisah{width:1px;background:var(--bs-border-color,#dfe3e8);margin:.15rem .2rem}
+  .tk-sunting{min-height:150px;max-height:440px;overflow:auto;padding:.75rem .95rem;line-height:1.7;color:var(--bs-body-color,#212529)}
   .tk-sunting:focus{outline:none}
   .tk-sunting p{margin:0 0 .8em}
   .tk-sunting ul,.tk-sunting ol{padding-left:1.45rem;margin:.2em 0 .9em}
   .tk-sunting h4{font-size:1.05rem;margin:.5em 0 .3em}
-  .tk-sunting blockquote{border-left:3px solid #b7baff;padding-left:12px;margin:.6em 0;color:#5d6b7f}
+  .tk-sunting blockquote{border-left:3px solid #8b8cf5;padding-left:12px;margin:.6em 0;color:var(--bs-secondary-color,#5d6b7f)}
 </style>
 <script>
   (function() {
