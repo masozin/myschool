@@ -82,7 +82,7 @@ class PembaruanController extends Controller
       [$manifest, $daftarFile, $daftarHapus] = $this->periksaPaket($filePaket);
     } catch (\Throwable $e) {
       File::delete($filePaket);
-      return back()->with('gagal', $e->getMessage());
+      return $this->kembaliGagal($request, $e->getMessage());
     }
 
     // 1) Backup file yang akan ditimpa / dihapus
@@ -91,7 +91,7 @@ class PembaruanController extends Controller
       $this->buatBackup($this->folderKerja() . '/' . $namaBackup, $daftarFile, $daftarHapus);
     } catch (\Throwable $e) {
       File::delete($filePaket);
-      return back()->with('gagal', 'Backup gagal dibuat, pembaruan dibatalkan: ' . $e->getMessage());
+      return $this->kembaliGagal($request, 'Backup gagal dibuat, pembaruan dibatalkan: ' . $e->getMessage());
     }
 
     // 2) Ekstrak ke staging, salin atomik, hapus yang perlu dihapus
@@ -123,7 +123,7 @@ class PembaruanController extends Controller
     } catch (\Throwable $e) {
       File::deleteDirectory($folderStaging);
       File::delete($filePaket);
-      return back()->with('gagal', 'Penyalinan file gagal di tengah jalan: ' . $e->getMessage()
+      return $this->kembaliGagal($request, 'Penyalinan file gagal di tengah jalan: ' . $e->getMessage()
         . ' Sebagian file mungkin sudah berubah — gunakan tombol Pulihkan pada backup ' . $namaBackup . ' untuk mengembalikan.');
     }
     File::deleteDirectory($folderStaging);
@@ -163,7 +163,7 @@ class PembaruanController extends Controller
     $this->tulisJson($this->folderKerja() . '/terpasang.json', $catatan);
     $this->tambahRiwayat($catatan);
 
-    return back()->with('laporan', $laporan);
+    return $this->kembaliLaporan($request, $laporan);
   }
 
   // ── Pulihkan dari backup ───────────────────────────────────────
@@ -176,11 +176,11 @@ class PembaruanController extends Controller
 
     $nama = basename($request->backup);
     if (!preg_match('/^backup-\d{8}-\d{6}\.zip$/', $nama)) {
-      return back()->with('gagal', 'Nama backup tidak sah.');
+      return $this->kembaliGagal($request, 'Nama backup tidak sah.');
     }
     $fileBackup = $this->folderKerja() . '/' . $nama;
     if (!File::exists($fileBackup)) {
-      return back()->with('gagal', 'File backup tidak ditemukan.');
+      return $this->kembaliGagal($request, 'File backup tidak ditemukan.');
     }
 
     $capWaktu = now()->format('Ymd-His');
@@ -226,7 +226,7 @@ class PembaruanController extends Controller
       File::deleteDirectory($folderStaging);
     } catch (\Throwable $e) {
       File::deleteDirectory($folderStaging);
-      return back()->with('gagal', 'Pemulihan gagal: ' . $e->getMessage());
+      return $this->kembaliGagal($request, 'Pemulihan gagal: ' . $e->getMessage());
     }
 
     $peringatan = [];
@@ -242,7 +242,7 @@ class PembaruanController extends Controller
       'status' => 'rollback',
     ]);
 
-    return back()->with('laporan', [
+    return $this->kembaliLaporan($request, [
       'versi' => 'Pemulihan dari ' . $nama,
       'file' => $dikembalikan,
       'dihapus' => $dihapus,
@@ -253,6 +253,30 @@ class PembaruanController extends Controller
   }
 
   // ── Bantuan internal ───────────────────────────────────────────
+
+  /**
+   * Halaman Pembaruan mengirim formulir via XHR agar bisa menampilkan
+   * progres unggah dan hasil tanpa muat ulang — untuk permintaan AJAX
+   * jawab JSON. Tanpa AJAX (JS mati), tetap redirect + flash seperti
+   * perilaku lama.
+   */
+  private function kembaliGagal(Request $request, string $pesan)
+  {
+    if ($request->ajax()) {
+      return response()->json(['ok' => false, 'pesan' => $pesan], 422);
+    }
+
+    return back()->with('gagal', $pesan);
+  }
+
+  private function kembaliLaporan(Request $request, array $laporan)
+  {
+    if ($request->ajax()) {
+      return response()->json(['ok' => true, 'laporan' => $laporan]);
+    }
+
+    return back()->with('laporan', $laporan);
+  }
 
   /**
    * Memeriksa paket dan mengembalikan [manifest, daftarFile,
