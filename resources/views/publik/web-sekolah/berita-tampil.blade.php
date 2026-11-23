@@ -27,7 +27,7 @@
         @if ($berita->foto)
           <img class="ws-cover" src="{{ route('web-sekolah.berita.foto', $berita) }}" alt="{{ $berita->judul }}">
         @endif
-        <div class="ws-isi">{{ $berita->isi }}</div>
+        <div class="ws-isi ws-kaya">{!! \App\Support\TeksKaya::tampil($berita->isi) !!}</div>
       </article>
 
       <p style="margin-top:26px"><a class="ws-btn ws-btn-outline" href="{{ route('web-sekolah.berita.index', $web->slug) }}">&larr; Semua Berita</a></p>

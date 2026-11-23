@@ -181,6 +181,24 @@
     .ws-vm h3{color:var(--ink);font-size:1.18rem;margin-bottom:9px;letter-spacing:-.01em}
     .ws-vm .ws-pre{color:var(--muted);font-size:.97rem;line-height:1.8}
 
+    /* ── Teks kaya (hasil editor) & lipat "Lihat Selengkapnya" ── */
+    .ws-kaya p{margin:0 0 .9em}
+    .ws-kaya p:last-child{margin-bottom:0}
+    .ws-kaya ul,.ws-kaya ol{margin:.2em 0 1em;padding-left:1.35em}
+    .ws-kaya li{margin:.25em 0}
+    .ws-kaya h3,.ws-kaya h4{color:var(--ink);margin:.6em 0 .35em;line-height:1.35}
+    .ws-kaya h4{font-size:1.06rem}
+    .ws-kaya a{color:var(--primary);text-decoration:underline}
+    .ws-kaya blockquote{border-left:3px solid var(--sky);padding-left:14px;margin:.6em 0;color:var(--muted)}
+    .ws-sambutan-teks .ws-kaya{font-size:1.03rem;line-height:1.85;color:var(--text)}
+    .ws-vm .ws-kaya{color:var(--muted);font-size:.97rem;line-height:1.8}
+    .ws-lipat{position:relative;max-height:250px;overflow:hidden}
+    .ws-lipat::after{content:"";position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(transparent,var(--card));pointer-events:none}
+    .ws-lipat.terbuka{max-height:none}
+    .ws-lipat.terbuka::after{display:none}
+    .ws-lipat-tombol{margin-top:12px;background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;padding:0;font-size:.95rem;font-family:inherit}
+    .ws-lipat-tombol:hover{text-decoration:underline}
+
     /* ── Galeri ─────────────────────────────────────────── */
     .ws-galeri{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
     @media(max-width:900px){.ws-galeri{grid-template-columns:repeat(2,1fr)}}
@@ -631,5 +649,25 @@
     })();
   </script>
   @yield('page-script')
+  <script>
+    // Lipat teks panjang (sambutan/visi/misi): bila isi melewati batas
+    // tinggi, potong dengan gradasi + tombol "Lihat Selengkapnya".
+    // Isi pendek tidak disentuh sama sekali.
+    (function () {
+      document.querySelectorAll('[data-lipat]').forEach(function (el) {
+        if (el.scrollHeight <= 265) return;
+        el.classList.add('ws-lipat');
+        var tombol = document.createElement('button');
+        tombol.type = 'button';
+        tombol.className = 'ws-lipat-tombol';
+        tombol.textContent = 'Lihat Selengkapnya';
+        tombol.addEventListener('click', function () {
+          var terbuka = el.classList.toggle('terbuka');
+          tombol.textContent = terbuka ? 'Tutup' : 'Lihat Selengkapnya';
+        });
+        el.insertAdjacentElement('afterend', tombol);
+      });
+    })();
+  </script>
 </body>
 </html>

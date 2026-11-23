@@ -31,8 +31,8 @@
 
         <div class="col-12">
           <label class="form-label" for="isi">Isi Berita *</label>
-          <textarea id="isi" name="isi" class="form-control" rows="12" required>{{ old('isi', $berita->isi) }}</textarea>
-          <small class="text-muted">Teks biasa — baris baru akan tampil apa adanya di web publik.</small>
+          <textarea id="isi" name="isi" class="form-control editor-kaya" rows="12" required>{{ old('isi', $berita->isi) }}</textarea>
+          <small class="text-muted">Pakai bilah alat di atas editor untuk menebalkan / memiringkan teks, membuat daftar poin atau nomor, dan menyisipkan tautan.</small>
         </div>
 
         <div class="col-12 col-md-6">
@@ -64,4 +64,5 @@
   </div>
 
   @include('_partials.kompres-foto-js')
+  @include('_partials.editor-kaya-js')
 @endsection

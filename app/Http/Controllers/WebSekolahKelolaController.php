@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Sekolah;
 use App\Support\KompresGambar;
+use App\Support\TeksKaya;
 use App\Models\WebBerita;
 use App\Models\WebDokumen;
 use App\Models\WebGaleri;
@@ -78,6 +79,14 @@ class WebSekolahKelolaController extends Controller
     ]);
 
     $data = collect($validated)->except(['foto_hero', 'hapus_foto_hero'])->all();
+
+    // Sambutan/visi/misi kini ditulis lewat editor kaya: saring
+    // HTML-nya ke allowlist format dasar sebelum disimpan.
+    foreach (['visi', 'misi', 'sambutan'] as $kolomKaya) {
+      if (array_key_exists($kolomKaya, $data)) {
+        $data[$kolomKaya] = TeksKaya::bersihkan($data[$kolomKaya]);
+      }
+    }
     $data['is_aktif'] = $request->boolean('is_aktif');
 
     $web = WebSekolah::firstOrNew(['sekolah_id' => $sekolah->id]);
@@ -193,7 +202,7 @@ class WebSekolahKelolaController extends Controller
 
   private function validasiBerita(Request $request): array
   {
-    return $request->validate([
+    $data = $request->validate([
       'judul' => ['required', 'string', 'max:255'],
       'isi' => ['required', 'string'],
       'status' => ['required', Rule::in([WebBerita::STATUS_DRAF, WebBerita::STATUS_TERBIT])],
@@ -201,6 +210,11 @@ class WebSekolahKelolaController extends Controller
     ], [
       'foto.max' => 'Ukuran foto tidak boleh lebih dari 10 MB.',
     ]);
+
+    // Isi berita ditulis lewat editor kaya: saring ke allowlist.
+    $data['isi'] = TeksKaya::bersihkan($data['isi']);
+
+    return $data;
   }
 
   // ── Galeri ──────────────────────────────────────────────────────────

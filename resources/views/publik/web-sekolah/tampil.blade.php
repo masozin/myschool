@@ -72,7 +72,7 @@
               @endif
             </aside>
             <div class="ws-sambutan-teks" data-reveal>
-              <p class="ws-pre">{{ $web->sambutan }}</p>
+              <div class="ws-kaya" data-lipat>{!! \App\Support\TeksKaya::tampil($web->sambutan) !!}</div>
             </div>
           </div>
         @endif
@@ -82,14 +82,14 @@
               <div class="ws-vm" data-reveal>
                 <span class="ws-vm-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg></span>
                 <h3>Visi</h3>
-                <p class="ws-pre">{{ $web->visi }}</p>
+                <div class="ws-kaya" data-lipat>{!! \App\Support\TeksKaya::tampil($web->visi) !!}</div>
               </div>
             @endif
             @if ($web->misi)
               <div class="ws-vm" data-reveal>
                 <span class="ws-vm-ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 5h13l-2.5 4L17 13H4"/></svg></span>
                 <h3>Misi</h3>
-                <p class="ws-pre">{{ $web->misi }}</p>
+                <div class="ws-kaya" data-lipat>{!! \App\Support\TeksKaya::tampil($web->misi) !!}</div>
               </div>
             @endif
           </div>

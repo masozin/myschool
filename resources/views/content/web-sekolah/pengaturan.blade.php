@@ -83,17 +83,19 @@
 
         <div class="col-12">
           <label class="form-label" for="sambutan">Sambutan Kepala Sekolah</label>
-          <textarea id="sambutan" name="sambutan" class="form-control" rows="6">{{ old('sambutan', $web->sambutan ?? '') }}</textarea>
+          <textarea id="sambutan" name="sambutan" class="form-control editor-kaya" rows="6">{{ old('sambutan', $web->sambutan ?? '') }}</textarea>
+          <small class="text-muted">Bisa diformat (tebal, miring, daftar). Bila panjang, di web publik otomatis dipotong dengan tombol "Lihat Selengkapnya".</small>
         </div>
 
         <div class="col-12 col-md-6">
           <label class="form-label" for="visi">Visi</label>
-          <textarea id="visi" name="visi" class="form-control" rows="4">{{ old('visi', $web->visi ?? '') }}</textarea>
+          <textarea id="visi" name="visi" class="form-control editor-kaya" rows="4">{{ old('visi', $web->visi ?? '') }}</textarea>
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label" for="misi">Misi</label>
-          <textarea id="misi" name="misi" class="form-control" rows="4"
-            placeholder="Satu misi per baris">{{ old('misi', $web->misi ?? '') }}</textarea>
+          <textarea id="misi" name="misi" class="form-control editor-kaya" rows="4"
+            placeholder="Tulis misi — gunakan tombol daftar nomor / poin di editor bila perlu">{{ old('misi', $web->misi ?? '') }}</textarea>
+          <small class="text-muted">Bila panjang, di web publik otomatis dipotong dengan tombol "Lihat Selengkapnya".</small>
         </div>
 
         <div class="col-12">
@@ -123,4 +125,5 @@
   </div>
 
   @include('_partials.kompres-foto-js')
+  @include('_partials.editor-kaya-js')
 @endsection
