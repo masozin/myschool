@@ -295,8 +295,8 @@
                     </div>
                     <div class="col-12 form-control-validation">
                       <div class="form-floating form-floating-outline">
-                        <input type="file" name="photo" id="photo" class="form-control" accept="image/*"
-                          onchange="document.getElementById('preview-photo').src = window.URL.createObjectURL(this.files[0])" />
+                        <input type="file" name="photo" id="photo" class="form-control crop-foto" accept="image/*"
+                          data-preview="#preview-photo" />
                         <label for="photo">Foto Siswa</label>
                       </div>
                     </div>
@@ -781,6 +781,8 @@
     </div>
   </div>
 </div>
+
+@include('_partials.crop-foto')
 @endsection
 
 @section('page-script')

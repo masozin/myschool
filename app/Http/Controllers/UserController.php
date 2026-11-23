@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\KompresGambar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -30,7 +31,7 @@ class UserController extends Controller
       'jenis_kelamin' => 'required|in:L,P',
       'jabatan' => 'nullable|string|max:100',
       'jenis_kepegawaian' => 'nullable|string|max:100',
-      'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048', // Maksimal 2MB
+      'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240', // Maksimal 10MB, dikompresi otomatis saat disimpan
     ]);
 
     // Update tabel users
@@ -51,7 +52,7 @@ class UserController extends Controller
           Storage::disk('public')->delete($user->Ptk->photo);
         }
         // Simpan foto baru
-        $ptkData['photo'] = $request->file('photo')->store('ptk_photos', 'public');
+        $ptkData['photo'] = KompresGambar::simpan($request->file('photo'), 'ptk_photos', 1200);
       }
 
       $user->Ptk()->update($ptkData);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sekolah;
+use App\Support\KompresGambar;
 use App\Models\WebBerita;
 use App\Models\WebDokumen;
 use App\Models\WebGaleri;
@@ -67,7 +68,7 @@ class WebSekolahKelolaController extends Controller
       'sambutan' => ['nullable', 'string'],
       'akreditasi' => ['nullable', 'string', 'max:10'],
       'tahun_berdiri' => ['nullable', 'integer', 'min:1800', 'max:' . (date('Y') + 1)],
-      'foto_hero' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+      'foto_hero' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
       'hapus_foto_hero' => ['nullable', 'boolean'],
     ], [
       'slug.regex' => 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (-).',
@@ -89,7 +90,7 @@ class WebSekolahKelolaController extends Controller
       if ($web->foto_hero) {
         Storage::disk('public')->delete($web->foto_hero);
       }
-      $data['foto_hero'] = $request->file('foto_hero')->store("web-sekolah/{$sekolah->id}", 'public');
+      $data['foto_hero'] = KompresGambar::simpan($request->file('foto_hero'), "web-sekolah/{$sekolah->id}", 1920);
     }
 
     $web->fill($data);
@@ -129,7 +130,7 @@ class WebSekolahKelolaController extends Controller
     $data['diterbitkan_pada'] = $data['status'] === WebBerita::STATUS_TERBIT ? now() : null;
 
     if ($request->hasFile('foto')) {
-      $data['foto'] = $request->file('foto')->store("web-sekolah/{$sekolah->id}/berita", 'public');
+      $data['foto'] = KompresGambar::simpan($request->file('foto'), "web-sekolah/{$sekolah->id}/berita", 1600);
     }
 
     WebBerita::create($data);
@@ -166,7 +167,7 @@ class WebSekolahKelolaController extends Controller
       if ($berita->foto) {
         Storage::disk('public')->delete($berita->foto);
       }
-      $data['foto'] = $request->file('foto')->store("web-sekolah/{$sekolah->id}/berita", 'public');
+      $data['foto'] = KompresGambar::simpan($request->file('foto'), "web-sekolah/{$sekolah->id}/berita", 1600);
     }
 
     $berita->update($data);
@@ -195,7 +196,9 @@ class WebSekolahKelolaController extends Controller
       'judul' => ['required', 'string', 'max:255'],
       'isi' => ['required', 'string'],
       'status' => ['required', Rule::in([WebBerita::STATUS_DRAF, WebBerita::STATUS_TERBIT])],
-      'foto' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+      'foto' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
+    ], [
+      'foto.max' => 'Ukuran foto tidak boleh lebih dari 10 MB.',
     ]);
   }
 
@@ -215,14 +218,17 @@ class WebSekolahKelolaController extends Controller
 
     $request->validate([
       'foto' => ['required', 'array', 'min:1'],
-      'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+      'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
       'judul' => ['nullable', 'string', 'max:255'],
+    ], [
+      'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
+      'foto.*.mimes' => 'Format foto harus JPG, PNG, atau WebP.',
     ]);
 
     $urutan = (int) ($sekolah->webGaleri()->max('urutan') ?? 0);
 
     foreach ($request->file('foto') as $file) {
-      $path = $file->store("web-sekolah/{$sekolah->id}/galeri", 'public');
+      $path = KompresGambar::simpan($file, "web-sekolah/{$sekolah->id}/galeri", 1600);
       WebGaleri::create([
         'sekolah_id' => $sekolah->id,
         'judul' => $request->judul,

@@ -19,7 +19,7 @@
   <div class="card mb-4">
     <div class="card-header border-bottom">
       <h5 class="card-title mb-0">Unggah Foto Galeri</h5>
-      <small class="text-muted">{{ $sekolah->detailTerbaru->nama_sekolah ?? '' }} — bisa pilih banyak foto sekaligus, maks 4 MB per foto.</small>
+      <small class="text-muted">{{ $sekolah->detailTerbaru->nama_sekolah ?? '' }} — bisa pilih banyak foto sekaligus, maks 10 MB per foto dan otomatis dikompresi saat tersimpan.</small>
     </div>
     <div class="card-body">
       <form method="POST" action="{{ route('web-sekolah.kelola.galeri.store') }}" enctype="multipart/form-data" class="row g-3">

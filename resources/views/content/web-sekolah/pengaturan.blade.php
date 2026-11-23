@@ -99,7 +99,7 @@
         <div class="col-12">
           <label class="form-label" for="foto_hero">Foto Utama (Hero)</label>
           <input type="file" id="foto_hero" name="foto_hero" class="form-control" accept=".png,.jpg,.jpeg,.webp">
-          <small class="text-muted">Maks 4 MB. Foto gedung / kegiatan sekolah, orientasi melebar lebih bagus.</small>
+          <small class="text-muted">Maks 10 MB, otomatis dikompresi saat tersimpan. Foto gedung / kegiatan sekolah, orientasi melebar lebih bagus.</small>
           @if ($web?->foto_hero && $web->is_aktif)
             <div class="mt-3">
               <img src="{{ route('web-sekolah.foto-hero', $web->slug) }}" alt="Foto hero saat ini"

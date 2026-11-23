@@ -20,6 +20,7 @@ use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\SiswaExport;
 use App\Helpers\FiturHelper;
+use App\Support\KompresGambar;
 use App\Models\SuratKeluar;
 use Illuminate\Support\Facades\Schema;
 
@@ -271,7 +272,7 @@ class SiswaController extends Controller
       'nik'            => 'nullable|digits:16|unique:tabel_siswa,nik',
       'agama'          => 'required|string',
       'alamat'         => 'required|string',
-      'photo'          => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+      'photo'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
 
       // Validasi Tabel Registrasi
       'sekolah_id'        => Auth::user()->hasRole('Admin') ? 'required|exists:tabel_sekolah,id' : 'nullable',
@@ -288,15 +289,9 @@ class SiswaController extends Controller
 
     $photoPath = null;
     if ($request->hasFile('photo')) {
-      // Ambil ekstensi asli (jpg/png)
-      $extension = $request->file('photo')->getClientOriginalExtension();
-
-      // Beri nama file: NISN.ekstensi (Contoh: 12345678.jpg)
-      $fileName = $request->nisn . '.' . $extension;
-
-      // Simpan ke folder 'photos/siswa' dengan nama tersebut
-      // 'public' di sini merujuk pada disk, 'photos/siswa' adalah foldernya
-      $photoPath = $request->file('photo')->storeAs('photos/siswa', $fileName, 'public');
+      // Nama file tetap NISN; isi dikompresi server (hasil selalu .jpg
+      // bila berhasil diproses — lihat KompresGambar::simpanDenganNama).
+      $photoPath = KompresGambar::simpanDenganNama($request->file('photo'), 'photos/siswa', $request->nisn, 1200);
     }
 
     $wali_status = $request->wali_status;
@@ -446,7 +441,7 @@ class SiswaController extends Controller
     // 3. Validasi
     $rules = [
       'nama_siswa'    => 'required|string|max:255',
-      'photo'         => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+      'photo'         => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
       'nisn'          => 'required|digits:10|unique:tabel_siswa,nisn,' . $id,
       'jenis_kelamin' => 'required|in:L,P',
       'tempat_lahir'  => 'required|string|max:255',
@@ -477,11 +472,8 @@ class SiswaController extends Controller
         Storage::disk('public')->delete($siswa->photo);
       }
 
-      $extension = $request->file('photo')->getClientOriginalExtension();
-      $fileName = $request->nisn . '.' . $extension;
-
-      // Simpan file baru
-      $photoPath = $request->file('photo')->storeAs('photos/siswa', $fileName, 'public');
+      // Simpan file baru (terkompresi, nama tetap NISN)
+      $photoPath = KompresGambar::simpanDenganNama($request->file('photo'), 'photos/siswa', $request->nisn, 1200);
       $siswa->photo = $photoPath;
     }
 

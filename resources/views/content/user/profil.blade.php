@@ -51,7 +51,7 @@
                         ? route('ptk.foto', $user->Ptk)
                         : asset('assets/img/avatars/1.png');
               @endphp
-              <img class="img-fluid rounded mb-4 object-fit-cover" src="{{ $avatarPath }}" height="120" width="120"
+              <img class="img-fluid rounded mb-4 object-fit-cover" id="photo-preview" src="{{ $avatarPath }}" height="120" width="120"
                 alt="User avatar" style="height: 120px; width: 120px;" />
               <div class="user-info text-center">
                 <h5>{{ $user->Ptk->nama_ptk ?? $user->name }}</h5>
@@ -201,9 +201,9 @@
 
                 <div class="col-md-6 mb-4">
                   <label for="photo" class="form-label">Upload Foto Baru (Opsional)</label>
-                  <input class="form-control" type="file" id="photo" name="photo"
-                    accept="image/png, image/jpeg, image/jpg" />
-                  <small class="text-muted">Maksimal 2MB. Format: JPG, PNG.</small>
+                  <input class="form-control crop-foto" type="file" id="photo" name="photo"
+                    accept="image/png, image/jpeg, image/jpg" data-preview="#photo-preview" />
+                  <small class="text-muted">Bisa dipotong 2×3 / 3×4 / 4×6. Maksimal 10 MB, otomatis dikompresi. Format: JPG, PNG.</small>
                 </div>
               @else
                 <div class="col-md-12 mb-4">
@@ -286,4 +286,6 @@
     </div>
     <!--/ User Content -->
   </div>
+
+  @include('_partials.crop-foto')
 @endsection

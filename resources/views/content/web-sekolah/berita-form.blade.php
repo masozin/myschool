@@ -38,7 +38,7 @@
         <div class="col-12 col-md-6">
           <label class="form-label" for="foto">Foto Berita</label>
           <input type="file" id="foto" name="foto" class="form-control" accept=".png,.jpg,.jpeg,.webp">
-          <small class="text-muted">Maks 4 MB. Kosongkan bila tidak mengganti foto.</small>
+          <small class="text-muted">Maks 10 MB, otomatis dikompresi saat tersimpan. Kosongkan bila tidak mengganti foto.</small>
           @if ($berita->foto && $berita->status === 'terbit')
             <div class="mt-2"><img src="{{ route('web-sekolah.berita.foto', $berita) }}" alt="Foto berita"
               style="max-width:320px;width:100%;border-radius:10px"></div>

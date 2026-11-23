@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ptk;
+use App\Support\KompresGambar;
 use App\Models\User;
 use App\Models\Sekolah;
 use Illuminate\Support\Str;
@@ -56,7 +57,7 @@ class PtkController extends Controller
       'gelar_belakang' => 'nullable|string|max:100',
       'tempat_lahir'  => 'nullable|string|max:100',
       'tanggal_lahir' => 'nullable|date',
-      'photo'         => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+      'photo'         => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip',
       'jenis_kelamin' => 'required|in:L,P',
@@ -93,7 +94,7 @@ class PtkController extends Controller
     // Foto disimpan di folder yang sama dengan unggahan lewat profil
     // (UserController): ptk_photos di disk public.
     $pathFoto = $request->hasFile('photo')
-      ? $request->file('photo')->store('ptk_photos', 'public')
+      ? KompresGambar::simpan($request->file('photo'), 'ptk_photos', 1200)
       : null;
 
     Ptk::create([
@@ -134,7 +135,7 @@ class PtkController extends Controller
       'gelar_belakang' => 'nullable|string|max:100',
       'tempat_lahir'  => 'nullable|string|max:100',
       'tanggal_lahir' => 'nullable|date',
-      'photo'         => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+      'photo'         => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
       'hapus_photo'   => 'nullable|boolean',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip,' . $id,
@@ -179,7 +180,7 @@ class PtkController extends Controller
       if ($ptk->photo && Storage::disk('public')->exists($ptk->photo)) {
         Storage::disk('public')->delete($ptk->photo);
       }
-      $ptk->photo = $fileFoto ? $fileFoto->store('ptk_photos', 'public') : null;
+      $ptk->photo = $fileFoto ? KompresGambar::simpan($fileFoto, 'ptk_photos', 1200) : null;
       $ptk->save();
     }
 

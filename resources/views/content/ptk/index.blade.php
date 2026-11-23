@@ -125,12 +125,12 @@
         </div>
 
         <div class="mb-5">
-          <label class="form-label" for="photo">Foto PTK (opsional, JPG/PNG maks 2 MB)</label>
+          <label class="form-label" for="photo">Foto PTK (opsional — bisa dipotong 2×3 / 3×4 / 4×6, otomatis dikompresi)</label>
           <div class="d-flex align-items-start gap-3">
             <img id="photo-preview" src="{{ asset('assets/img/avatars/1.png') }}"
               class="rounded object-fit-cover" width="72" height="72" alt="Pratinjau foto PTK" />
             <div class="flex-grow-1">
-              <input type="file" class="form-control" id="photo" name="photo" accept="image/png,image/jpeg" />
+              <input type="file" class="form-control crop-foto" id="photo" name="photo" accept="image/png,image/jpeg" data-preview="#photo-preview" />
               <div class="form-check mt-2" id="hapus-photo-wrap" style="display: none">
                 <input class="form-check-input" type="checkbox" id="hapus_photo" name="hapus_photo" value="1" />
                 <label class="form-check-label" for="hapus_photo">Hapus foto saat ini saat disimpan</label>
@@ -194,6 +194,8 @@
       </div>
     </div>
   </div>
+
+  @include('_partials.crop-foto')
 @endsection
 
 @section('page-script')
@@ -585,12 +587,7 @@
         });
       }
 
-      // Pratinjau langsung saat berkas foto dipilih di form PTK
-      document.getElementById('photo').addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-          document.getElementById('photo-preview').src = URL.createObjectURL(this.files[0]);
-        }
-      });
+      // Pratinjau + potong foto ditangani _partials/crop-foto (class crop-foto).
 
       // 4. Event Delegation
       document.addEventListener('click', async function(e) {
