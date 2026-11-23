@@ -19,6 +19,13 @@
     function muatGambar(berkas) {
       if (window.createImageBitmap) {
         return createImageBitmap(berkas, { imageOrientation: 'from-image' })
+          // Samakan bentuk hasil dengan muatLewatImg ({gambar, lebar,
+          // tinggi}). Versi awal mengembalikan bitmap mentah sehingga
+          // kompresSatu membaca hasil.gambar.width dari undefined —
+          // pengecualiannya tertelan .catch dan berkas ASLI terkirim
+          // tanpa kompresi (bug yang dilaporkan Mark 2026-11-23:
+          // foto 4 MB tetap 4 MB di pratinjau & progres unggah).
+          .then(function(bitmap) { return { gambar: bitmap, url: null, lebar: bitmap.width, tinggi: bitmap.height }; })
           .catch(function() { return muatLewatImg(berkas); });
       }
       return muatLewatImg(berkas);
@@ -104,6 +111,11 @@
         const dt = new DataTransfer();
         hasil.forEach(function(f) { dt.items.add(f); });
         input.files = dt.files;
+        // Beri tahu pendengar lain (pratinjau) bahwa isi input sudah
+        // diganti berkas terkompresi — mengganti .files lewat program
+        // TIDAK memicu event 'change', jadi tanpa ini pratinjau tetap
+        // menampilkan ukuran berkas asli.
+        input.dispatchEvent(new Event('kompres-selesai'));
         tombol.forEach(function(t) { t.disabled = false; });
         delete input.dataset.kompresBerjalan;
         status.textContent = totalBaru < totalAwal ?

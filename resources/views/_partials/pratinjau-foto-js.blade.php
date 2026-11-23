@@ -6,8 +6,10 @@
   Cara pakai: beri atribut data-pratinjau="#id-wadah" pada
   <input type="file" multiple>, siapkan <div id="...">, lalu @include
   partial ini SEKALI di halaman itu. Berjalan berdampingan dengan
-  kompres-foto-js (pratinjau dari berkas pilihan; kompresi mengganti
-  isi input tanpa mengubah tampilan pratinjau).
+  kompres-foto-js: pratinjau digambar dari berkas pilihan, lalu
+  digambar ULANG saat kompresi selesai (event 'kompres-selesai')
+  supaya ukuran yang tampil adalah ukuran berkas terkompresi —
+  ukuran yang benar-benar akan diunggah.
 --}}
 <script>
   (function() {
@@ -15,7 +17,7 @@
     window.__pratinjauFotoSiap = true;
 
     document.querySelectorAll('input[data-pratinjau]').forEach(function(input) {
-      input.addEventListener('change', function() {
+      function gambarPratinjau() {
         const wadah = document.querySelector(input.getAttribute('data-pratinjau'));
         if (!wadah) return;
         wadah.innerHTML = '';
@@ -36,7 +38,9 @@
           kotak.appendChild(ket);
           wadah.appendChild(kotak);
         });
-      });
+      }
+      input.addEventListener('change', gambarPratinjau);
+      input.addEventListener('kompres-selesai', gambarPratinjau);
     });
   })();
 </script>
