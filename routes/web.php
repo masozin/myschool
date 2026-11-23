@@ -185,6 +185,7 @@ Route::controller(WebSekolahKelolaController::class)
     Route::post('/galeri/kegiatan', 'kegiatanStore')->name('galeri.kegiatan.store');
     Route::put('/galeri/kegiatan/{kegiatan}', 'kegiatanUpdate')->name('galeri.kegiatan.update');
     Route::delete('/galeri/kegiatan/{kegiatan}', 'kegiatanDestroy')->name('galeri.kegiatan.destroy');
+    Route::post('/galeri/kegiatan/{kegiatan}/tampil', 'kegiatanToggleTampil')->name('galeri.kegiatan.tampil');
     Route::put('/galeri/{galeri}', 'galeriUpdate')->name('galeri.update');
     Route::delete('/galeri/{galeri}', 'galeriDestroy')->name('galeri.destroy');
 

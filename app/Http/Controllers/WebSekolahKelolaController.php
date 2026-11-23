@@ -389,6 +389,23 @@ class WebSekolahKelolaController extends Controller
       ->with('success', 'Album kegiatan berhasil diperbarui.');
   }
 
+  /**
+   * Saklar tampil/sembunyi album langsung dari kartu di daftar album
+   * (AJAX): simpan is_tampil, balas JSON ringkas.
+   */
+  public function kegiatanToggleTampil(Request $request, WebGaleriKegiatan $kegiatan)
+  {
+    abort_if($kegiatan->sekolah_id !== $this->sekolahSaya()->id, 404);
+
+    $data = $request->validate([
+      'is_tampil' => ['required', 'boolean'],
+    ]);
+
+    $kegiatan->update($data);
+
+    return response()->json(['ok' => true, 'is_tampil' => (bool) $kegiatan->is_tampil]);
+  }
+
   public function kegiatanDestroy(WebGaleriKegiatan $kegiatan)
   {
     $sekolah = $this->sekolahSaya();

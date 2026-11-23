@@ -44,11 +44,13 @@
             <input type="text" id="keterangan" name="keterangan" class="form-control" value="{{ $kegiatan->keterangan }}" placeholder="mis. Diikuti seluruh siswa & guru">
           </div>
           <div class="col-12 col-md-4">
-            <label class="form-label" for="is_tampil">Tampil di Halaman Web</label>
-            <select id="is_tampil" name="is_tampil" class="form-select">
-              <option value="1" @selected($kegiatan->is_tampil)>Tampilkan — album &amp; fotonya terlihat pengunjung</option>
-              <option value="0" @selected(!$kegiatan->is_tampil)>Sembunyikan — hanya terlihat di halaman kelola ini</option>
-            </select>
+            <label class="form-label d-block">Tampil di Halaman Web</label>
+            <div class="form-check form-switch mt-2">
+              <input type="hidden" name="is_tampil" value="0">
+              <input class="form-check-input" type="checkbox" role="switch" id="is_tampil" name="is_tampil" value="1" @checked($kegiatan->is_tampil) style="width:2.6em;height:1.4em;cursor:pointer">
+              <label class="form-check-label ms-1" for="is_tampil">Terlihat oleh pengunjung</label>
+            </div>
+            <small class="text-muted">Bila mati, album &amp; seluruh fotonya disembunyikan dari web publik — tetap terlihat di halaman kelola.</small>
           </div>
           <div class="col-12 d-flex flex-wrap gap-2">
             <button type="submit" class="btn btn-primary">Simpan Rincian Album</button>
