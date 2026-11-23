@@ -102,15 +102,35 @@
     }
 
     .db-stat .db-stat-icon {
-      width: 52px;
-      height: 52px;
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 1rem;
-      color: #fff;
-      font-size: 1.45rem;
-      box-shadow: 0 8px 16px -6px rgba(67, 89, 113, .45);
+      border-radius: .8rem;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    /* Ubin ikon seragam untuk kartu profil sekolah */
+    .db-tile {
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: .75rem;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .db-tile-lg {
+      width: 48px;
+      height: 48px;
+      border-radius: .9rem;
+      font-size: 1.35rem;
     }
 
     .db-grad-primary {
@@ -138,7 +158,7 @@
     }
 
     .db-stat .db-stat-value {
-      font-size: 1.85rem;
+      font-size: 1.45rem;
       line-height: 1.1;
       font-weight: 700;
       letter-spacing: -.02em;
@@ -313,11 +333,6 @@
               <span
                 class="badge bg-white text-primary fw-semibold rounded-pill px-3 py-2">{{ $ptk->jabatan ?? 'Pengguna' }}</span>
             @endif
-            @if (!$isAdmin && isset($sekolah) && $sekolah)
-              <span class="badge bg-white bg-opacity-25 text-white fw-medium rounded-pill px-3 py-2 ms-1">
-                {{ $sekolahDetail->nama_sekolah ?? '' }}
-              </span>
-            @endif
           </p>
           <a href="{{ url('user/profile') }}" class="btn btn-light btn-sm fw-semibold shadow-sm">
             <i class="ri ri-user-3-line me-1"></i> Lihat Profil
@@ -335,10 +350,10 @@
             <div class="card-body">
               <div class="d-flex align-items-start gap-3 mb-4">
                 @if ($logo)
-                  <img src="{{ asset('storage/' . $logo->path) }}" height="52" width="52" alt="Logo sekolah"
-                    class="rounded-3 border object-fit-contain flex-shrink-0" onerror="this.style.display='none'" />
+                  <img src="{{ asset('storage/' . $logo->path) }}" alt="Logo sekolah"
+                    class="db-tile-lg rounded-3 border object-fit-contain" onerror="this.style.display='none'" />
                 @else
-                  <span class="db-section-icon db-grad-primary text-white flex-shrink-0" style="width:52px;height:52px;">
+                  <span class="db-tile db-tile-lg bg-label-primary text-primary">
                     <i class="ri ri-school-line"></i>
                   </span>
                 @endif
@@ -350,7 +365,7 @@
               </div>
               <ul class="list-unstyled d-flex flex-column gap-3 mb-0">
                 <li class="d-flex align-items-start gap-3">
-                  <span class="db-section-icon bg-label-primary text-primary" style="width:38px;height:38px;">
+                  <span class="db-tile bg-label-primary text-primary">
                     <i class="ri ri-user-line"></i>
                   </span>
                   <div>
@@ -362,7 +377,7 @@
                   </div>
                 </li>
                 <li class="d-flex align-items-start gap-3">
-                  <span class="db-section-icon bg-label-success text-success" style="width:38px;height:38px;">
+                  <span class="db-tile bg-label-success text-success">
                     <i class="ri ri-map-pin-line"></i>
                   </span>
                   <div>
@@ -422,22 +437,22 @@
     @if ($isAdmin)
       @php
         $statAdmin = [
-            ['label' => 'Total Sekolah', 'value' => $jumlahSekolah, 'icon' => 'ri-building-line', 'grad' => 'db-grad-primary', 'badge' => 'Semua Jenjang', 'badgeClass' => 'bg-label-primary'],
-            ['label' => 'Total Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'grad' => 'db-grad-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
-            ['label' => 'Total Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'grad' => 'db-grad-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
-            ['label' => 'Total PTK Aktif', 'value' => $jumlahPtk, 'icon' => 'ri-user-star-line', 'grad' => 'db-grad-info', 'badge' => 'Status aktif saja', 'badgeClass' => 'bg-label-info'],
+            ['label' => 'Total Sekolah', 'value' => $jumlahSekolah, 'icon' => 'ri-building-line', 'tile' => 'bg-label-primary text-primary', 'badge' => 'Semua Jenjang', 'badgeClass' => 'bg-label-primary'],
+            ['label' => 'Total Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
+            ['label' => 'Total Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
+            ['label' => 'Total PTK Aktif', 'value' => $jumlahPtk, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info', 'badge' => 'Status aktif saja', 'badgeClass' => 'bg-label-info'],
         ];
       @endphp
       @foreach ($statAdmin as $s)
         <div class="col-12 col-sm-6 col-xl-3">
           <div class="card db-card db-stat h-100">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-4">
-                <span class="db-stat-icon {{ $s['grad'] }}"><i class="ri {{ $s['icon'] }}"></i></span>
-                <span class="badge {{ $s['badgeClass'] }} rounded-pill">{{ $s['badge'] }}</span>
+            <div class="card-body d-flex align-items-center gap-3 py-4">
+              <span class="db-stat-icon {{ $s['tile'] }}"><i class="ri {{ $s['icon'] }}"></i></span>
+              <div class="min-w-0">
+                <div class="db-stat-value">{{ number_format($s['value']) }}</div>
+                <p class="text-muted mb-0 small">{{ $s['label'] }}</p>
+                <small class="text-muted d-block" style="font-size:.72rem">{{ $s['badge'] }}</small>
               </div>
-              <div class="db-stat-value">{{ number_format($s['value']) }}</div>
-              <p class="text-muted mb-0">{{ $s['label'] }}</p>
             </div>
           </div>
         </div>
@@ -445,23 +460,23 @@
     @elseif($sekolah)
       @php
         $statSekolah = [
-            ['label' => 'Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'grad' => 'db-grad-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
-            ['label' => 'Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'grad' => 'db-grad-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
-            ['label' => 'Guru', 'value' => $jumlahGuru, 'icon' => 'ri-user-star-line', 'grad' => 'db-grad-info', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-info'],
-            ['label' => 'Tendik', 'value' => $jumlahTendik, 'icon' => 'ri-briefcase-line', 'grad' => 'db-grad-secondary', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-secondary'],
-            ['label' => 'Total PTK', 'value' => $jumlahGuru + $jumlahTendik, 'icon' => 'ri-team-line', 'grad' => 'db-grad-primary', 'badge' => 'Guru + Tendik', 'badgeClass' => 'bg-label-primary'],
+            ['label' => 'Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
+            ['label' => 'Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
+            ['label' => 'Guru', 'value' => $jumlahGuru, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-info'],
+            ['label' => 'Tendik', 'value' => $jumlahTendik, 'icon' => 'ri-briefcase-line', 'tile' => 'bg-label-secondary text-secondary', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-secondary'],
+            ['label' => 'Total PTK', 'value' => $jumlahGuru + $jumlahTendik, 'icon' => 'ri-team-line', 'tile' => 'bg-label-primary text-primary', 'badge' => 'Guru + Tendik', 'badgeClass' => 'bg-label-primary'],
         ];
       @endphp
       @foreach ($statSekolah as $s)
         <div class="col-12 col-sm-6 col-lg-4 col-xxl">
           <div class="card db-card db-stat h-100">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-4">
-                <span class="db-stat-icon {{ $s['grad'] }}"><i class="ri {{ $s['icon'] }}"></i></span>
+            <div class="card-body d-flex align-items-center gap-3 py-4">
+              <span class="db-stat-icon {{ $s['tile'] }}"><i class="ri {{ $s['icon'] }}"></i></span>
+              <div class="min-w-0">
+                <div class="db-stat-value">{{ number_format($s['value']) }}</div>
+                <p class="text-muted mb-0 small">{{ $s['label'] }}</p>
+                <small class="text-muted d-block" style="font-size:.72rem">{{ $s['badge'] }}</small>
               </div>
-              <div class="db-stat-value">{{ number_format($s['value']) }}</div>
-              <p class="text-muted mb-2">{{ $s['label'] }}</p>
-              <span class="badge {{ $s['badgeClass'] }} rounded-pill">{{ $s['badge'] }}</span>
             </div>
           </div>
         </div>
@@ -470,7 +485,7 @@
   </div>
   {{-- /ROW 2 --}}
 
-  {{-- ── ROW 3 ── --}}
+  {{-- ── ROW 3 : Grafik (Admin: rekap tabel) ── --}}
   <div class="row g-6 mb-6">
     @if ($isAdmin)
       <div class="col-12">
@@ -501,7 +516,7 @@
                     <tr>
                       <td class="py-2 ps-0">
                         <div class="d-flex align-items-center gap-3">
-                          <span class="db-section-icon {{ $r['class'] }}" style="width:38px;height:38px;">
+                          <span class="db-tile {{ $r['class'] }}">
                             <i class="ri {{ $r['icon'] }}"></i>
                           </span>
                           <span class="fw-medium">{{ $r['label'] }}</span>
@@ -518,7 +533,7 @@
       </div>
     @else
       {{-- Chart gender siswa --}}
-      <div class="col-12 col-md-6 col-xl-3">
+      <div class="col-12 col-lg-4">
         <div class="card db-card h-100">
           <div class="card-body d-flex flex-column">
             <div class="db-section-head mb-2">
@@ -552,7 +567,7 @@
       </div>
 
       {{-- Distribusi gender per tingkat --}}
-      <div class="col-12 col-md-6 col-xl-4">
+      <div class="col-12 col-lg-8">
         <div class="card db-card h-100">
           <div class="card-body d-flex flex-column">
             <div class="db-section-head mb-3">
@@ -570,7 +585,13 @@
           </div>
         </div>
       </div>
+    @endif
+  </div>
+  {{-- /ROW 3 --}}
 
+  {{-- ── ROW 4 : Dua pivot sejajar ── --}}
+  <div class="row g-6 mb-6">
+    @if (!$isAdmin)
       {{-- Pivot Agama --}}
       <div class="col-12 col-xl-5">
         <div class="card db-card h-100">
@@ -591,13 +612,10 @@
         </div>
       </div>
     @endif
-  </div>
-  {{-- /ROW 3 --}}
 
-  {{-- ── ROW 4 : Pivot Usia ── --}}
-  <div class="row g-6 mb-6">
-    <div class="col-12">
-      <div class="card db-card">
+    {{-- Pivot Usia --}}
+    <div class="col-12 {{ $isAdmin ? '' : 'col-xl-7' }}">
+      <div class="card db-card h-100">
         <div class="card-body">
           <div class="db-section-head mb-3">
             <span class="db-section-icon bg-label-danger text-danger">
@@ -605,8 +623,8 @@
             </span>
             <div>
               <h5 class="mb-0">Pivot Siswa: Tingkat &times; Usia</h5>
-              <small class="text-muted">Berdasarkan registrasi terbaru yang aktif. Siswa tanpa tanggal lahir tidak
-                masuk pivot ini.</small>
+              <small class="text-muted">Tingkat dari rombel semester tampilan, usia dari tanggal lahir. Siswa
+                tanpa tanggal lahir tidak masuk pivot ini.</small>
             </div>
           </div>
           <div id="pivot-tingkat-usia" class="table-responsive db-pivot">
@@ -616,6 +634,7 @@
       </div>
     </div>
   </div>
+  {{-- /ROW 4 --}}
 
   {{-- ── ROW 5 : Riwayat Login ── --}}
   <div class="row g-6">

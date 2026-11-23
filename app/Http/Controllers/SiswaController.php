@@ -718,31 +718,46 @@ class SiswaController extends Controller
   {
     $user = Auth::user();
 
-    // Definisi baku yang sama dengan DashboardController: siswa aktif =
-    // registrasi TERBARU berstatus 'aktif' (di sekolah pengguna; Admin
-    // boleh membatasi lewat parameter sekolah_id). Tingkat diambil dari
-    // registrasi terbaru itu juga, bukan dari registrasi aktif mana pun.
+    // Tingkat diambil dari ROMBEL pada semester tampilan — BUKAN dari
+    // registrasi. Tingkat pada registrasi adalah tingkat saat siswa
+    // DITERIMA dan memang dikunci begitu siswa masuk rombel (lihat
+    // update(): "HANYA update tingkat jika BELUM ada di anggota
+    // rombel"), sedangkan kenaikan kelas hidup di keanggotaan rombel.
+    // Versi lama membaca tingkat registrasi, sehingga hampir semua
+    // siswa menumpuk di tingkat penerimaannya (umumnya tingkat 1).
+    // Populasi & saringannya disamakan dengan pivot agama: anggota
+    // rombel semester tampilan yang registrasi terbarunya aktif.
     $sekolahId = $user->hasRole('Admin')
       ? ($request->filled('sekolah_id') ? $request->integer('sekolah_id') : null)
       : $user->ptk?->sekolah_id;
+    $semesterId = session('semester_id')
+      ?: Semester::where('is_active', true)->value('id');
 
-    $siswaRecords = Siswa::query()
-      ->whereHas('registrasiTerbaru', function ($q) use ($sekolahId) {
+    $anggota = RombelAnggota::with(['siswa:id,tgl_lahir', 'rombel:id,tingkat,sekolah_id,semester_id'])
+      ->whereHas('siswa.registrasiTerbaru', function ($q) use ($sekolahId) {
         $q->where('status', 'aktif')
           ->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId));
       })
-      ->with('registrasiTerbaru')
+      ->whereHas('rombel', function ($q) use ($sekolahId, $semesterId) {
+        $q->when($sekolahId, fn($qq) => $qq->where('sekolah_id', $sekolahId))
+          ->when($semesterId, fn($qq) => $qq->where('semester_id', $semesterId));
+      })
       ->get();
 
     $pivot = []; // [tingkat][usia] = count
     $usiaSet = [];
+    $sudahDihitung = [];
 
-    foreach ($siswaRecords as $siswa) {
-      $registrasi = $siswa->registrasiTerbaru;
-      if (!$registrasi || !$registrasi->tingkat || !$siswa->tgl_lahir) continue;
+    foreach ($anggota as $a) {
+      if (!$a->rombel || !$a->siswa || !$a->siswa->tgl_lahir) continue;
+      $tingkat = $a->rombel->tingkat;
 
-      $tingkat = $registrasi->tingkat;
-      $usia = \Carbon\Carbon::parse($siswa->tgl_lahir)->age;
+      // Satu siswa paling banyak dihitung satu kali per tingkat.
+      $kunci = $tingkat . ':' . $a->siswa_id;
+      if (isset($sudahDihitung[$kunci])) continue;
+      $sudahDihitung[$kunci] = true;
+
+      $usia = \Carbon\Carbon::parse($a->siswa->tgl_lahir)->age;
 
       $pivot[$tingkat][$usia] = ($pivot[$tingkat][$usia] ?? 0) + 1;
       $usiaSet[$usia] = true;
