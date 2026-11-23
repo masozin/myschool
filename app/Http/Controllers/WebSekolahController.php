@@ -13,6 +13,7 @@ use App\Models\Semester;
 use App\Models\WebBerita;
 use App\Models\WebDokumen;
 use App\Models\WebGaleri;
+use App\Models\WebGaleriKegiatan;
 use App\Models\WebSekolah;
 use Illuminate\Support\Facades\Storage;
 
@@ -51,10 +52,23 @@ class WebSekolahController extends Controller
       ->take(6)
       ->get();
 
+    // Galeri tampil berkelompok: kartu album kegiatan (dengan foto
+    // sampul + jumlah foto) lebih dulu, lalu foto tanpa album.
+    $data['albumGaleri'] = $web->sekolah->webGaleriKegiatan()
+      ->withCount('galeri')
+      ->with(['galeri' => fn ($q) => $q->orderBy('urutan')->latest('id')])
+      ->orderByRaw('tanggal IS NULL')
+      ->orderByDesc('tanggal')
+      ->latest('id')
+      ->get()
+      ->filter(fn ($kegiatan) => $kegiatan->galeri_count > 0)
+      ->values();
+
     $data['galeri'] = $web->sekolah->webGaleri()
+      ->whereNull('kegiatan_id')
       ->orderBy('urutan')
       ->latest('id')
-      ->take(12)
+      ->take(8)
       ->get();
 
     // Agenda terdekat dari kalender pendidikan (kaldik bersifat global,
@@ -157,6 +171,19 @@ class WebSekolahController extends Controller
     abort_if(!$berita->foto || !Storage::disk('public')->exists($berita->foto), 404);
 
     return Storage::disk('public')->response($berita->foto);
+  }
+
+  // ── Halaman publik satu album kegiatan ────────────────────────────
+  public function galeriAlbum(string $slugWeb, WebGaleriKegiatan $kegiatan)
+  {
+    $web = $this->cariWebPublik($slugWeb);
+    abort_if($kegiatan->sekolah_id !== $web->sekolah_id, 404);
+
+    $data = $this->dataSekolah($web);
+    $data['kegiatan'] = $kegiatan;
+    $data['fotoAlbum'] = $kegiatan->galeri()->get();
+
+    return view('publik.web-sekolah.galeri-album', $data);
   }
 
   public function fotoGaleri(WebGaleri $galeri)

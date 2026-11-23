@@ -98,7 +98,7 @@
 
         <div class="col-12">
           <label class="form-label" for="foto_hero">Foto Utama (Hero)</label>
-          <input type="file" id="foto_hero" name="foto_hero" class="form-control" accept=".png,.jpg,.jpeg,.webp">
+          <input type="file" id="foto_hero" name="foto_hero" class="form-control kompres-foto" data-maks="1920" accept=".png,.jpg,.jpeg,.webp">
           <small class="text-muted">Maks 10 MB, otomatis dikompresi saat tersimpan. Foto gedung / kegiatan sekolah, orientasi melebar lebih bagus.</small>
           @if ($web?->foto_hero && $web->is_aktif)
             <div class="mt-3">
@@ -121,4 +121,6 @@
       </form>
     </div>
   </div>
+
+  @include('_partials.kompres-foto-js')
 @endsection

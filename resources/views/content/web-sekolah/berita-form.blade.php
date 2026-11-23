@@ -37,7 +37,7 @@
 
         <div class="col-12 col-md-6">
           <label class="form-label" for="foto">Foto Berita</label>
-          <input type="file" id="foto" name="foto" class="form-control" accept=".png,.jpg,.jpeg,.webp">
+          <input type="file" id="foto" name="foto" class="form-control kompres-foto" data-maks="1600" accept=".png,.jpg,.jpeg,.webp">
           <small class="text-muted">Maks 10 MB, otomatis dikompresi saat tersimpan. Kosongkan bila tidak mengganti foto.</small>
           @if ($berita->foto && $berita->status === 'terbit')
             <div class="mt-2"><img src="{{ route('web-sekolah.berita.foto', $berita) }}" alt="Foto berita"
@@ -62,4 +62,6 @@
       </form>
     </div>
   </div>
+
+  @include('_partials.kompres-foto-js')
 @endsection

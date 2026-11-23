@@ -7,6 +7,7 @@ use App\Support\KompresGambar;
 use App\Models\WebBerita;
 use App\Models\WebDokumen;
 use App\Models\WebGaleri;
+use App\Models\WebGaleriKegiatan;
 use App\Models\WebSekolah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -208,8 +209,14 @@ class WebSekolahKelolaController extends Controller
   {
     $sekolah = $this->sekolahSaya();
     $galeri = $sekolah->webGaleri()->orderBy('urutan')->latest('id')->get();
+    $daftarKegiatan = $sekolah->webGaleriKegiatan()
+      ->withCount('galeri')
+      ->orderByRaw('tanggal IS NULL')
+      ->orderByDesc('tanggal')
+      ->latest('id')
+      ->get();
 
-    return view('content.web-sekolah.galeri-index', compact('sekolah', 'galeri'));
+    return view('content.web-sekolah.galeri-index', compact('sekolah', 'galeri', 'daftarKegiatan'));
   }
 
   public function galeriStore(Request $request)
@@ -220,10 +227,23 @@ class WebSekolahKelolaController extends Controller
       'foto' => ['required', 'array', 'min:1'],
       'foto.*' => ['file', 'mimes:png,jpg,jpeg,webp', 'max:10240'],
       'judul' => ['nullable', 'string', 'max:255'],
+      'kegiatan_id' => ['nullable', 'integer', Rule::exists('tabel_web_galeri_kegiatan', 'id')->where('sekolah_id', $sekolah->id)],
+      'kegiatan_baru' => ['nullable', 'string', 'max:255'],
     ], [
       'foto.*.max' => 'Ukuran tiap foto tidak boleh lebih dari 10 MB — foto akan dikompresi otomatis saat tersimpan.',
       'foto.*.mimes' => 'Format foto harus JPG, PNG, atau WebP.',
     ]);
+
+    // Album tujuan: nama baru yang diisi menang atas pilihan dropdown;
+    // kosong keduanya berarti foto tanpa album ("Foto Lainnya").
+    $kegiatanId = null;
+    if ($request->filled('kegiatan_baru')) {
+      $kegiatanId = $sekolah->webGaleriKegiatan()->create([
+        'nama' => $request->kegiatan_baru,
+      ])->id;
+    } elseif ($request->filled('kegiatan_id')) {
+      $kegiatanId = (int) $request->kegiatan_id;
+    }
 
     $urutan = (int) ($sekolah->webGaleri()->max('urutan') ?? 0);
 
@@ -231,6 +251,7 @@ class WebSekolahKelolaController extends Controller
       $path = KompresGambar::simpan($file, "web-sekolah/{$sekolah->id}/galeri", 1600);
       WebGaleri::create([
         'sekolah_id' => $sekolah->id,
+        'kegiatan_id' => $kegiatanId,
         'judul' => $request->judul,
         'foto' => $path,
         'urutan' => ++$urutan,
@@ -250,6 +271,7 @@ class WebSekolahKelolaController extends Controller
       'judul' => ['nullable', 'string', 'max:255'],
       'keterangan' => ['nullable', 'string', 'max:255'],
       'urutan' => ['nullable', 'integer', 'min:0'],
+      'kegiatan_id' => ['nullable', 'integer', Rule::exists('tabel_web_galeri_kegiatan', 'id')->where('sekolah_id', $sekolah->id)],
     ]);
 
     $galeri->update($data);
@@ -268,6 +290,54 @@ class WebSekolahKelolaController extends Controller
 
     return redirect()->route('web-sekolah.kelola.galeri.index')
       ->with('success', 'Foto galeri berhasil dihapus.');
+  }
+
+  // ── Album Kegiatan (pengelompokan galeri) ─────────────────────────
+  public function kegiatanStore(Request $request)
+  {
+    $sekolah = $this->sekolahSaya();
+
+    $data = $request->validate([
+      'nama' => ['required', 'string', 'max:255'],
+      'tanggal' => ['nullable', 'date'],
+      'keterangan' => ['nullable', 'string'],
+    ]);
+
+    $sekolah->webGaleriKegiatan()->create($data);
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Album kegiatan berhasil dibuat.');
+  }
+
+  public function kegiatanUpdate(Request $request, WebGaleriKegiatan $kegiatan)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($kegiatan->sekolah_id !== $sekolah->id, 404);
+
+    $data = $request->validate([
+      'nama' => ['required', 'string', 'max:255'],
+      'tanggal' => ['nullable', 'date'],
+      'keterangan' => ['nullable', 'string'],
+    ]);
+
+    $kegiatan->update($data);
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Album kegiatan berhasil diperbarui.');
+  }
+
+  public function kegiatanDestroy(WebGaleriKegiatan $kegiatan)
+  {
+    $sekolah = $this->sekolahSaya();
+    abort_if($kegiatan->sekolah_id !== $sekolah->id, 404);
+
+    // Foto TIDAK ikut terhapus — albumnya saja yang dibubarkan,
+    // foto-fotonya kembali menjadi tanpa album.
+    $kegiatan->galeri()->update(['kegiatan_id' => null]);
+    $kegiatan->delete();
+
+    return redirect()->route('web-sekolah.kelola.galeri.index')
+      ->with('success', 'Album kegiatan dihapus — foto-fotonya tetap ada sebagai Foto Lainnya.');
   }
 
   // ── Dokumen Publik ────────────────────────────────────────────────

@@ -135,25 +135,48 @@
     </div>
   </section>
 
-  {{-- ── Galeri ───────────────────────────────────────────────────── --}}
-  @if ($galeri->isNotEmpty())
+  {{-- ── Galeri: album kegiatan + foto lainnya ───────────────────── --}}
+  @if ($albumGaleri->isNotEmpty() || $galeri->isNotEmpty())
     <section class="ws-section" id="galeri" style="padding-top:70px">
       <div class="ws-container">
         <div class="ws-sec-head" data-reveal>
           <span class="ws-eyebrow-sm">Dokumentasi</span>
           <h2>Galeri Kegiatan</h2>
-          <p>Momen dan aktivitas {{ $namaSekolah }} — ketuk foto untuk memperbesar.</p>
+          <p>Momen dan aktivitas {{ $namaSekolah }}@if ($albumGaleri->isNotEmpty()) — ketuk kartu album untuk melihat semua foto kegiatannya, atau ketuk foto untuk memperbesar.@else — ketuk foto untuk memperbesar.@endif</p>
         </div>
-        <div class="ws-galeri">
-          @foreach ($galeri as $g)
-            <figure data-reveal>
-              <img src="{{ route('web-sekolah.galeri.foto', $g) }}" alt="{{ $g->judul ?? 'Galeri ' . $namaSekolah }}" loading="lazy">
-              @if ($g->judul)
-                <figcaption>{{ $g->judul }}@if ($g->keterangan) — {{ $g->keterangan }} @endif</figcaption>
+        @if ($albumGaleri->isNotEmpty())
+          <div class="ws-galeri">
+            @foreach ($albumGaleri as $album)
+              @php $sampul = $album->fotoSampul(); @endphp
+              @if ($sampul)
+                <a class="ws-album-kartu" href="{{ route('web-sekolah.galeri.album', [$web->slug, $album]) }}" data-reveal
+                  aria-label="Lihat album {{ $album->nama }}">
+                  <img src="{{ route('web-sekolah.galeri.foto', $sampul) }}" alt="{{ $album->nama }}" loading="lazy">
+                  <span class="ws-album-lencana">Album</span>
+                  <span class="ws-album-info">
+                    <strong>{{ $album->nama }}</strong>
+                    <small>@if ($album->tanggal){{ $album->tanggal->translatedFormat('d F Y') }} &middot; @endif{{ $album->galeri_count }} foto</small>
+                  </span>
+                </a>
               @endif
-            </figure>
-          @endforeach
-        </div>
+            @endforeach
+          </div>
+        @endif
+        @if ($galeri->isNotEmpty())
+          @if ($albumGaleri->isNotEmpty())
+            <h3 style="margin:34px 0 18px;font-size:1.25rem">Foto Lainnya</h3>
+          @endif
+          <div class="ws-galeri">
+            @foreach ($galeri as $g)
+              <figure data-reveal>
+                <img src="{{ route('web-sekolah.galeri.foto', $g) }}" alt="{{ $g->judul ?? 'Galeri ' . $namaSekolah }}" loading="lazy">
+                @if ($g->judul)
+                  <figcaption>{{ $g->judul }}@if ($g->keterangan) — {{ $g->keterangan }} @endif</figcaption>
+                @endif
+              </figure>
+            @endforeach
+          </div>
+        @endif
       </div>
     </section>
   @endif

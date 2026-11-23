@@ -14,6 +14,7 @@ class WebGaleri extends Model
 
   protected $fillable = [
     'sekolah_id',
+    'kegiatan_id',
     'judul',
     'keterangan',
     'foto',
@@ -27,5 +28,10 @@ class WebGaleri extends Model
   public function sekolah(): BelongsTo
   {
     return $this->belongsTo(Sekolah::class, 'sekolah_id');
+  }
+
+  public function kegiatan(): BelongsTo
+  {
+    return $this->belongsTo(WebGaleriKegiatan::class, 'kegiatan_id');
   }
 }

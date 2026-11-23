@@ -190,6 +190,13 @@
     .ws-galeri figcaption{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(6,22,48,.88));color:#fff;font-size:.86rem;font-weight:600;padding:30px 14px 12px;opacity:0;transform:translateY(6px);transition:all .3s ease}
     .ws-galeri figure:hover figcaption{opacity:1;transform:none}
     .ws-galeri figure:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+    .ws-album-kartu{display:block;border-radius:16px;overflow:hidden;position:relative;aspect-ratio:4/3;background:var(--navy-900);text-decoration:none}
+    .ws-album-kartu img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+    .ws-album-kartu:hover img{transform:scale(1.08)}
+    .ws-album-lencana{position:absolute;top:12px;left:12px;background:var(--sky);color:#06203f;font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:999px;z-index:2}
+    .ws-album-info{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(6,22,48,.9));color:#fff;padding:34px 14px 12px;display:block}
+    .ws-album-info strong{display:block;font-size:1rem;line-height:1.3}
+    .ws-album-info small{opacity:.88;font-weight:600}
 
     /* ── Layanan ────────────────────────────────────────── */
     .ws-layanan{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}

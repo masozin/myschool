@@ -148,6 +148,7 @@ Route::controller(WebSekolahController::class)->group(function () {
   Route::get('/sekolah/{slugWeb}', 'tampil')->name('web-sekolah.tampil');
   Route::get('/sekolah/{slugWeb}/berita', 'beritaIndex')->name('web-sekolah.berita.index');
   Route::get('/sekolah/{slugWeb}/berita/{slugBerita}', 'beritaTampil')->name('web-sekolah.berita.tampil');
+  Route::get('/sekolah/{slugWeb}/galeri/{kegiatan}', 'galeriAlbum')->name('web-sekolah.galeri.album');
   Route::get('/sekolah/{slugWeb}/foto-hero', 'fotoHero')->name('web-sekolah.foto-hero');
   Route::get('/sekolah/{slugWeb}/logo', 'logo')->name('web-sekolah.logo');
   Route::get('/web-berita/{berita}/foto', 'fotoBerita')->name('web-sekolah.berita.foto');
@@ -179,6 +180,9 @@ Route::controller(WebSekolahKelolaController::class)
 
     Route::get('/galeri', 'galeriIndex')->name('galeri.index');
     Route::post('/galeri', 'galeriStore')->name('galeri.store');
+    Route::post('/galeri/kegiatan', 'kegiatanStore')->name('galeri.kegiatan.store');
+    Route::put('/galeri/kegiatan/{kegiatan}', 'kegiatanUpdate')->name('galeri.kegiatan.update');
+    Route::delete('/galeri/kegiatan/{kegiatan}', 'kegiatanDestroy')->name('galeri.kegiatan.destroy');
     Route::put('/galeri/{galeri}', 'galeriUpdate')->name('galeri.update');
     Route::delete('/galeri/{galeri}', 'galeriDestroy')->name('galeri.destroy');
 

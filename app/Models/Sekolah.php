@@ -108,6 +108,11 @@ class Sekolah extends Model
     return $this->hasMany(WebGaleri::class, 'sekolah_id');
   }
 
+  public function webGaleriKegiatan(): HasMany
+  {
+    return $this->hasMany(WebGaleriKegiatan::class, 'sekolah_id');
+  }
+
   public function webDokumen(): HasMany
   {
     return $this->hasMany(WebDokumen::class, 'sekolah_id');
