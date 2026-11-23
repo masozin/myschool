@@ -460,21 +460,21 @@
   </section>
 
   {{-- ── MySchool Mobile ──────────────────────────────────────────── --}}
-  <section class="ws-section" style="padding-top:70px">
+  <section class="ws-section" style="padding-top:56px">
     <div class="ws-container">
-      <div class="ws-mobile" data-reveal>
-        <div class="ws-mobile-teks">
+      <div class="ws-aplikasi" data-reveal>
+        <div class="ws-aplikasi-teks">
           <span class="ws-eyebrow-sm" style="color:var(--sky)">Aplikasi Pendamping</span>
           <h2>Kini Tersedia <span style="color:var(--sky)">MySchool Mobile</span></h2>
           <p>Aplikasi Android untuk guru dan staf {{ $namaSekolah }} — urusan kelas dapat dikerjakan langsung dari ponsel, tanpa harus membuka laptop.</p>
-          <ul class="ws-mobile-fitur">
+          <ul class="ws-aplikasi-fitur">
             <li>Presensi siswa per rombel, langsung dari kelas</li>
             <li>Data siswa sekolah dalam genggaman</li>
             <li>Masuk mudah dengan NIP — tanpa perlu surel</li>
           </ul>
-          <p class="ws-mobile-catatan">Aplikasi khusus guru &amp; staf sekolah — hubungi operator sekolah untuk mendapatkan dan memasang aplikasinya.</p>
+          <p class="ws-aplikasi-catatan">Aplikasi khusus guru &amp; staf sekolah — hubungi operator sekolah untuk mendapatkan dan memasang aplikasinya.</p>
         </div>
-        <div class="ws-mobile-visual" aria-hidden="true">
+        <div class="ws-aplikasi-visual" aria-hidden="true">
           <div class="ws-phone">
             <div class="ws-phone-layar">
               <div class="ws-phone-kepala">
