@@ -199,6 +199,31 @@
     .ws-lipat-tombol{margin-top:12px;background:none;border:none;color:var(--primary);font-weight:700;cursor:pointer;padding:0;font-size:.95rem;font-family:inherit}
     .ws-lipat-tombol:hover{text-decoration:underline}
 
+    /* ── MySchool Mobile ────────────────────────────────── */
+    .ws-mobile{background:linear-gradient(140deg,var(--navy-900),var(--navy-800));border-radius:calc(var(--radius) + 6px);color:#fff;padding:52px;display:grid;grid-template-columns:1.5fr .9fr;gap:40px;align-items:center;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
+    .ws-mobile::after{content:"";position:absolute;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(79,150,255,.35),transparent 65%);top:-180px;right:-120px;pointer-events:none}
+    .ws-mobile h2{font-size:2rem;line-height:1.2;margin:.35em 0 .5em;color:#fff;letter-spacing:-.01em}
+    .ws-mobile-teks{position:relative;z-index:1}
+    .ws-mobile-teks p{color:rgba(255,255,255,.86);line-height:1.75;max-width:56ch}
+    .ws-mobile-fitur{list-style:none;margin:20px 0;padding:0;display:grid;gap:10px}
+    .ws-mobile-fitur li{position:relative;padding-left:30px;color:rgba(255,255,255,.94)}
+    .ws-mobile-fitur li::before{content:"\2713";position:absolute;left:0;top:1px;width:19px;height:19px;border-radius:50%;background:var(--sky);color:#06203f;font-size:.68rem;font-weight:800;text-align:center;line-height:19px}
+    .ws-mobile-catatan{font-size:.88rem;opacity:.75}
+    .ws-mobile-visual{display:flex;justify-content:center;position:relative;z-index:1}
+    .ws-phone{width:200px;height:400px;background:#0b1c33;border:3px solid rgba(255,255,255,.25);border-radius:36px;padding:10px;box-shadow:0 30px 60px rgba(2,10,24,.45);transform:rotate(4deg)}
+    .ws-phone-layar{background:linear-gradient(170deg,#f4f8ff,#e3edfd);border-radius:27px;height:100%;padding:18px 14px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+    .ws-phone-kepala{display:flex;gap:9px;align-items:center}
+    .ws-phone-logo{width:34px;height:34px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+    .ws-phone-kepala strong{display:block;color:var(--ink);font-size:.92rem;line-height:1.1}
+    .ws-phone-kepala small{color:var(--muted);font-size:.68rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:108px}
+    .ws-phone-kartu{background:var(--primary);color:#fff;border-radius:14px;padding:12px}
+    .ws-phone-kartu small{display:block;opacity:.85;font-size:.64rem;text-transform:uppercase;letter-spacing:.06em}
+    .ws-phone-kartu strong{font-size:.84rem;line-height:1.35;display:block;margin-top:2px}
+    .ws-phone-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .ws-phone-grid span{background:#fff;border:1px solid var(--line);border-radius:12px;height:52px}
+    .ws-phone-baris{background:#fff;border:1px solid var(--line);border-radius:10px;height:34px}
+    @media(max-width:900px){.ws-mobile{grid-template-columns:1fr;padding:38px 26px}.ws-phone{transform:none;height:360px}}
+
     /* ── Galeri ─────────────────────────────────────────── */
     .ws-galeri{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
     @media(max-width:900px){.ws-galeri{grid-template-columns:repeat(2,1fr)}}

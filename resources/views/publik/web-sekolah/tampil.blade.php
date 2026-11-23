@@ -458,6 +458,39 @@
       </div>
     </div>
   </section>
+
+  {{-- ── MySchool Mobile ──────────────────────────────────────────── --}}
+  <section class="ws-section" style="padding-top:70px">
+    <div class="ws-container">
+      <div class="ws-mobile" data-reveal>
+        <div class="ws-mobile-teks">
+          <span class="ws-eyebrow-sm" style="color:var(--sky)">Aplikasi Pendamping</span>
+          <h2>Kini Tersedia <span style="color:var(--sky)">MySchool Mobile</span></h2>
+          <p>Aplikasi Android untuk guru dan staf {{ $namaSekolah }} — urusan kelas dapat dikerjakan langsung dari ponsel, tanpa harus membuka laptop.</p>
+          <ul class="ws-mobile-fitur">
+            <li>Presensi siswa per rombel, langsung dari kelas</li>
+            <li>Data siswa sekolah dalam genggaman</li>
+            <li>Masuk mudah dengan NIP — tanpa perlu surel</li>
+          </ul>
+          <p class="ws-mobile-catatan">Aplikasi khusus guru &amp; staf sekolah — hubungi operator sekolah untuk mendapatkan dan memasang aplikasinya.</p>
+        </div>
+        <div class="ws-mobile-visual" aria-hidden="true">
+          <div class="ws-phone">
+            <div class="ws-phone-layar">
+              <div class="ws-phone-kepala">
+                <span class="ws-phone-logo">M</span>
+                <div><strong>MySchool</strong><small>{{ $namaSekolah }}</small></div>
+              </div>
+              <div class="ws-phone-kartu"><small>Presensi Hari Ini</small><strong>Presensi kelas tercatat rapi setiap hari</strong></div>
+              <div class="ws-phone-grid"><span></span><span></span><span></span><span></span></div>
+              <div class="ws-phone-baris"></div>
+              <div class="ws-phone-baris" style="width:70%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 @endsection
 
 @section('page-script')
