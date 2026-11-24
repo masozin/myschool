@@ -71,6 +71,13 @@
     :root[data-tema="dark"] .ws-pagination a,:root[data-tema="dark"] .ws-pagination span,
     :root[data-tema="dark"] .ws-pill{background:var(--card)}
     :root[data-tema="dark"] .ws-pills{background:#0b1a36}
+    /* Jadwal hari ini — mode gelap */
+    :root[data-tema="dark"] .ws-jam-chip{background:rgba(255,255,255,.09);color:var(--ink)}
+    :root[data-tema="dark"] .ws-row + .ws-row{border-top-color:var(--line)}
+    :root[data-tema="dark"] .ws-row .ws-waktu{color:var(--ink)}
+    :root[data-tema="dark"] .ws-row.istirahat{background:rgba(246,166,9,.12)}
+    :root[data-tema="dark"] .ws-row.istirahat .ws-isi strong{color:#f6c453}
+    :root[data-tema="dark"] .ws-row.berlangsung{background:linear-gradient(90deg,rgba(79,150,255,.22),rgba(79,150,255,.08));border-left-color:var(--sky)}
     /* ── Tombol saklar tema ── */
     .ws-tema{margin-left:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex:none}
     .ws-tema svg{width:20px;height:20px}
@@ -390,7 +397,14 @@
     .ws-row.kegiatan .ws-titik{background:#22c55e}
     .ws-row.berlangsung{background:linear-gradient(90deg,#eaf3ff,#f4f9ff);border-left-color:var(--primary)}
     .ws-lencana-live{flex:none;background:#dc2626;color:#fff;font-size:.7rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
-    @media(max-width:560px){.ws-row .ws-waktu{width:96px;font-size:.85rem}.ws-panel{padding:6px 12px 16px}.ws-pills{padding:16px 14px}}
+    @media(max-width:560px){
+      .ws-panel{padding:6px 12px 16px}.ws-pills{padding:16px 14px}
+      .ws-row{flex-wrap:wrap;gap:4px 12px;align-items:flex-start}
+      .ws-row .ws-titik{order:1;margin-top:6px}
+      .ws-row .ws-isi{order:2}
+      .ws-row .ws-lencana-live{order:3}
+      .ws-row .ws-waktu{order:4;flex:0 0 100%;width:auto;padding-left:22px;font-size:.85rem;color:var(--muted)}
+    }
     .ws-libur{background:linear-gradient(140deg,var(--navy-900),var(--primary));border-radius:20px;color:#fff;padding:44px 34px;text-align:center;box-shadow:var(--shadow-md)}
     .ws-libur svg{width:54px;height:54px;margin:0 auto 16px;color:var(--accent)}
     .ws-libur h3{font-size:1.55rem;font-weight:800;letter-spacing:-.01em;margin-bottom:8px}
