@@ -52,6 +52,34 @@ class KelolaBosController extends Controller
   /** Jenis BKU belanja (Kas Keluar dkk.) untuk realisasi. */
   private const JENIS_BELANJA = [4, 15, 24, 35];
 
+  /**
+   * Pemetaan jenis BKU (id_ref_bku ARKAS) untuk kartu dana di halaman
+   * BKU: id => tanda (+1 menambah, -1 mengurangi). Kolom saldo di cermin
+   * BKU tidak bertanda, jadi arah tiap jenis ditetapkan di sini — sudah
+   * diuji terhadap saldo bawaan antarbulan ARKAS (data 2024–2026 cocok
+   * di semua bulan). Ubah di sini bila ada jenis baru.
+   *
+   * Tunai : 9 Saldo Awal Tunai (+), 12 Pergeseran Tunai (+),
+   *         4 Kas Keluar (−)
+   * Bank  : 8 Saldo Awal Bank (+), 2 Terima Dana BOS (+), 6 Bunga Bank (+),
+   *         7 Pajak Bunga (−), 3 Tarik Tunai (−),
+   *         15 Kas Keluar Non Tunai (−)
+   *
+   * Penting: "Saldo Awal" (8/9) bukan saldo awal tahun, melainkan saldo
+   * penutup bulan sebelumnya yang dibawa ARKAS ke tiap bulan, per
+   * anggaran (sumber dana). Menjumlahkannya lintas bulan salah; yang
+   * dipakai hanya baris saldo awal TERAKHIR tiap anggaran, ditambah
+   * transaksi sesudahnya (lihat hitungKartuDana).
+   *
+   * Pajak : jenis 10 Pajak Belanja Terima — hanya ditampilkan sebagai
+   *         jumlah pajak, tidak ikut menghitung dana.
+   */
+  private const DANA_TUNAI = [9 => 1, 12 => 1, 4 => -1];
+  private const DANA_BANK = [8 => 1, 2 => 1, 6 => 1, 7 => -1, 3 => -1, 15 => -1];
+  private const JENIS_PAJAK = 10;
+  /** Jenis yang dikenal tetapi tidak memengaruhi saldo kas (pajak terima/setor). */
+  private const DANA_DIABAIKAN = [10, 11];
+
   /** Konteks sekolah aktif (pola yang sama dengan Surat Keluar). */
   private function sekolahKonteksIdNullable(): ?int
   {
@@ -1182,6 +1210,190 @@ class KelolaBosController extends Controller
     ]);
   }
 
+  // ── Kartu dana & anggaran (halaman BKU) ─────────────────
+
+  /**
+   * Ringkasan dana dari jumlah saldo per jenis BKU
+   * ($perJenis: [id_ref_bku => ['jml' => int, 'total' => float]]) yang
+   * sudah dibatasi pada saldo awal terakhir + transaksi sesudahnya.
+   * Dana tersedia = tunai + non tunai (bank). Jenis di luar pemetaan
+   * tidak ikut dihitung dan dilaporkan lewat 'takDikenal'.
+   */
+  private function ringkasDana(array $perJenis, float $pajak): array
+  {
+    $jumlahkan = function (array $peta) use ($perJenis): float {
+      $hasil = 0.0;
+      foreach ($peta as $idJenis => $tanda) {
+        $hasil += $tanda * ($perJenis[$idJenis]['total'] ?? 0.0);
+      }
+      return $hasil;
+    };
+
+    $tunai = $jumlahkan(self::DANA_TUNAI);
+    $bank = $jumlahkan(self::DANA_BANK);
+
+    $dikenal = array_merge(array_keys(self::DANA_TUNAI), array_keys(self::DANA_BANK), self::DANA_DIABAIKAN);
+    $takDikenal = ['jml' => 0, 'ids' => []];
+    foreach ($perJenis as $idJenis => $d) {
+      if (!in_array($idJenis, $dikenal, true) && $d['jml'] > 0) {
+        $takDikenal['jml'] += $d['jml'];
+        $takDikenal['ids'][] = $idJenis;
+      }
+    }
+
+    return [
+      'tersedia' => $tunai + $bank,
+      'tunai' => $tunai,
+      'bank' => $bank,
+      'pajak' => $pajak,
+      'takDikenal' => $takDikenal,
+    ];
+  }
+
+  /**
+   * Kartu dana: posisi pada akhir bulan $bulanSampai tahun $tahun (atau
+   * akhir tahun bila bulan tidak dipilih). Tidak ikut saringan jenis,
+   * rekening, atau pencarian — ini posisi, bukan daftar.
+   *
+   * Cara hitung: untuk TIAP anggaran (sumber dana punya rantai saldo
+   * sendiri), ambil baris Saldo Awal Bank/Tunai terakhir sebelum batas,
+   * lalu jumlahkan baris itu dan seluruh transaksi sesudahnya sampai
+   * batas. Saldo awal ARKAS adalah saldo penutup bulan sebelumnya, jadi
+   * hasilnya sama dengan saldo penutup bulan yang bersangkutan.
+   *
+   * Pajak: jumlah Pajak Belanja Terima sejak 1 Januari sampai batas.
+   */
+  private function hitungKartuDana(int $sekolahId, ?int $tahun, ?int $bulanSampai): array
+  {
+    $bulanSampai = ($bulanSampai !== null && $bulanSampai >= 1 && $bulanSampai <= 12) ? $bulanSampai : null;
+    $perJenis = [];
+    $pajak = 0.0;
+
+    if ($tahun !== null) {
+      $awalTahun = \Carbon\Carbon::create($tahun, 1, 1)->startOfDay();
+      $sebelum = \Carbon\Carbon::create($tahun, $bulanSampai ?? 12, 1)->addMonth()->startOfMonth();
+      $batas = $sebelum->format('Y-m-d H:i:s');
+
+      $sql = <<<SQL
+        SELECT k.id_ref_bku, COUNT(*) AS jml, SUM(k.saldo) AS total
+        FROM bos_kas_umum k
+        WHERE k.sekolah_id = ?
+          AND k.soft_delete = 0
+          AND k.tanggal_transaksi < ?
+          AND k.tanggal_transaksi >= COALESCE((
+            SELECT MAX(s.tanggal_transaksi)
+            FROM bos_kas_umum s
+            WHERE s.sekolah_id = k.sekolah_id
+              AND s.soft_delete = 0
+              AND s.id_ref_bku IN (8, 9)
+              AND s.id_anggaran_arkas = k.id_anggaran_arkas
+              AND s.tanggal_transaksi < ?
+          ), '1900-01-01 00:00:00')
+        GROUP BY k.id_ref_bku
+        SQL;
+
+      foreach (\Illuminate\Support\Facades\DB::select($sql, [$sekolahId, $batas, $batas]) as $b) {
+        $perJenis[(int) $b->id_ref_bku] = ['jml' => (int) $b->jml, 'total' => (float) $b->total];
+      }
+
+      $pajak = (float) BosKasUmum::query()
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->where('id_ref_bku', self::JENIS_PAJAK)
+        ->where('tanggal_transaksi', '>=', $awalTahun)
+        ->where('tanggal_transaksi', '<', $sebelum)
+        ->sum('saldo');
+    }
+
+    return ['tahun' => $tahun, 'bulan' => $bulanSampai] + $this->ringkasDana($perJenis, $pajak);
+  }
+
+  /**
+   * Kartu anggaran s.d. bulan berjalan — definisi yang sama dengan
+   * Kertas Kerja (titik potong bulan otomatis, versi RKAS disetujui
+   * terakhir), tetapi mencakup semua sumber dana karena halaman BKU
+   * tidak per sumber dana.
+   *  - bisa      : jumlah sisa jadwal baris yang masih bersisa
+   *                (kartu "Bisa Dibelanjakan" Kertas Kerja)
+   *  - sudah     : realisasi BKU belanja baris-baris itu
+   *  - bulanIni  : jadwal bulan titik potong saja
+   *  - terjadwal : jadwal kumulatif Januari s.d. bulan titik potong
+   */
+  private function hitungKartuAnggaran(int $sekolahId, ?int $tahun): array
+  {
+    $tahunIni = (int) now()->format('Y');
+    $tahunAcuan = $tahun ?? $tahunIni;
+    $bulanPotong = $tahunAcuan === $tahunIni
+      ? (int) now()->format('n')
+      : ($tahunAcuan < $tahunIni ? 12 : 0);
+
+    $hasil = [
+      'tahun' => $tahunAcuan,
+      'bulan' => $bulanPotong,
+      'ada' => false,
+      'terjadwal' => 0.0,
+      'bisa' => 0.0,
+      'sudah' => 0.0,
+      'bulanIni' => 0.0,
+    ];
+
+    if ($bulanPotong < 1) {
+      return $hasil;
+    }
+
+    $ids = $this->pilihVersiIds($this->kelompokVersi($sekolahId), $tahunAcuan, null, null);
+    if (!$ids) {
+      return $hasil;
+    }
+
+    $periodeIni = 80 + $bulanPotong; // id_periode 81–92 = Januari–Desember
+    $jenisBelanja = implode(',', array_map('intval', self::JENIS_BELANJA));
+    $tandaTanya = implode(',', array_fill(0, count($ids), '?'));
+
+    $sql = <<<SQL
+      SELECT
+        COALESCE(SUM(jad.jadwal), 0) AS terjadwal,
+        COALESCE(SUM(jad.bulan_ini), 0) AS bulan_ini,
+        COALESCE(SUM(rea.realisasi), 0) AS sudah,
+        COALESCE(SUM(CASE
+          WHEN COALESCE(jad.jadwal, 0) > 0 AND COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0) > 0
+          THEN COALESCE(jad.jadwal, 0) - COALESCE(rea.realisasi, 0)
+          ELSE 0 END), 0) AS bisa
+      FROM bos_rapbs
+      LEFT JOIN (
+        SELECT sekolah_id, id_rapbs_arkas,
+               SUM(jumlah) AS jadwal,
+               SUM(CASE WHEN id_periode = {$periodeIni} THEN jumlah ELSE 0 END) AS bulan_ini
+        FROM bos_rapbs_periode
+        WHERE soft_delete = 0 AND id_periode BETWEEN 81 AND {$periodeIni}
+        GROUP BY sekolah_id, id_rapbs_arkas
+      ) jad ON jad.id_rapbs_arkas = bos_rapbs.id_arkas AND jad.sekolah_id = bos_rapbs.sekolah_id
+      LEFT JOIN (
+        SELECT per16.sekolah_id, per16.id_rapbs_arkas, SUM(bku16.saldo) AS realisasi
+        FROM bos_kas_umum bku16
+        JOIN bos_rapbs_periode per16
+          ON per16.id_arkas = bku16.id_rapbs_periode AND per16.sekolah_id = bku16.sekolah_id
+        WHERE bku16.soft_delete = 0
+          AND bku16.id_ref_bku IN ({$jenisBelanja})
+          AND bku16.id_rapbs_periode IS NOT NULL
+        GROUP BY per16.sekolah_id, per16.id_rapbs_arkas
+      ) rea ON rea.id_rapbs_arkas = bos_rapbs.id_arkas AND rea.sekolah_id = bos_rapbs.sekolah_id
+      WHERE bos_rapbs.sekolah_id = ?
+        AND bos_rapbs.soft_delete = 0
+        AND bos_rapbs.id_anggaran_arkas IN ({$tandaTanya})
+      SQL;
+
+    $agg = \Illuminate\Support\Facades\DB::selectOne($sql, array_merge([$sekolahId], $ids));
+
+    return [
+      'ada' => true,
+      'terjadwal' => (float) ($agg->terjadwal ?? 0),
+      'bisa' => (float) ($agg->bisa ?? 0),
+      'sudah' => (float) ($agg->sudah ?? 0),
+      'bulanIni' => (float) ($agg->bulan_ini ?? 0),
+    ] + $hasil;
+  }
+
   // ── BKU ──────────────────────────────────────────────────
 
   public function bku(Request $request)
@@ -1249,6 +1461,17 @@ class KelolaBosController extends Controller
 
     $totalNominal = (float) $saring($dasar())->sum('bos_kas_umum.saldo');
 
+    // Kartu dana & anggaran di atas tabel (tidak ikut saringan
+    // jenis/rekening/pencarian). Saat "Semua tahun" dipilih, kartu dana
+    // memakai tahun terbaru karena saldo awal dicatat per tahun.
+    $tahunDana = $tahunEfektif ?? ($daftarTahun[0] ?? null);
+    $kartuDana = $this->hitungKartuDana(
+      $sekolahId,
+      $tahunDana,
+      $request->filled('bulan') ? $request->integer('bulan') : null
+    );
+    $kartuAnggaran = $this->hitungKartuAnggaran($sekolahId, $tahunEfektif);
+
     $kolomUrut = [
       'tanggal' => 'bos_kas_umum.tanggal_transaksi',
       'bukti' => 'bos_kas_umum.no_bukti',
@@ -1304,6 +1527,8 @@ class KelolaBosController extends Controller
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
+      'kartuDana' => $kartuDana,
+      'kartuAnggaran' => $kartuAnggaran,
       'daftarTahun' => $daftarTahun,
       'tahunTerpilih' => $tahunEfektif,
       'daftarJenis' => $daftarJenis,
