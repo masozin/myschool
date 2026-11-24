@@ -38,8 +38,9 @@ use Illuminate\Support\Str;
  * bawaan tahun berjalan + BOS Reguler + versi terakhir
  * disetujui bila parameternya tidak dikirim.
  *
- * Operator Sekolah & Kepala Sekolah melihat sekolahnya;
- * Admin memantau lewat pemilih sekolah (pola Surat Keluar).
+ * Operator Sekolah, Kepala Sekolah & Bendahara (hanya
+ * membaca) melihat sekolahnya; Admin memantau lewat
+ * pemilih sekolah (pola Surat Keluar).
  */
 class KelolaBosController extends Controller
 {

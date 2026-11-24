@@ -9,6 +9,7 @@ use App\Models\Sekolah;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
@@ -66,11 +67,16 @@ class PtkController extends Controller
         'string',
         'max:100',
         function ($attribute, $value, $fail) use ($sekolahId, $namaSekolah) {
-          // Daftar jabatan yang dibatasi (hanya boleh 1 per sekolah)
-          $jabatanTerbatas = ['Kepala Sekolah', 'Operator Sekolah'];
+          // Kepala Sekolah maksimal 1 per sekolah, dihitung gabungan
+          // jabatan utama + peran tambahan + role akun orang lain.
+          if ($value === 'Kepala Sekolah' && $this->peranTerbatasTerisi($sekolahId, $value)) {
+            $fail("Jabatan $value sudah terisi di $namaSekolah.");
+          }
 
-          if (in_array($value, $jabatanTerbatas)) {
-            // Cek apakah sudah ada orang lain di sekolah ini dengan jabatan tersebut
+          // Operator Sekolah sebagai jabatan utama tetap maksimal 1
+          // per sekolah dari kolom jabatan saja — peran tambahan
+          // Operator untuk guru memang diperbolehkan tanpa batas.
+          if ($value === 'Operator Sekolah') {
             $exists = \App\Models\Ptk::where('sekolah_id', $sekolahId)
               ->where('jabatan', $value)
               ->exists();
@@ -78,6 +84,29 @@ class PtkController extends Controller
             if ($exists) {
               $fail("Jabatan $value sudah terisi di $namaSekolah.");
             }
+          }
+        },
+      ],
+      'peran_tambahan'   => [
+        'nullable',
+        'array',
+        function ($attribute, $value, $fail) use ($sekolahId, $namaSekolah) {
+          // Peran terbatas maksimal 1 orang per sekolah, dihitung
+          // dengan aturan gabungan yang sama seperti jabatan utama.
+          foreach (['Kepala Sekolah', 'Bendahara'] as $peranTerbatas) {
+            if (in_array($peranTerbatas, $value ?? [], true)
+              && $this->peranTerbatasTerisi($sekolahId, $peranTerbatas)) {
+              $fail("Peran $peranTerbatas sudah terisi di $namaSekolah.");
+            }
+          }
+        },
+      ],
+      'peran_tambahan.*' => [
+        'string',
+        Rule::in(Ptk::PERAN_TERKELOLA),
+        function ($attribute, $value, $fail) use ($request) {
+          if ($value === $request->input('jabatan')) {
+            $fail('Peran tambahan tidak boleh sama dengan jabatan utama.');
           }
         },
       ],
@@ -90,6 +119,18 @@ class PtkController extends Controller
     }
 
     $validated = $request->validate($rules);
+
+    $peranTambahan = $this->bersihkanPeranTambahan($validated['peran_tambahan'] ?? [], $validated['jabatan']);
+
+    // Pengaman pemberi peran: pada PTK baru semua peran tambahan
+    // dihitung sebagai penambahan, dan aktor non-Admin tidak boleh
+    // menambahkan peran Operator Sekolah / Kepala Sekolah / Admin.
+    $terlarang = $this->penambahanPeranTerlarang($peranTambahan, []);
+    if ($terlarang) {
+      return response()->json([
+        'message' => 'Akses ditolak. Hanya Admin yang dapat memberikan peran tambahan: ' . implode(', ', $terlarang) . '.'
+      ], 403);
+    }
 
     // Foto disimpan di folder yang sama dengan unggahan lewat profil
     // (UserController): ptk_photos di disk public.
@@ -108,6 +149,7 @@ class PtkController extends Controller
       'nip'           => $validated['nip'],
       'jenis_kelamin' => $validated['jenis_kelamin'],
       'jabatan'       => $validated['jabatan'],
+      'peran_tambahan' => $peranTambahan ?: null,
       'jenis_kepegawaian' => $validated['jenis_kepegawaian'],
       'sekolah_id'    => $sekolahId, // Set otomatis agar tidak bisa manipulasi sekolah lain
       'user_id'       => null,       // Default null, diisi jika nanti buat akun login untuk guru ini
@@ -145,11 +187,16 @@ class PtkController extends Controller
         'string',
         'max:100',
         function ($attribute, $value, $fail) use ($sekolahId, $id, $namaSekolah) {
-          // Daftar jabatan yang dibatasi (hanya boleh 1 per sekolah)
-          $jabatanTerbatas = ['Kepala Sekolah', 'Operator Sekolah'];
+          // Kepala Sekolah maksimal 1 per sekolah, dihitung gabungan
+          // jabatan utama + peran tambahan + role akun orang lain.
+          if ($value === 'Kepala Sekolah' && $this->peranTerbatasTerisi($sekolahId, $value, $id)) {
+            $fail("Jabatan $value sudah terisi di $namaSekolah.");
+          }
 
-          if (in_array($value, $jabatanTerbatas)) {
-            // Cek apakah sudah ada orang lain di sekolah ini dengan jabatan tersebut
+          // Operator Sekolah sebagai jabatan utama tetap maksimal 1
+          // per sekolah dari kolom jabatan saja — peran tambahan
+          // Operator untuk guru memang diperbolehkan tanpa batas.
+          if ($value === 'Operator Sekolah') {
             $exists = \App\Models\Ptk::where('sekolah_id', $sekolahId)
               ->where('jabatan', $value)
               ->where('id', '!=', $id) // Kecuali dirinya sendiri (karena sedang edit)
@@ -161,10 +208,50 @@ class PtkController extends Controller
           }
         },
       ],
+      'peran_tambahan'   => [
+        'nullable',
+        'array',
+        function ($attribute, $value, $fail) use ($sekolahId, $id, $namaSekolah) {
+          // Peran terbatas maksimal 1 orang per sekolah, dihitung
+          // dengan aturan gabungan yang sama seperti jabatan utama.
+          foreach (['Kepala Sekolah', 'Bendahara'] as $peranTerbatas) {
+            if (in_array($peranTerbatas, $value ?? [], true)
+              && $this->peranTerbatasTerisi($sekolahId, $peranTerbatas, $id)) {
+              $fail("Peran $peranTerbatas sudah terisi di $namaSekolah.");
+            }
+          }
+        },
+      ],
+      'peran_tambahan.*' => [
+        'string',
+        Rule::in(Ptk::PERAN_TERKELOLA),
+        function ($attribute, $value, $fail) use ($request) {
+          if ($value === $request->input('jabatan')) {
+            $fail('Peran tambahan tidak boleh sama dengan jabatan utama.');
+          }
+        },
+      ],
     ]);
 
     // Simpan jabatan lama sebelum diupdate untuk pengecekan
     $jabatanLama = $ptk->jabatan;
+    $peranLama = $ptk->peran_tambahan ?? [];
+
+    // Peran tambahan yang tidak dikirim dianggap dikosongkan: form
+    // edit selalu menampilkan checkbox-nya, jadi kotak yang tidak
+    // dicentang memang berarti peran itu dicabut.
+    $peranTambahan = $this->bersihkanPeranTambahan($request->input('peran_tambahan', []), $validated['jabatan']);
+    $validated['peran_tambahan'] = $peranTambahan ?: null;
+
+    // Pengaman pemberi peran: hanya PENAMBAHAN peran terlarang yang
+    // ditolak bagi aktor non-Admin; peran lama yang sudah terpasang
+    // boleh tetap dipertahankan lewat edit biasa.
+    $terlarang = $this->penambahanPeranTerlarang($peranTambahan, $peranLama);
+    if ($terlarang) {
+      return response()->json([
+        'message' => 'Akses ditolak. Hanya Admin yang dapat memberikan peran tambahan: ' . implode(', ', $terlarang) . '.'
+      ], 403);
+    }
 
     // Foto & hapus_photo ditangani manual di bawah, bukan mass-update.
     $fileFoto = $request->file('photo');
@@ -184,16 +271,28 @@ class PtkController extends Controller
       $ptk->save();
     }
 
-    // 2. Sinkronisasi Role jika PTK sudah punya akun
-    if ($ptk->user_id && $jabatanLama !== $validated['jabatan']) {
+    // 2. Sinkronisasi Role jika PTK sudah punya akun dan jabatan
+    // atau peran tambahannya berubah. Yang diganti hanya peran yang
+    // dikelola lewat data PTK (Ptk::PERAN_TERKELOLA); role di luar
+    // daftar itu — mis. Admin yang dipasang manual — dipertahankan.
+    $peranBerubah = $jabatanLama !== $validated['jabatan']
+      || array_values($peranLama) !== $peranTambahan;
+
+    if ($ptk->user_id && $peranBerubah) {
       $user = \App\Models\User::find($ptk->user_id);
 
       if ($user) {
-        // Pastikan Role tersedia di database, jika belum buat otomatis
-        $role = \Spatie\Permission\Models\Role::firstOrCreate(['name' => $validated['jabatan']]);
+        // Pastikan semua Role tersedia di database, buat bila belum ada
+        foreach ($ptk->semuaPeran() as $namaPeran) {
+          \Spatie\Permission\Models\Role::firstOrCreate(['name' => $namaPeran, 'guard_name' => 'web']);
+        }
 
-        // Hapus semua role lama dan pasang role baru sesuai jabatan baru
-        $user->syncRoles([$role->name]);
+        $peranTakTerkelola = $user->getRoleNames()
+          ->reject(fn($nama) => in_array($nama, Ptk::PERAN_TERKELOLA, true))
+          ->values()
+          ->all();
+
+        $user->syncRoles(array_merge($peranTakTerkelola, $ptk->semuaPeran()));
       }
     }
 
@@ -296,9 +395,15 @@ class PtkController extends Controller
           'password'  => Hash::make($plainPassword),
         ]);
 
-        $role = Role::firstOrCreate(['name' => $ptk->jabatan, 'guard_name' => 'web']);
+        // Pasang SEMUA peran PTK: jabatan utama + peran tambahan
+        $roles = [];
+        foreach ($ptk->semuaPeran() as $namaPeran) {
+          $roles[] = Role::firstOrCreate(['name' => $namaPeran, 'guard_name' => 'web']);
+        }
 
-        $user->assignRole($role);
+        if ($roles) {
+          $user->assignRole($roles);
+        }
 
         // 7. Update user_id di tabel ptk
         $ptk->update(['user_id' => $user->id]);
@@ -319,6 +424,72 @@ class PtkController extends Controller
         'message' => 'Gagal membuat akun: ' . $e->getMessage()
       ], 500);
     }
+  }
+
+  /**
+   * Bersihkan daftar peran tambahan dari request: hanya role
+   * terkelola, unik, dan tidak mengulang jabatan utama.
+   */
+  private function bersihkanPeranTambahan($input, ?string $jabatan): array
+  {
+    if (!is_array($input)) {
+      return [];
+    }
+
+    $peran = array_filter(array_map(fn($nama) => trim((string) $nama), $input), function ($nama) use ($jabatan) {
+      return $nama !== '' && $nama !== $jabatan && in_array($nama, Ptk::PERAN_TERKELOLA, true);
+    });
+
+    return array_values(array_unique($peran));
+  }
+
+  /**
+   * Apakah peran terbatas (maksimal 1 orang per sekolah) sudah terisi
+   * PTK LAIN di sekolah ini — dihitung gabungan dari jabatan utama,
+   * peran tambahan, dan role Spatie pada akun user mereka, agar tidak
+   * ada pemegang "bayangan" lewat salah satu jalur.
+   */
+  private function peranTerbatasTerisi(int $sekolahId, string $peran, ?int $kecualiPtkId = null): bool
+  {
+    $daftarPtk = Ptk::where('sekolah_id', $sekolahId)
+      ->when($kecualiPtkId, fn($q) => $q->where('id', '!=', $kecualiPtkId))
+      ->with('user.roles')
+      ->get();
+
+    foreach ($daftarPtk as $ptkLain) {
+      if ($ptkLain->jabatan === $peran) {
+        return true;
+      }
+
+      if (in_array($peran, $ptkLain->peran_tambahan ?? [], true)) {
+        return true;
+      }
+
+      if ($ptkLain->user && $ptkLain->user->roles->contains('name', $peran)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Peran tambahan terlarang yang BARU ditambahkan oleh aktor
+   * non-Admin. Admin boleh memberikan semua peran; selain Admin,
+   * penambahan peran Operator Sekolah, Kepala Sekolah, dan Admin
+   * ditolak (mencegah eskalasi hak akses). Peran yang sudah terpasang
+   * sebelumnya tidak dihitung, agar edit biasa pada PTK yang sudah
+   * memilikinya tidak ikut terkunci.
+   */
+  private function penambahanPeranTerlarang(array $peranBaru, array $peranLama): array
+  {
+    if (Auth::user()->hasRole('Admin')) {
+      return [];
+    }
+
+    $terlarang = ['Admin', 'Kepala Sekolah', 'Operator Sekolah'];
+
+    return array_values(array_intersect(array_diff($peranBaru, $peranLama), $terlarang));
   }
 
   /**
