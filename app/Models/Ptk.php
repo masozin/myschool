@@ -15,7 +15,53 @@ class Ptk extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_ptk';
-  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'kode', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'jabatan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'kode', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'jabatan', 'peran_tambahan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+
+  /**
+   * Daftar role baku aplikasi (nama role bersifat case sensitive).
+   * Inilah satu-satunya sumber daftar role: RolesSeeder membuat
+   * semuanya di database, dan validasi peran tambahan mengacu ke sini.
+   */
+  public const PERAN_BAKU = [
+    'Admin',
+    'Kepala Sekolah',
+    'Operator Sekolah',
+    'Guru',
+    'Tata Usaha',
+    'Pustakawan',
+    'Bendahara',
+  ];
+
+  /**
+   * Role yang dikelola lewat data PTK (jabatan utama + peran tambahan).
+   * 'Admin' SENGAJA tidak termasuk: role itu dipasang manual di luar
+   * form PTK, jadi sinkronisasi role dari PTK tidak boleh menghapusnya.
+   */
+  public const PERAN_TERKELOLA = [
+    'Kepala Sekolah',
+    'Operator Sekolah',
+    'Guru',
+    'Tata Usaha',
+    'Pustakawan',
+    'Bendahara',
+  ];
+
+  /**
+   * Semua peran akses milik PTK ini: jabatan utama ditambah peran
+   * tambahan, tanpa duplikat dan tanpa nilai kosong. Inilah daftar
+   * yang diterapkan sebagai role Spatie pada akun user-nya.
+   */
+  public function semuaPeran(): array
+  {
+    $peran = array_merge(
+      [(string) ($this->jabatan ?? '')],
+      is_array($this->peran_tambahan) ? $this->peran_tambahan : []
+    );
+
+    $peran = array_map(fn($nama) => trim((string) $nama), $peran);
+
+    return array_values(array_unique(array_filter($peran, fn($nama) => $nama !== '')));
+  }
 
   /** Kode singkat guru: kolom kode bila diisi, selain itu inisial nama. */
   public function kodeGuru(): string
@@ -35,6 +81,7 @@ class Ptk extends Model
   protected $casts = [
     'tanggal_keluar' => 'date',
     'tanggal_lahir' => 'date',
+    'peran_tambahan' => 'array',
   ];
 
   protected $appends = ['nama_lengkap'];
