@@ -437,10 +437,10 @@
     @if ($isAdmin)
       @php
         $statAdmin = [
-            ['label' => 'Total Sekolah', 'value' => $jumlahSekolah, 'icon' => 'ri-building-line', 'tile' => 'bg-label-primary text-primary', 'badge' => 'Semua Jenjang', 'badgeClass' => 'bg-label-primary'],
-            ['label' => 'Total Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
-            ['label' => 'Total Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
-            ['label' => 'Total PTK Aktif', 'value' => $jumlahPtk, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info', 'badge' => 'Status aktif saja', 'badgeClass' => 'bg-label-info'],
+            ['label' => 'Total Sekolah', 'value' => $jumlahSekolah, 'icon' => 'ri-building-line', 'tile' => 'bg-label-primary text-primary'],
+            ['label' => 'Total Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success'],
+            ['label' => 'Total Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning'],
+            ['label' => 'Total PTK Aktif', 'value' => $jumlahPtk, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info'],
         ];
       @endphp
       @foreach ($statAdmin as $s)
@@ -451,7 +451,6 @@
               <div class="min-w-0">
                 <div class="db-stat-value">{{ number_format($s['value']) }}</div>
                 <p class="text-muted mb-0 small">{{ $s['label'] }}</p>
-                <small class="text-muted d-block" style="font-size:.72rem">{{ $s['badge'] }}</small>
               </div>
             </div>
           </div>
@@ -460,22 +459,21 @@
     @elseif($sekolah)
       @php
         $statSekolah = [
-            ['label' => 'Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success', 'badge' => 'Registrasi terbaru aktif', 'badgeClass' => 'bg-label-success'],
-            ['label' => 'Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning', 'badge' => 'Semester tampilan', 'badgeClass' => 'bg-label-warning'],
-            ['label' => 'Guru', 'value' => $jumlahGuru, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-info'],
-            ['label' => 'Tendik', 'value' => $jumlahTendik, 'icon' => 'ri-briefcase-line', 'tile' => 'bg-label-secondary text-secondary', 'badge' => 'PTK aktif', 'badgeClass' => 'bg-label-secondary'],
-            ['label' => 'Total PTK', 'value' => $jumlahGuru + $jumlahTendik, 'icon' => 'ri-team-line', 'tile' => 'bg-label-primary text-primary', 'badge' => 'Guru + Tendik', 'badgeClass' => 'bg-label-primary'],
+            ['label' => 'Siswa Aktif', 'value' => $jumlahSiswa, 'icon' => 'ri-group-line', 'tile' => 'bg-label-success text-success'],
+            ['label' => 'Rombel', 'value' => $jumlahRombel, 'icon' => 'ri-door-open-line', 'tile' => 'bg-label-warning text-warning'],
+            ['label' => 'Guru', 'value' => $jumlahGuru, 'icon' => 'ri-user-star-line', 'tile' => 'bg-label-info text-info'],
+            ['label' => 'Tendik', 'value' => $jumlahTendik, 'icon' => 'ri-briefcase-line', 'tile' => 'bg-label-secondary text-secondary'],
+            ['label' => 'Total PTK', 'value' => $jumlahGuru + $jumlahTendik, 'icon' => 'ri-team-line', 'tile' => 'bg-label-primary text-primary'],
         ];
       @endphp
       @foreach ($statSekolah as $s)
-        <div class="col-12 col-sm-6 col-lg-4 col-xxl">
+        <div class="col-12 col-sm-6 col-lg-4 col-xl">
           <div class="card db-card db-stat h-100">
             <div class="card-body d-flex align-items-center gap-3 py-4">
               <span class="db-stat-icon {{ $s['tile'] }}"><i class="ri {{ $s['icon'] }}"></i></span>
               <div class="min-w-0">
                 <div class="db-stat-value">{{ number_format($s['value']) }}</div>
                 <p class="text-muted mb-0 small">{{ $s['label'] }}</p>
-                <small class="text-muted d-block" style="font-size:.72rem">{{ $s['badge'] }}</small>
               </div>
             </div>
           </div>
@@ -773,7 +771,7 @@
               const val = row.cells[u] ?? 0;
               return `<td class="text-center">${val || '-'}</td>`;
             }).join('');
-            return `<tr><td class="fw-medium">Tingkat ${esc(row.tingkat)}</td>${cells}` +
+            return `<tr><td class="fw-medium">Tk ${esc(row.tingkat)}</td>${cells}` +
               `<td class="text-center fw-bold">${row.total}</td></tr>`;
           }).join('');
 
@@ -805,10 +803,13 @@
             container.innerHTML = '<div class="text-center text-muted py-4">Belum ada data.</div>';
             return;
           }
-          const thAgama = ["Isl", "Kri", "Kat", "Hin", "Bud", "Kon", "Lain"];
+          const singkatAgama = {
+            Islam: 'Isl', Kristen: 'Kri', Katolik: 'Kat', Hindu: 'Hin',
+            Buddha: 'Bud', Konghucu: 'Kon', Lainnya: 'Lain'
+          };
 
-          const thead = '<th>Tingkat</th>' + thAgama.map(a =>
-            `<th class="text-center">${esc(a)}</th>`).join('') +
+          const thead = '<th>Tingkat</th>' + json.agamaList.map(a =>
+            `<th class="text-center" title="${esc(a)}">${esc(singkatAgama[a] ?? a)}</th>`).join('') +
             '<th class="text-center fw-bold">Total</th>';
 
           const tbody = json.rows.map(row => {

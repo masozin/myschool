@@ -861,10 +861,17 @@ class SiswaController extends Controller
 
     ksort($rows);
 
+    // Tampilkan hanya agama yang ada isinya (total kolom > 0). Kolom
+    // kosong dibuang dari daftar, dari tiap baris, dan dari total kolom.
+    $agamaTampil = array_values(array_filter($agamaList, fn($a) => $colTotals[$a] > 0));
+    foreach ($rows as $tingkat => $row) {
+      $rows[$tingkat]['cells'] = array_intersect_key($row['cells'], array_flip($agamaTampil));
+    }
+
     return response()->json([
-      'agamaList'  => $agamaList,
+      'agamaList'  => $agamaTampil,
       'rows'       => array_values($rows),
-      'colTotals'  => $colTotals,
+      'colTotals'  => array_intersect_key($colTotals, array_flip($agamaTampil)),
       'grandTotal' => $grandTotal,
     ]);
   }
