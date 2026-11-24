@@ -63,6 +63,108 @@
       </div>
     </div>
 
+    {{-- Kartu dana & anggaran --}}
+    @php
+      $namaBulanKartu = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      $rp = fn($v) => 'Rp ' . number_format($v, 0, ',', '.');
+      $merah = fn($v) => $v < 0 ? 'text-danger' : '';
+      $bulanDana = $kartuDana['bulan'] ?? null;
+      $labelDana = $kartuDana['tahun'] === null
+          ? 'belum ada transaksi'
+          : ($bulanDana ? 's.d. akhir ' . $namaBulanKartu[$bulanDana] . ' ' : 'tahun ') . $kartuDana['tahun'];
+      $bulanAng = $kartuAnggaran['bulan'];
+      $labelAng = $bulanAng >= 1 ? 's.d. ' . $namaBulanKartu[$bulanAng] . ' ' . $kartuAnggaran['tahun'] : $kartuAnggaran['tahun'];
+    @endphp
+
+    <h6 class="mb-2">Posisi Dana <span class="text-muted fw-normal">&middot; {{ $labelDana }}</span></h6>
+    <div class="row g-3 mb-2">
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Total Dana Tersedia</div>
+            <div class="fw-bold {{ $merah($kartuDana['tersedia']) ?: 'text-primary' }}">{{ $rp($kartuDana['tersedia']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Dana Tunai</div>
+            <div class="fw-semibold {{ $merah($kartuDana['tunai']) }}">{{ $rp($kartuDana['tunai']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Dana Non Tunai (Bank)</div>
+            <div class="fw-semibold {{ $merah($kartuDana['bank']) }}">{{ $rp($kartuDana['bank']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Pajak Belum Disetor</div>
+            <div class="fw-semibold {{ $merah($kartuDana['pajak']) }}">{{ $rp($kartuDana['pajak']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Dana tersedia = tunai + non
+          tunai (tanpa pajak). Tunai = saldo awal tunai + pergeseran tunai − kas keluar. Non tunai = saldo awal bank +
+          terima dana + bunga bank − pajak bunga − tarik tunai − kas keluar non tunai. Pajak = pajak belanja diterima −
+          disetor. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
+        @if (!empty($kartuDana['takDikenal']['jml']))
+          <div class="small text-warning mt-1"><i class="icon-base ri ri-error-warning-line me-1"></i>{{ $kartuDana['takDikenal']['jml'] }}
+            transaksi dengan jenis BKU #{{ implode(', #', $kartuDana['takDikenal']['ids']) }} belum dipetakan dan tidak
+            ikut dihitung pada kartu dana.</div>
+        @endif
+      </div>
+    </div>
+
+    <h6 class="mb-2 mt-4">Anggaran <span class="text-muted fw-normal">&middot; {{ $labelAng }}</span></h6>
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-sm-4">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Bisa Dibelanjakan</div>
+            <div class="fw-semibold">{{ $rp($kartuAnggaran['bisa']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-4">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Sudah Dibelanjakan</div>
+            <div class="fw-semibold">{{ $rp($kartuAnggaran['sudah']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-4">
+        <div class="card h-100">
+          <div class="card-body py-3">
+            <div class="text-muted small">Anggaran Bulan Ini{{ $bulanAng >= 1 ? ' (' . $namaBulanKartu[$bulanAng] . ')' : '' }}</div>
+            <div class="fw-semibold">{{ $rp($kartuAnggaran['bulanIni']) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        @if ($bulanAng < 1)
+          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Belum ada bulan berjalan
+            pada tahun {{ $kartuAnggaran['tahun'] }}.</div>
+        @elseif (!$kartuAnggaran['ada'])
+          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Belum ada RKAS untuk tahun
+            {{ $kartuAnggaran['tahun'] }}.</div>
+        @else
+          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Terjadwal s.d. bulan ini
+            {{ $rp($kartuAnggaran['terjadwal']) }}. Bisa dibelanjakan = sisa jadwal baris yang belum terpenuhi; sudah
+            dibelanjakan = realisasi BKU belanja. Memakai versi RKAS disetujui terakhir, semua sumber dana — sama dengan
+            Kertas Kerja.</div>
+        @endif
+      </div>
+    </div>
+
     {{-- Saringan --}}
     <div class="card mb-4">
       <div class="card-body py-3">
