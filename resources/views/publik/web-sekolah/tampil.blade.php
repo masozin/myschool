@@ -234,11 +234,13 @@
               <div class="ws-agenda-isi">
                 <h3>{{ $a->kegiatan }}</h3>
                 <p>
-                  {{ $a->tanggal_mulai->translatedFormat('l, d F Y') }}
-                  @if ($a->tanggal_selesai && $a->tanggal_selesai->ne($a->tanggal_mulai))
-                    &ndash; {{ $a->tanggal_selesai->translatedFormat('l, d F Y') }}
-                  @endif
-                  &middot; {{ $a->jenis }}
+                  <span class="ws-agenda-wkt">
+                    {{ $a->tanggal_mulai->translatedFormat('l, d F Y') }}
+                    @if ($a->tanggal_selesai && $a->tanggal_selesai->ne($a->tanggal_mulai))
+                      <span class="ws-agenda-sd">&ndash; {{ $a->tanggal_selesai->translatedFormat('l, d F Y') }}</span>
+                    @endif
+                  </span>
+                  <span class="ws-agenda-jenis">{{ $a->jenis }}</span>
                 </p>
               </div>
               @if ($a->is_libur)

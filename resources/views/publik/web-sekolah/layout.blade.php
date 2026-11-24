@@ -433,7 +433,20 @@
     .ws-lencana{flex:none;font-size:.74rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 13px;border-radius:999px}
     .ws-lencana-libur{background:#fdecec;color:#b3261e}
     .ws-lencana-kegiatan{background:#e8f5e9;color:#1e7d32}
-    @media(max-width:560px){.ws-agenda-item{flex-wrap:wrap;gap:14px}}
+    .ws-agenda-jenis::before{content:"\00b7\00a0"}
+    @media(max-width:560px){
+      .ws-agenda{gap:12px}
+      .ws-agenda-item{display:grid;grid-template-columns:58px minmax(0,1fr);gap:2px 14px;align-items:start;padding:14px 16px}
+      .ws-agenda-item:hover{transform:none}
+      .ws-agenda-tgl{grid-row:1 / span 2;width:58px;padding:9px 2px;border-radius:12px}
+      .ws-agenda-tgl .ws-d{font-size:1.35rem}
+      .ws-agenda-isi{grid-column:2;overflow-wrap:anywhere}
+      .ws-agenda-isi h3{font-size:1rem}
+      .ws-agenda-isi p{font-size:.86rem;line-height:1.5}
+      .ws-agenda-wkt,.ws-agenda-sd,.ws-agenda-jenis{display:block}
+      .ws-agenda-jenis::before{content:none}
+      .ws-lencana{grid-column:2;justify-self:start;margin-top:8px;font-size:.7rem;padding:5px 11px}
+    }
 
     /* ── Dewan guru ─────────────────────────────────────── */
     .ws-guru{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
