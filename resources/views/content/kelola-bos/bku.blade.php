@@ -71,7 +71,9 @@
       $bulanDana = $kartuDana['bulan'] ?? null;
       $labelDana = $kartuDana['tahun'] === null
           ? 'belum ada transaksi'
-          : ($bulanDana ? 's.d. akhir ' . $namaBulanKartu[$bulanDana] . ' ' : 'tahun ') . $kartuDana['tahun'];
+          : ($bulanDana
+              ? 's.d. akhir ' . $namaBulanKartu[$bulanDana] . ' ' . $kartuDana['tahun']
+              : ($kartuDana['tahun'] < (int) now()->format('Y') ? 'akhir tahun ' : 'posisi terakhir tahun ') . $kartuDana['tahun']);
       $bulanAng = $kartuAnggaran['bulan'];
       $labelAng = $bulanAng >= 1 ? 's.d. ' . $namaBulanKartu[$bulanAng] . ' ' . $kartuAnggaran['tahun'] : $kartuAnggaran['tahun'];
     @endphp
@@ -105,16 +107,17 @@
       <div class="col-6 col-md-3">
         <div class="card h-100">
           <div class="card-body py-3">
-            <div class="text-muted small">Pajak Belum Disetor</div>
+            <div class="text-muted small">Jumlah Pajak Belanja</div>
             <div class="fw-semibold {{ $merah($kartuDana['pajak']) }}">{{ $rp($kartuDana['pajak']) }}</div>
           </div>
         </div>
       </div>
       <div class="col-12">
         <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Dana tersedia = tunai + non
-          tunai (tanpa pajak). Tunai = saldo awal tunai + pergeseran tunai − kas keluar. Non tunai = saldo awal bank +
-          terima dana + bunga bank − pajak bunga − tarik tunai − kas keluar non tunai. Pajak = pajak belanja diterima −
-          disetor. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
+          tunai. Dihitung per anggaran dari saldo awal bulan terakhir (saldo penutup bulan sebelumnya) ditambah
+          transaksi sesudahnya: tunai + pergeseran tunai − kas keluar; non tunai + terima dana + bunga bank − pajak
+          bunga − tarik tunai − kas keluar non tunai. Jumlah pajak = pajak belanja yang tercatat sejak Januari s.d.
+          posisi ini, tidak memengaruhi dana. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
         @if (!empty($kartuDana['takDikenal']['jml']))
           <div class="small text-warning mt-1"><i class="icon-base ri ri-error-warning-line me-1"></i>{{ $kartuDana['takDikenal']['jml'] }}
             transaksi dengan jenis BKU #{{ implode(', #', $kartuDana['takDikenal']['ids']) }} belum dipetakan dan tidak
