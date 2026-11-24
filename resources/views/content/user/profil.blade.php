@@ -55,9 +55,15 @@
                 alt="User avatar" style="height: 120px; width: 120px;" />
               <div class="user-info text-center">
                 <h5>{{ $user->Ptk->nama_ptk ?? $user->name }}</h5>
-                <span class="badge bg-label-primary rounded-pill">
-                  {{ $user->roles->pluck('name')->first() ?? 'User' }}
-                </span>
+                @forelse ($user->roles->pluck('name') as $namaPeran)
+                  <span class="badge bg-label-primary rounded-pill">
+                    {{ $namaPeran }}
+                  </span>
+                @empty
+                  <span class="badge bg-label-primary rounded-pill">
+                    User
+                  </span>
+                @endforelse
               </div>
             </div>
           </div>

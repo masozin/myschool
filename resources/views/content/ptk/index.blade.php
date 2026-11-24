@@ -113,6 +113,19 @@
           <label for="jabatan">Jabatan</label>
         </div>
 
+        <div class="mb-5">
+          <label class="form-label">Peran Tambahan</label>
+          @foreach (\App\Models\Ptk::PERAN_TERKELOLA as $peran)
+            <div class="form-check">
+              <input class="form-check-input peran-tambahan-item" type="checkbox" name="peran_tambahan[]"
+                value="{{ $peran }}" id="peran-tambahan-{{ $loop->index }}" />
+              <label class="form-check-label" for="peran-tambahan-{{ $loop->index }}">{{ $peran }}</label>
+            </div>
+          @endforeach
+          <small class="text-muted">Peran di luar jabatan utama — mis. guru yang juga operator atau bendahara
+            sekolah. Boleh lebih dari satu.</small>
+        </div>
+
         <div class="form-floating form-floating-outline mb-5">
           <select id="jenis_kepegawaian" name="jenis_kepegawaian" class="form-select">
             <option value="">pilih jenis kepegawaian</option>
@@ -226,6 +239,31 @@
       // const isAdmin = window.hasRole('Admin');
       const judulForm = document.getElementById('offcanvas-label'); // Sesuaikan dengan ID di Blade
 
+      // --- Peran Tambahan (multi-role) ---
+      // Checkbox yang sama dengan jabatan utama dinonaktifkan dan
+      // dibersihkan: peran itu sudah tercakup sebagai peran utama.
+      const segarkanPeranTambahan = () => {
+        const jabatan = document.getElementById('jabatan').value;
+        document.querySelectorAll('.peran-tambahan-item').forEach(cb => {
+          if (cb.value === jabatan) {
+            cb.checked = false;
+            cb.disabled = true;
+          } else {
+            cb.disabled = false;
+          }
+        });
+      };
+
+      const isiPeranTambahan = daftar => {
+        const terpilih = Array.isArray(daftar) ? daftar : [];
+        document.querySelectorAll('.peran-tambahan-item').forEach(cb => {
+          cb.checked = terpilih.includes(cb.value);
+        });
+        segarkanPeranTambahan();
+      };
+
+      document.getElementById('jabatan').addEventListener('change', segarkanPeranTambahan);
+
       // 1. Inisialisasi Kolom
       let columns = [{
         data: null
@@ -236,6 +274,10 @@
       }, {
         data: 'jabatan',
         render: function(data, type, full) {
+          const tambahan = Array.isArray(full.peran_tambahan) ? full.peran_tambahan : [];
+          if (type !== 'display') {
+            return [data, ...tambahan].filter(Boolean).join(' ');
+          }
           const petaStatus = {
             aktif: ['Aktif', 'bg-label-success'],
             tidak_aktif: ['Tidak Aktif', 'bg-label-secondary'],
@@ -243,7 +285,11 @@
           };
           const status = petaStatus[full.status] ? full.status : 'aktif';
           const [labelStatus, kelasStatus] = petaStatus[status];
-          let html = `${data ?? '-'}<br><span class="badge ${kelasStatus} mt-1">${labelStatus}</span>`;
+          let html = `<span class="badge bg-label-primary">${data ?? '-'}</span>`;
+          tambahan.forEach(peran => {
+            html += ` <span class="badge bg-label-info">${peran}</span>`;
+          });
+          html += `<br><span class="badge ${kelasStatus} mt-1">${labelStatus}</span>`;
           if (status !== 'aktif' && full.tanggal_keluar) {
             html += `<br><small class="text-muted">Keluar: ${String(full.tanggal_keluar).slice(0, 10)}</small>`;
           }
@@ -532,6 +578,7 @@
               // Reset Form & Validasi
               formPtk.reset();
               fv.resetForm(true);
+              segarkanPeranTambahan();
               window.dtPtk.ajax.reload(null, false);
             } else if (response.status === 422) {
               const errors = res.errors;
@@ -596,6 +643,7 @@
           saveMode = 'add';
           formPtk.reset();
           fv.resetForm(true);
+          segarkanPeranTambahan();
           judulForm.innerHTML = 'Tambah PTK Baru';
           document.getElementById('photo-preview').src = '{{ asset('assets/img/avatars/1.png') }}';
           document.getElementById('hapus-photo-wrap').style.display = 'none';
@@ -642,6 +690,7 @@
             document.getElementById('kode').value = data.kode || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';
             document.getElementById('jabatan').value = data.jabatan || '';
+            isiPeranTambahan(data.peran_tambahan || []);
             document.getElementById('jenis_kepegawaian').value = data.jenis_kepegawaian || '';
 
             // Jika Admin, set value Select2/Select Sekolah
