@@ -295,7 +295,8 @@
       "roles": [
         "Admin",
         "Operator Sekolah",
-        "Kepala Sekolah"
+        "Kepala Sekolah",
+        "Bendahara"
       ],
       "fitur": "kelola-bos",
       "submenu": [
@@ -306,7 +307,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {
@@ -316,7 +318,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {
@@ -326,7 +329,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {
@@ -336,7 +340,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {
@@ -346,7 +351,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {
@@ -356,7 +362,8 @@
           "roles": [
             "Admin",
             "Operator Sekolah",
-            "Kepala Sekolah"
+            "Kepala Sekolah",
+            "Bendahara"
           ]
         },
         {

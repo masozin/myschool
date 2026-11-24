@@ -842,11 +842,12 @@ Route::controller(SuratKeluarController::class)
 |--------------------------------------------------------------------------
 | Tampilan read-only cermin data ARKAS: Kertas Kerja
 | (rapbs) dan BKU (kas_umum), disinkronkan agen dari laptop
-| ARKAS lewat /api/bos/sinkron. Operator Sekolah & Kepala
-| Sekolah melihat sekolahnya, Admin memantau per sekolah
-| terpilih. Cermin bersifat hanya baca; penulisannya
-| hanya lapisan kerja: nama alias tampilan (Fase 1.7)
-| dan token agen sinkron (Fase 1.12).
+| ARKAS lewat /api/bos/sinkron. Operator Sekolah, Kepala
+| Sekolah & Bendahara (hanya membaca) melihat sekolahnya,
+| Admin memantau per sekolah terpilih. Cermin bersifat
+| hanya baca; penulisannya hanya lapisan kerja: nama
+| alias tampilan (Fase 1.7) dan token agen sinkron
+| (Fase 1.12).
 */
 Route::controller(KelolaBosController::class)
   ->prefix('kelola-bos')
@@ -854,26 +855,26 @@ Route::controller(KelolaBosController::class)
   ->middleware(['auth:sanctum', 'fitur:kelola-bos'])
   ->group(function () {
     Route::get('/kertas-kerja', 'kertasKerja')->name('kertas-kerja')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/bku', 'bku')->name('bku')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/kegiatan', 'referensiKegiatan')->name('referensi.kegiatan')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/rekening', 'referensiRekening')->name('referensi.rekening')
-      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     // Nama alias (Fase 1.7) — satu-satunya penulisan Kelola
     // BOS; lapisan kerja pengguna, bukan data cermin ARKAS.
-    // Kepala Sekolah hanya membaca, jadi tidak ikut di sini.
+    // Kepala Sekolah & Bendahara hanya membaca, jadi tidak ikut di sini.
     Route::post('/alias', 'simpanAlias')->name('alias.simpan')
       ->middleware('role:Admin|Operator Sekolah');
     // Token sinkron (Fase 1.12) — pembuatan token agen
     // dari web; penulisan lapisan kerja kedua. Kepala
-    // Sekolah tidak mengelola kunci akses, jadi halaman
-    // maupun aksinya tertutup untuknya.
+    // Sekolah & Bendahara tidak mengelola kunci akses,
+    // jadi halaman maupun aksinya tertutup untuk mereka.
     Route::get('/token', 'token')->name('token')
       ->middleware('role:Admin|Operator Sekolah');
     Route::post('/token/buat', 'tokenBuat')->name('token.buat')
