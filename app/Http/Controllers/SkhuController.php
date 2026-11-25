@@ -74,8 +74,10 @@ class SkhuController extends Controller
     $siswaAkhir = $this->getSiswaKelasAkhir($sekolah->id, $semester->id, $tingkatAkhir);
 
     // Guru hanya melihat siswa pada rombel yang ia wali kelasi —
-    // guru lain tidak diberi akses ke SKHU siswa tersebut
-    if ($user->hasRole('Guru')) {
+    // guru lain tidak diberi akses ke SKHU siswa tersebut.
+    // Pengecualian multi-role: Guru yang juga Operator Sekolah
+    // melihat seluruh sekolah, sesuai peran Operator-nya.
+    if ($user->hasRole('Guru') && !$user->hasRole('Operator Sekolah')) {
       $siswaAkhir = $siswaAkhir
         ->filter(fn($anggota) => (int) ($anggota->rombel->ptk_id ?? 0) === (int) $user->ptk?->id)
         ->values();
@@ -299,8 +301,9 @@ class SkhuController extends Controller
       ->whereHas('siswa', fn($q) => $q->where('id', $siswaId))
       ->firstOrFail();
 
-    // Guru hanya boleh membuka siswa rombelnya sendiri
-    if ($user->hasRole('Guru') && (int) $anggota->rombel->ptk_id !== (int) $user->ptk?->id) {
+    // Guru hanya boleh membuka siswa rombelnya sendiri;
+    // Guru yang juga Operator Sekolah boleh membuka siswa se-sekolah
+    if ($user->hasRole('Guru') && !$user->hasRole('Operator Sekolah') && (int) $anggota->rombel->ptk_id !== (int) $user->ptk?->id) {
       abort(403, 'Anda bukan wali kelas siswa ini.');
     }
 
@@ -370,8 +373,9 @@ class SkhuController extends Controller
     $sekolahId = Auth::user()->ptk->sekolah_id
       ?? $siswa->registrasiTerbaru?->sekolah_id;
 
-    // Guru hanya boleh menyimpan SKHU siswa rombelnya sendiri
-    if (Auth::user()->hasRole('Guru')) {
+    // Guru hanya boleh menyimpan SKHU siswa rombelnya sendiri;
+    // Guru yang juga Operator Sekolah boleh menyimpan se-sekolah
+    if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
       $this->abortUnlessWaliKelas($siswa->id, (int) $sekolahId, (int) $semester->id);
     }
 
@@ -446,8 +450,9 @@ class SkhuController extends Controller
 
     $this->abortJikaTerkunci((int) $skhu->sekolah_id, (int) $skhu->semester_id);
 
-    // Guru hanya boleh mengubah SKHU siswa rombelnya sendiri
-    if ($user->hasRole('Guru')) {
+    // Guru hanya boleh mengubah SKHU siswa rombelnya sendiri;
+    // Guru yang juga Operator Sekolah boleh mengubah se-sekolah
+    if ($user->hasRole('Guru') && !$user->hasRole('Operator Sekolah')) {
       $this->abortUnlessWaliKelas((int) $skhu->siswa_id, (int) $skhu->sekolah_id, (int) $skhu->semester_id);
     }
 

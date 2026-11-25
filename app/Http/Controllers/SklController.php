@@ -173,10 +173,14 @@ class SklController extends Controller
       ->all();
   }
 
-  /** Penjaga per-SKL untuk Guru: hanya siswa rombelnya sendiri. */
+  /**
+   * Penjaga per-SKL untuk Guru: hanya siswa rombelnya sendiri.
+   * Pengecualian multi-role: Guru yang juga Operator Sekolah
+   * mengelola SKL se-sekolah, sesuai peran Operator-nya.
+   */
   private function abortUnlessWaliKelasSkl(Skl $skl): void
   {
-    if (!Auth::user()->hasRole('Guru')) {
+    if (!Auth::user()->hasRole('Guru') || Auth::user()->hasRole('Operator Sekolah')) {
       return;
     }
 
@@ -199,7 +203,7 @@ class SklController extends Controller
   {
     $query->where('sekolah_id', $this->getSekolahId());
 
-    if (Auth::user()->hasRole('Guru')) {
+    if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
       $query->whereIn(
         'siswa_id',
         $this->siswaIdsWaliKelas($this->getSekolahId(), (int) Semester::smtIdKelulusan())
@@ -277,8 +281,9 @@ class SklController extends Controller
         });
     })->orderBy('nama_siswa');
 
-    // Guru hanya melihat siswa pada rombel yang ia wali kelasi
-    if (Auth::user()->hasRole('Guru')) {
+    // Guru hanya melihat siswa pada rombel yang ia wali kelasi;
+    // Guru yang juga Operator Sekolah melihat seluruh sekolah
+    if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
       $siswaQuery->whereIn('id', $this->siswaIdsWaliKelas($sekolahId, (int) $semesterId));
     }
 
@@ -394,8 +399,9 @@ class SklController extends Controller
 
     $request->validate(['siswa_id' => 'required|exists:tabel_siswa,id']);
 
-    // Guru hanya boleh membuat SKL untuk siswa rombelnya sendiri
-    if (Auth::user()->hasRole('Guru')) {
+    // Guru hanya boleh membuat SKL untuk siswa rombelnya sendiri;
+    // Guru yang juga Operator Sekolah boleh membuat untuk se-sekolah
+    if (Auth::user()->hasRole('Guru') && !Auth::user()->hasRole('Operator Sekolah')) {
       $ids = $this->siswaIdsWaliKelas($this->getSekolahId(), (int) Semester::smtIdKelulusan());
       abort_unless(
         in_array((int) $request->siswa_id, $ids, true),
