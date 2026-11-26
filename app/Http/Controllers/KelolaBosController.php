@@ -1406,6 +1406,11 @@ class KelolaBosController extends Controller
       return view('content.kelola-bos.bku', $konteks + [
         'baris' => null,
         'totalNominal' => 0,
+        'totalAnggaran' => 0,
+        'tahunAnggaran' => (int) now()->format('Y'),
+        'sumberTerpilih' => null,
+        'namaSumberTerpilih' => null,
+        'daftarSumberDana' => collect(),
         'daftarTahun' => [],
         'daftarJenis' => collect(),
         'daftarRekening' => collect(),
@@ -1461,6 +1466,39 @@ class KelolaBosController extends Controller
     };
 
     $totalNominal = (float) $saring($dasar())->sum('bos_kas_umum.saldo');
+
+    // Angka kepala halaman: total anggaran tahun berjalan
+    // (tahun efektif halaman; "semua tahun" = tahun kalender
+    // berjalan) untuk sumber dana terpilih — menggantikan
+    // total nominal saringan yang menjumlah semua jenis BKU
+    // sekaligus sehingga uang yang sama terhitung berulang.
+    // Pilihan sumber mengikuti pola Kertas Kerja: parameter
+    // tidak dikirim = bawaan (BOS Reguler bila ada); dikirim
+    // kosong secara eksplisit = semua sumber dana. Totalnya
+    // jumlah baris RAPBS versi disetujui terakhir, definisi
+    // yang sama dengan ringkasan Kertas Kerja.
+    $tahunAnggaran = $tahunEfektif ?? (int) now()->format('Y');
+    $kelompok = $this->kelompokVersi($sekolahId);
+    $sumberTerpilih = $request->filled('sumber_dana')
+      ? $request->integer('sumber_dana')
+      : ($request->has('sumber_dana') ? null : $this->sumberBawaan($kelompok, $tahunAnggaran));
+    $idsAnggaran = $this->pilihVersiIds($kelompok, $tahunAnggaran, $sumberTerpilih, null);
+    $totalAnggaran = $idsAnggaran
+      ? (float) BosRapbs::where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->whereIn('id_anggaran_arkas', $idsAnggaran)
+        ->sum('jumlah')
+      : 0.0;
+    $namaSumberTerpilih = null;
+    if ($sumberTerpilih !== null) {
+      foreach ($kelompok as $k) {
+        if ($k['tahun'] === $tahunAnggaran && $k['sumber'] === $sumberTerpilih) {
+          $namaSumberTerpilih = $k['nama_sumber'];
+          break;
+        }
+      }
+      $namaSumberTerpilih ??= 'Sumber dana #' . $sumberTerpilih;
+    }
 
     // Kartu dana & anggaran di atas tabel (tidak ikut saringan
     // jenis/rekening/pencarian). Saat "Semua tahun" dipilih, kartu dana
@@ -1528,6 +1566,11 @@ class KelolaBosController extends Controller
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
+      'totalAnggaran' => $totalAnggaran,
+      'tahunAnggaran' => $tahunAnggaran,
+      'sumberTerpilih' => $sumberTerpilih,
+      'namaSumberTerpilih' => $namaSumberTerpilih,
+      'daftarSumberDana' => $this->daftarSumberDana($sekolahId),
       'kartuDana' => $kartuDana,
       'kartuAnggaran' => $kartuAnggaran,
       'daftarTahun' => $daftarTahun,

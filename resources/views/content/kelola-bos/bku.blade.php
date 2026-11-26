@@ -57,8 +57,9 @@
           </p>
         </div>
         <div class="text-end">
-          <div class="text-muted small">Total nominal sesuai saringan</div>
-          <h5 class="mb-0">Rp {{ number_format($totalNominal, 0, ',', '.') }}</h5>
+          <div class="text-muted small">Anggaran {{ $tahunAnggaran ?? now()->format('Y') }} &middot;
+            {{ $namaSumberTerpilih ?? 'Semua Sumber Dana' }}</div>
+          <h5 class="mb-0">Rp {{ number_format($totalAnggaran ?? 0, 0, ',', '.') }}</h5>
         </div>
       </div>
     </div>
@@ -191,6 +192,17 @@
             </select>
           </div>
           <div class="col-6 col-md-2">
+            <label class="form-label">Sumber Dana</label>
+            <select name="sumber_dana" class="form-select">
+              <option value="">Semua</option>
+              @foreach ($daftarSumberDana ?? [] as $sd)
+                <option value="{{ $sd->id_ref_sumber_dana }}"
+                  {{ ($sumberTerpilih ?? null) === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
+                  {{ $sd->nama_sumber_dana }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
             <label class="form-label">Jenis BKU</label>
             <select name="jenis" class="form-select">
               <option value="">Semua jenis</option>
@@ -200,7 +212,7 @@
               @endforeach
             </select>
           </div>
-          <div class="col-6 col-md-3">
+          <div class="col-6 col-md-2">
             <label class="form-label">Rekening</label>
             <select name="rekening" class="form-select">
               <option value="">Semua rekening</option>
@@ -210,7 +222,7 @@
               @endforeach
             </select>
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-2">
             <label class="form-label">Pencarian</label>
             <input type="text" name="cari" class="form-control" value="{{ request('cari') }}"
               placeholder="Uraian, no bukti, nama toko…">
