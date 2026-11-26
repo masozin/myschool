@@ -82,6 +82,35 @@
         </div>
 
         <div class="form-floating form-floating-outline mb-5">
+          <input type="text" class="form-control" id="npwp" name="npwp"
+            placeholder="NPWP" maxlength="30" />
+          <label for="npwp">NPWP (untuk SPJ, opsional)</label>
+        </div>
+
+        <div class="form-floating form-floating-outline mb-5">
+          <textarea class="form-control" id="alamat" name="alamat" rows="2" maxlength="1000"
+            placeholder="Alamat" style="height: 80px"></textarea>
+          <label for="alamat">Alamat (opsional)</label>
+        </div>
+
+        <div class="row">
+          <div class="col-6">
+            <div class="form-floating form-floating-outline mb-5">
+              <input type="text" class="form-control" id="no_rekening" name="no_rekening"
+                placeholder="Nomor Rekening" maxlength="30" />
+              <label for="no_rekening">Nomor Rekening (SPJ)</label>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="form-floating form-floating-outline mb-5">
+              <input type="text" class="form-control" id="nama_bank" name="nama_bank"
+                placeholder="Nama Bank" maxlength="100" />
+              <label for="nama_bank">Nama Bank (SPJ)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-floating form-floating-outline mb-5">
           <input type="text" class="form-control" id="tempat_lahir" name="tempat_lahir"
             placeholder="Tempat Lahir" maxlength="100" />
           <label for="tempat_lahir">Tempat Lahir (opsional)</label>
@@ -167,6 +196,64 @@
             <label for="sekolah_id">Sekolah</label>
           </div>
         @endhasrole
+
+        <div class="mb-5">
+          <h6 class="mb-2">Riwayat Kepangkatan</h6>
+          <div id="pangkat-info-baru" class="alert alert-secondary py-2 px-3 small mb-0">
+            Simpan PTK terlebih dahulu, lalu tambahkan riwayat kepangkatan.
+          </div>
+          <div id="pangkat-aktif" style="display: none">
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered mb-3">
+                <thead>
+                  <tr>
+                    <th>Pangkat</th>
+                    <th>Golongan</th>
+                    <th>TMT</th>
+                    <th>Nomor SK</th>
+                    <th>Tanggal SK</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="daftar-pangkat-body">
+                  <tr>
+                    <td colspan="6" class="text-center text-muted">Belum ada riwayat kepangkatan.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label" for="pangkat-baru">Pangkat</label>
+                <input type="text" class="form-control form-control-sm" id="pangkat-baru"
+                  placeholder="mis. Penata" maxlength="100" />
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="golongan-baru">Golongan</label>
+                <input type="text" class="form-control form-control-sm" id="golongan-baru"
+                  placeholder="mis. III/c" maxlength="10" />
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="tmt-baru">TMT</label>
+                <input type="date" class="form-control form-control-sm" id="tmt-baru" />
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="nomor-sk-baru">Nomor SK (opsional)</label>
+                <input type="text" class="form-control form-control-sm" id="nomor-sk-baru"
+                  placeholder="Nomor SK" maxlength="100" />
+              </div>
+              <div class="col-6">
+                <label class="form-label" for="tanggal-sk-baru">Tanggal SK (opsional)</label>
+                <input type="date" class="form-control form-control-sm" id="tanggal-sk-baru" />
+              </div>
+            </div>
+            <button type="button" id="btn-tambah-pangkat" class="btn btn-outline-primary btn-sm mt-3">
+              <i class="ri-add-line me-1"></i> Tambah Riwayat
+            </button>
+            <small class="text-muted d-block mt-2">Pangkat/golongan yang berlaku adalah entri dengan TMT
+              terbaru — dipakai untuk daftar penerima SPJ.</small>
+          </div>
+        </div>
 
         <button type="submit" id="submit" class="btn btn-primary me-sm-3 me-1 data-submit">Simpan</button>
         <button type="reset" class="btn btn-outline-danger" data-bs-dismiss="offcanvas">Batal</button>
@@ -263,6 +350,120 @@
       };
 
       document.getElementById('jabatan').addEventListener('change', segarkanPeranTambahan);
+
+      // --- Riwayat Kepangkatan (data SPJ) ---
+      // Seksi ini hanya aktif pada mode edit: riwayat melekat pada PTK
+      // yang sudah tersimpan. Input mini di sini SENGAJA tanpa atribut
+      // name agar tidak ikut terkirim bersama form utama PTK.
+      const seksiPangkatAktif = document.getElementById('pangkat-aktif');
+      const infoPangkatBaru = document.getElementById('pangkat-info-baru');
+      const badanPangkat = document.getElementById('daftar-pangkat-body');
+      const idInputPangkat = ['pangkat-baru', 'golongan-baru', 'tmt-baru', 'nomor-sk-baru', 'tanggal-sk-baru'];
+      const csrfPangkat = () => document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      const lolosHtml = teks => String(teks ?? '').replace(/[&<>"']/g, huruf => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[huruf]));
+      const tanggalSingkat = nilai => nilai ? String(nilai).slice(0, 10) : '-';
+
+      const gambarPangkat = daftar => {
+        if (!Array.isArray(daftar) || daftar.length === 0) {
+          badanPangkat.innerHTML =
+            '<tr><td colspan="6" class="text-center text-muted">Belum ada riwayat kepangkatan.</td></tr>';
+          return;
+        }
+        badanPangkat.innerHTML = daftar.map(r => `
+          <tr>
+            <td>${lolosHtml(r.pangkat)}</td>
+            <td>${lolosHtml(r.golongan)}</td>
+            <td>${tanggalSingkat(r.tmt)}</td>
+            <td>${lolosHtml(r.nomor_sk) || '-'}</td>
+            <td>${r.tanggal_sk ? tanggalSingkat(r.tanggal_sk) : '-'}</td>
+            <td class="text-center">
+              <button type="button" class="btn btn-icon btn-text-danger btn-sm rounded-pill hapus-pangkat"
+                data-id="${r.id}" title="Hapus riwayat">
+                <i class="icon-base ri ri-delete-bin-7-line"></i>
+              </button>
+            </td>
+          </tr>`).join('');
+      };
+
+      const muatPangkat = async id => {
+        badanPangkat.innerHTML =
+          '<tr><td colspan="6" class="text-center text-muted">Memuat…</td></tr>';
+        try {
+          const response = await fetch(`/ptk/${id}/pangkat`, {
+            headers: {
+              Accept: 'application/json'
+            }
+          });
+          const res = await response.json();
+          if (!response.ok) {
+            throw new Error(res.message || 'Gagal memuat riwayat kepangkatan.');
+          }
+          gambarPangkat(res.data || []);
+        } catch (error) {
+          badanPangkat.innerHTML =
+            '<tr><td colspan="6" class="text-center text-danger">Gagal memuat riwayat kepangkatan.</td></tr>';
+        }
+      };
+
+      const aturModePangkat = modeEdit => {
+        seksiPangkatAktif.style.display = modeEdit ? '' : 'none';
+        infoPangkatBaru.style.display = modeEdit ? 'none' : '';
+        if (!modeEdit) {
+          idInputPangkat.forEach(idInput => {
+            document.getElementById(idInput).value = '';
+          });
+          badanPangkat.innerHTML =
+            '<tr><td colspan="6" class="text-center text-muted">Belum ada riwayat kepangkatan.</td></tr>';
+        }
+      };
+
+      document.getElementById('btn-tambah-pangkat')?.addEventListener('click', async function() {
+        if (!globalId) {
+          return;
+        }
+        const muatan = {
+          pangkat: document.getElementById('pangkat-baru').value.trim(),
+          golongan: document.getElementById('golongan-baru').value.trim(),
+          tmt: document.getElementById('tmt-baru').value,
+          nomor_sk: document.getElementById('nomor-sk-baru').value.trim() || null,
+          tanggal_sk: document.getElementById('tanggal-sk-baru').value || null
+        };
+        if (!muatan.pangkat || !muatan.golongan || !muatan.tmt) {
+          Swal.fire('Perhatian', 'Pangkat, golongan, dan TMT wajib diisi.', 'warning');
+          return;
+        }
+        try {
+          const response = await fetch(`/ptk/${globalId}/pangkat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': csrfPangkat(),
+              Accept: 'application/json'
+            },
+            body: JSON.stringify(muatan)
+          });
+          const res = await response.json();
+          if (!response.ok) {
+            if (response.status === 422 && res.errors) {
+              throw new Error(Object.values(res.errors).flat()[0]);
+            }
+            throw new Error(res.message || 'Gagal menambah riwayat kepangkatan.');
+          }
+          idInputPangkat.forEach(idInput => {
+            document.getElementById(idInput).value = '';
+          });
+          Swal.fire('Berhasil', res.message, 'success');
+          muatPangkat(globalId);
+        } catch (error) {
+          Swal.fire('Gagal', error.message, 'error');
+        }
+      });
 
       // 1. Inisialisasi Kolom
       let columns = [{
@@ -641,9 +842,15 @@
         // Tombol Tambah (Pastikan tombol di card-header punya class atau ID ini)
         if (e.target.closest('[data-bs-target="#offcanvasPtk"]') && !e.target.closest('.edit-data')) {
           saveMode = 'add';
+          globalId = null;
           formPtk.reset();
           fv.resetForm(true);
           segarkanPeranTambahan();
+          document.getElementById('npwp').value = '';
+          document.getElementById('alamat').value = '';
+          document.getElementById('no_rekening').value = '';
+          document.getElementById('nama_bank').value = '';
+          aturModePangkat(false);
           judulForm.innerHTML = 'Tambah PTK Baru';
           document.getElementById('photo-preview').src = '{{ asset('assets/img/avatars/1.png') }}';
           document.getElementById('hapus-photo-wrap').style.display = 'none';
@@ -688,10 +895,18 @@
             }
             document.getElementById('nip').value = data.nip || '';
             document.getElementById('kode').value = data.kode || '';
+            document.getElementById('npwp').value = data.npwp || '';
+            document.getElementById('alamat').value = data.alamat || '';
+            document.getElementById('no_rekening').value = data.no_rekening || '';
+            document.getElementById('nama_bank').value = data.nama_bank || '';
             document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';
             document.getElementById('jabatan').value = data.jabatan || '';
             isiPeranTambahan(data.peran_tambahan || []);
             document.getElementById('jenis_kepegawaian').value = data.jenis_kepegawaian || '';
+
+            // Riwayat kepangkatan dimuat terpisah lewat endpoint-nya
+            aturModePangkat(true);
+            muatPangkat(data.id);
 
             // Jika Admin, set value Select2/Select Sekolah
             if (isAdmin && data.sekolah_id) {
@@ -707,6 +922,45 @@
               title: 'Error',
               text: 'Data tidak ditemukan di tabel'
             });
+          }
+        }
+
+        // Tombol Hapus Riwayat Kepangkatan
+        const pangkatBtn = e.target.closest('.hapus-pangkat');
+        if (pangkatBtn && globalId) {
+          const riwayatId = pangkatBtn.dataset.id;
+          const konfirmasi = await Swal.fire({
+            title: 'Hapus riwayat ini?',
+            text: 'Entri riwayat kepangkatan ini akan dihapus.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal',
+            customClass: {
+              confirmButton: 'btn btn-danger me-3',
+              cancelButton: 'btn btn-outline-secondary'
+            },
+            buttonsStyling: false
+          });
+
+          if (konfirmasi.isConfirmed) {
+            try {
+              const response = await fetch(`/ptk/${globalId}/pangkat/${riwayatId}`, {
+                method: 'DELETE',
+                headers: {
+                  'X-CSRF-TOKEN': csrfPangkat(),
+                  Accept: 'application/json'
+                }
+              });
+              const res = await response.json();
+              if (!response.ok) {
+                throw new Error(res.message || 'Gagal menghapus riwayat kepangkatan.');
+              }
+              Swal.fire('Berhasil', res.message, 'success');
+              muatPangkat(globalId);
+            } catch (error) {
+              Swal.fire('Gagal', error.message, 'error');
+            }
           }
         }
 

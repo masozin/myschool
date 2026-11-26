@@ -61,6 +61,10 @@ class PtkController extends Controller
       'photo'         => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip',
+      'npwp'          => 'nullable|string|max:30',
+      'alamat'        => 'nullable|string|max:1000',
+      'no_rekening'   => 'nullable|string|max:30',
+      'nama_bank'     => 'nullable|string|max:100',
       'jenis_kelamin' => 'required|in:L,P',
       'jabatan'       => [
         'required',
@@ -147,6 +151,10 @@ class PtkController extends Controller
       'photo'         => $pathFoto,
       'kode'          => $validated['kode'] ?? null,
       'nip'           => $validated['nip'],
+      'npwp'          => $validated['npwp'] ?? null,
+      'alamat'        => $validated['alamat'] ?? null,
+      'no_rekening'   => $validated['no_rekening'] ?? null,
+      'nama_bank'     => $validated['nama_bank'] ?? null,
       'jenis_kelamin' => $validated['jenis_kelamin'],
       'jabatan'       => $validated['jabatan'],
       'peran_tambahan' => $peranTambahan ?: null,
@@ -181,6 +189,10 @@ class PtkController extends Controller
       'hapus_photo'   => 'nullable|boolean',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip,' . $id,
+      'npwp'          => 'nullable|string|max:30',
+      'alamat'        => 'nullable|string|max:1000',
+      'no_rekening'   => 'nullable|string|max:30',
+      'nama_bank'     => 'nullable|string|max:100',
       'jenis_kelamin' => 'required|in:L,P',
       'jabatan'       => [
         'required',
@@ -519,6 +531,61 @@ class PtkController extends Controller
 
     return response()->json([
       'message' => 'Status ' . $ptk->nama_ptk . ' kini ' . $label . '.',
+    ]);
+  }
+
+  /**
+   * Daftar riwayat kepangkatan seorang PTK, terbaru dulu.
+   * Ptk::findOrFail tunduk pada SekolahScope, jadi PTK sekolah lain
+   * tidak bisa diakses operator sekolah ini.
+   */
+  public function daftarPangkat($id)
+  {
+    $ptk = Ptk::findOrFail($id);
+
+    return response()->json([
+      'data' => $ptk->riwayatPangkat()->get(),
+    ]);
+  }
+
+  /** Tambah satu entri riwayat kepangkatan untuk PTK ini. */
+  public function simpanPangkat(Request $request, $id)
+  {
+    $ptk = Ptk::findOrFail($id);
+
+    $validated = $request->validate([
+      'pangkat'    => 'required|string|max:100',
+      'golongan'   => 'required|string|max:10',
+      'tmt'        => 'required|date',
+      'nomor_sk'   => 'nullable|string|max:100',
+      'tanggal_sk' => 'nullable|date',
+    ]);
+
+    $riwayat = $ptk->riwayatPangkat()->create([
+      'pangkat'    => $validated['pangkat'],
+      'golongan'   => $validated['golongan'],
+      'tmt'        => $validated['tmt'],
+      'nomor_sk'   => $validated['nomor_sk'] ?? null,
+      'tanggal_sk' => $validated['tanggal_sk'] ?? null,
+    ]);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Riwayat kepangkatan berhasil ditambahkan.',
+      'data'    => $riwayat,
+    ]);
+  }
+
+  /** Hapus satu entri riwayat kepangkatan milik PTK ini. */
+  public function hapusPangkat($id, $riwayatId)
+  {
+    $ptk = Ptk::findOrFail($id);
+
+    $riwayat = $ptk->riwayatPangkat()->findOrFail($riwayatId);
+    $riwayat->delete();
+
+    return response()->json([
+      'message' => 'Riwayat kepangkatan berhasil dihapus.',
     ]);
   }
 }

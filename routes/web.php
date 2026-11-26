@@ -350,6 +350,9 @@ Route::controller(PtkController::class)
     Route::delete('/{id}', 'destroy')->name('destroy');
     Route::post('/{id}/generate-akun', 'generateAkun')->name('generate-akun');
     Route::post('/{id}/status', 'updateStatus')->name('status');
+    Route::get('/{id}/pangkat', 'daftarPangkat')->name('pangkat.index');
+    Route::post('/{id}/pangkat', 'simpanPangkat')->name('pangkat.store');
+    Route::delete('/{id}/pangkat/{riwayatId}', 'hapusPangkat')->name('pangkat.destroy');
   });
 
 
