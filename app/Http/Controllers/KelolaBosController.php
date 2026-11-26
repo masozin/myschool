@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BosAnggaran;
+use App\Models\BosKasNota;
 use App\Models\BosKasUmum;
 use App\Models\BosNamaAlias;
 use App\Models\BosRapbs;
@@ -13,7 +14,12 @@ use App\Models\BosRefKode;
 use App\Models\BosRefRekening;
 use App\Models\BosSinkronLog;
 use App\Models\BosSinkronToken;
+use App\Models\BosSpjPenerima;
+use App\Models\Penerima;
+use App\Models\Ptk;
 use App\Models\Sekolah;
+use App\Support\Terbilang;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -1413,6 +1419,8 @@ class KelolaBosController extends Controller
         'arah' => 'desc',
         'petaAlias' => [],
         'bisaTulisAlias' => false,
+        'bisaTulisPenerima' => false,
+        'jumlahPenerima' => [],
         'tahunTerpilih' => null,
       ]);
     }
@@ -1525,6 +1533,27 @@ class KelolaBosController extends Controller
       ->orderBy('kode_rekening')
       ->get();
 
+    // Jumlah penerima SPJ (Fase 2) per baris belanja di
+    // halaman ini — satu query hitung berkelompok menurut
+    // kunci grup kwitansi, lalu dipetakan ke id baris.
+    $jumlahPenerima = [];
+    $kunciPerBaris = [];
+    foreach ($baris as $b) {
+      if (in_array((int) $b->id_ref_bku, self::JENIS_BELANJA, true)) {
+        $kunciPerBaris[$b->id] = $this->kunciGrupKwitansi($b);
+      }
+    }
+    if ($kunciPerBaris) {
+      $hitung = BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', array_unique(array_values($kunciPerBaris)))
+        ->selectRaw('grup_kunci, COUNT(*) as jml')
+        ->groupBy('grup_kunci')
+        ->pluck('jml', 'grup_kunci');
+      foreach ($kunciPerBaris as $barisId => $kunci) {
+        $jumlahPenerima[$barisId] = (int) ($hitung[$kunci] ?? 0);
+      }
+    }
+
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
@@ -1538,6 +1567,834 @@ class KelolaBosController extends Controller
       'arah' => $arah,
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
+      'bisaTulisPenerima' => $this->bisaTulisAlias(),
+      'jumlahPenerima' => $jumlahPenerima,
+    ]);
+  }
+
+  // ── SPJ Kwitansi (Fase 1) ─────────────────────────────
+  //
+  // Kwitansi SPJ dibuat dari baris belanja BKU, digabung
+  // per nota / nomor bukti (disetujui user 2026-11-26):
+  // satu nota ARKAS adalah satu pembayaran ke satu toko,
+  // jadi satu kwitansi per nota — baris-baris barangnya
+  // menjadi rincian di badan kwitansi. Nomor urut
+  // kwitansi adalah posisi grup dalam tahun transaksinya
+  // (deterministik, tanpa tabel penyimpanan).
+
+  /** Memo penandatangan per sekolah selama satu request. */
+  private array $memoPenandatangan = [];
+
+  /** Kunci pengelompokan kwitansi untuk satu baris BKU. */
+  private function kunciGrupKwitansi(BosKasUmum $b): string
+  {
+    if (!empty($b->id_kas_nota)) {
+      return 'nota:' . $b->id_kas_nota;
+    }
+
+    $noBukti = trim((string) ($b->no_bukti ?? ''));
+    if ($noBukti !== '') {
+      return 'bukti:' . $noBukti . '|' . ($b->tanggal_transaksi?->format('Y-m-d') ?? '');
+    }
+
+    return 'baris:' . $b->id;
+  }
+
+  /**
+   * Kelompokkan baris-baris menjadi grup kwitansi. Hanya
+   * baris belanja (JENIS_BELANJA) yang belum terhapus.
+   *
+   * @return array<string, BosKasUmum[]>
+   */
+  private function grupKwitansi($baris): array
+  {
+    $grup = [];
+    foreach ($baris as $b) {
+      if ($b->soft_delete) {
+        continue;
+      }
+      if (!in_array((int) $b->id_ref_bku, self::JENIS_BELANJA, true)) {
+        continue;
+      }
+      $grup[$this->kunciGrupKwitansi($b)][] = $b;
+    }
+
+    return $grup;
+  }
+
+  /** Urutkan grup menurut tanggal transaksi paling awal grup, lalu id baris terkecil grup. */
+  private function urutkanGrupKwitansi(array $grup): array
+  {
+    $meta = fn(array $rows) => [
+      collect($rows)->map(fn($r) => $r->tanggal_transaksi?->getTimestamp() ?? 0)->min(),
+      collect($rows)->min('id'),
+    ];
+    uasort($grup, fn($a, $b) => $meta($a) <=> $meta($b));
+
+    return $grup;
+  }
+
+  /** Posisi grup (1-based) di antara semua grup belanja sekolah pada tahun itu. */
+  private function nomorUrutKwitansi(int $sekolahId, string $kunciGrup, int $tahun): int
+  {
+    $baris = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->whereYear('tanggal_transaksi', $tahun)
+      ->orderBy('tanggal_transaksi')
+      ->orderBy('id')
+      ->get();
+
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+    $posisi = array_search($kunciGrup, array_keys($grup), true);
+
+    return $posisi === false ? 0 : $posisi + 1;
+  }
+
+  /**
+   * Penandatangan kwitansi: Kepala Sekolah dari detail
+   * sekolah (cadangan PTK ber-jabatan Kepala Sekolah) dan
+   * Bendahara dari PTK (jabatan atau peran tambahan).
+   *
+   * @return array{kepala: array{nama: ?string, nip: ?string}, bendahara: array{nama: ?string, nip: ?string}}
+   */
+  private function penandatangan(int $sekolahId, $sekolah): array
+  {
+    if (isset($this->memoPenandatangan[$sekolahId])) {
+      return $this->memoPenandatangan[$sekolahId];
+    }
+
+    $kepala = ['nama' => null, 'nip' => null];
+    $detail = $sekolah?->detailTerbaru;
+    if ($detail && trim((string) $detail->kepala_sekolah) !== '') {
+      $kepala = ['nama' => $detail->kepala_sekolah, 'nip' => $detail->nip];
+    } else {
+      $ptkKepala = Ptk::where('sekolah_id', $sekolahId)
+        ->where('jabatan', 'Kepala Sekolah')
+        ->where('status', 'aktif')
+        ->first();
+      if ($ptkKepala) {
+        $kepala = ['nama' => $ptkKepala->nama_lengkap, 'nip' => $ptkKepala->nip];
+      }
+    }
+
+    $bendahara = ['nama' => null, 'nip' => null];
+    $ptkBendahara = Ptk::where('sekolah_id', $sekolahId)
+      ->where('status', 'aktif')
+      ->where(function ($q) {
+        $q->where('jabatan', 'Bendahara')
+          ->orWhereJsonContains('peran_tambahan', 'Bendahara');
+      })
+      ->first();
+    if ($ptkBendahara) {
+      $bendahara = ['nama' => $ptkBendahara->nama_lengkap, 'nip' => $ptkBendahara->nip];
+    }
+
+    return $this->memoPenandatangan[$sekolahId] = [
+      'kepala' => $kepala,
+      'bendahara' => $bendahara,
+    ];
+  }
+
+  /** Susun data satu kwitansi dari grup barisnya. */
+  private function dataKwitansi(int $sekolahId, array $grup, int $nomorUrut): array
+  {
+    $grup = array_values($grup);
+    $pertama = $grup[0];
+
+    $nota = null;
+    if (!empty($pertama->id_kas_nota)) {
+      $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->first();
+    }
+
+    $total = array_sum(array_map(fn($b) => (float) $b->saldo, $grup));
+
+    $rekeningUnik = collect($grup)->pluck('kode_rekening')->filter()->unique()->values();
+    $kodeRekening = $rekeningUnik->count() === 1
+      ? $rekeningUnik->first()
+      : ($nota->kode_rekening ?? null);
+
+    $fmtVolume = function ($v) {
+      if ($v === null) {
+        return null;
+      }
+      $s = number_format((float) $v, 2, ',', '.');
+      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    };
+
+    $tanggal = $nota->tanggal_nota ?? $pertama->tanggal_transaksi;
+    $sekolah = Sekolah::with('detailTerbaru')->find($sekolahId);
+
+    return [
+      'nomor' => str_pad((string) $nomorUrut, 3, '0', STR_PAD_LEFT),
+      'no_bukti' => $nota->no_bukti ?? ($pertama->no_bukti ?? null),
+      'kode_rekening' => $kodeRekening,
+      'uraian' => count($grup) === 1
+        ? $pertama->uraian
+        : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut',
+      'rincian' => array_map(fn($b) => [
+        'uraian' => $b->uraian,
+        'kode_rekening' => $b->kode_rekening,
+        'volume' => $fmtVolume($b->volume),
+        'saldo' => (float) $b->saldo,
+      ], $grup),
+      'total' => $total,
+      'terbilang' => Terbilang::rupiah($total),
+      'tanggal' => $tanggal?->format('d-m-Y'),
+      'penerima' => $nota->nama_toko ?? null,
+      'ttd' => $this->penandatangan($sekolahId, $sekolah),
+    ];
+  }
+
+  /** Cetak kwitansi untuk grup nota/bukti dari satu baris BKU. */
+  public function cetakKwitansi(Request $request, int $id)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+    if (!$sekolahId) {
+      abort(404);
+    }
+
+    $baris = BosKasUmum::where('id', $id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->first();
+    if (!$baris) {
+      abort(404);
+    }
+
+    $kunci = $this->kunciGrupKwitansi($baris);
+
+    $q = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
+    if (str_starts_with($kunci, 'nota:')) {
+      $q->where('id_kas_nota', $baris->id_kas_nota);
+    } elseif (str_starts_with($kunci, 'bukti:')) {
+      $q->whereNull('id_kas_nota')
+        ->where('no_bukti', $baris->no_bukti)
+        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi);
+    } else {
+      $q->where('id', $baris->id);
+    }
+    $grup = $q->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+
+    $tahun = (int) ($baris->tanggal_transaksi?->format('Y') ?? now()->format('Y'));
+    $nomor = $this->nomorUrutKwitansi($sekolahId, $kunci, $tahun);
+    $data = $this->dataKwitansi($sekolahId, $grup, $nomor);
+
+    return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
+      'daftarKwitansi' => [$data],
+      'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
+    ])->setPaper('a4', 'portrait')
+      ->stream('kwitansi-' . ($data['no_bukti'] ?? $id) . '.pdf');
+  }
+
+  /** Cetak kwitansi semua transaksi belanja sesuai saringan halaman BKU. */
+  public function cetakKwitansiMassal(Request $request)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+    if (!$sekolahId) {
+      abort(404);
+    }
+
+    // Saringan sama seperti bku(), selalu dibatasi jenis belanja.
+    $dasar = fn() => BosKasUmum::query()
+      ->from('bos_kas_umum')
+      ->leftJoin('bos_ref_bku', function ($j) {
+        $j->on('bos_ref_bku.id_ref_bku', '=', 'bos_kas_umum.id_ref_bku');
+      })
+      ->leftJoin('bos_kas_nota', function ($j) {
+        $j->on('bos_kas_nota.id_arkas', '=', 'bos_kas_umum.id_kas_nota')
+          ->on('bos_kas_nota.sekolah_id', '=', 'bos_kas_umum.sekolah_id');
+      })
+      ->where('bos_kas_umum.sekolah_id', $sekolahId)
+      ->where('bos_kas_umum.soft_delete', false);
+
+    $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+    $daftarTahun = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->selectRaw(($driver === 'mysql'
+        ? 'YEAR(tanggal_transaksi)'
+        : "CAST(strftime('%Y', tanggal_transaksi) AS INTEGER)") . ' as tahun')
+      ->distinct()
+      ->orderByDesc('tahun')
+      ->pluck('tahun')
+      ->map(fn($t) => (int) $t)
+      ->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
+    $saring = function ($q) use ($request, $tahunEfektif) {
+      $q->when($tahunEfektif !== null, fn($x) => $x->whereYear('bos_kas_umum.tanggal_transaksi', $tahunEfektif))
+        ->when($request->filled('bulan'), fn($x) => $x->whereMonth('bos_kas_umum.tanggal_transaksi', $request->integer('bulan')))
+        ->when($request->filled('jenis'), fn($x) => $x->where('bos_kas_umum.id_ref_bku', $request->integer('jenis')))
+        ->when($request->filled('rekening'), fn($x) => $x->where('bos_kas_umum.kode_rekening', $request->input('rekening')))
+        ->when($request->filled('cari'), function ($x) use ($request) {
+          $cari = '%' . $request->input('cari') . '%';
+          $x->where(function ($y) use ($cari) {
+            $y->where('bos_kas_umum.uraian', 'like', $cari)
+              ->orWhere('bos_kas_umum.no_bukti', 'like', $cari)
+              ->orWhere('bos_kas_nota.nama_toko', 'like', $cari);
+          });
+        });
+      return $q;
+    };
+
+    $baris = $saring($dasar())
+      ->whereIn('bos_kas_umum.id_ref_bku', self::JENIS_BELANJA)
+      ->select('bos_kas_umum.*')
+      ->orderBy('bos_kas_umum.tanggal_transaksi')
+      ->orderBy('bos_kas_umum.id')
+      ->get();
+
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+
+    if (!$grup) {
+      return redirect()->route('kelola-bos.bku', $request->query())
+        ->with('error', 'Tidak ada transaksi belanja pada saringan ini.');
+    }
+
+    $daftarKwitansi = [];
+    foreach ($grup as $kunci => $rows) {
+      $tahunGrup = (int) (collect($rows)->map(fn($r) => $r->tanggal_transaksi?->format('Y'))->filter()->min()
+        ?? now()->format('Y'));
+      $nomor = $this->nomorUrutKwitansi($sekolahId, (string) $kunci, $tahunGrup);
+      $daftarKwitansi[] = $this->dataKwitansi($sekolahId, $rows, $nomor);
+    }
+
+    return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
+      'daftarKwitansi' => $daftarKwitansi,
+      'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
+    ])->setPaper('a4', 'portrait')
+      ->stream('kwitansi-massal.pdf');
+  }
+
+  // ── SPJ Penerima (Fase 2) ─────────────────────────────
+  //
+  // Daftar penerima per grup transaksi BKU (grup yang
+  // sama dengan kwitansi: per nota / nomor bukti).
+  // Penerima diambil dari PTK, dari induk penerima
+  // non-PTK (tabel_penerima), atau diketik manual —
+  // semuanya disimpan sebagai SNAPSHOT di
+  // bos_spj_penerima agar dokumen SPJ tidak berubah
+  // saat data induk berubah. Semua method di sini JSON
+  // untuk modal editor di halaman BKU; konteks sekolah
+  // SELALU diambil dari baris BKU pada URL (pola yang
+  // sama dengan cetakKwitansi), tidak dari parameter
+  // bebas, agar operator sekolah lain tidak bisa
+  // mengintip / mengubah data sekolah ini.
+
+  /**
+   * Konteks grup penerima dari satu baris BKU: sekolah
+   * aktif, baris, kunci grup, dan baris-baris grupnya.
+   * Null bila baris tidak ada di sekolah aktif.
+   */
+  private function konteksGrupPenerima(Request $request, int $id, bool $wajibBelanja = true): ?array
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return null;
+    }
+
+    $q = BosKasUmum::where('id', $id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false);
+    if ($wajibBelanja) {
+      $q->whereIn('id_ref_bku', self::JENIS_BELANJA);
+    }
+    $baris = $q->first();
+    if (!$baris) {
+      return null;
+    }
+
+    $kunci = $this->kunciGrupKwitansi($baris);
+
+    $gq = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
+    if (str_starts_with($kunci, 'nota:')) {
+      $gq->where('id_kas_nota', $baris->id_kas_nota);
+    } elseif (str_starts_with($kunci, 'bukti:')) {
+      $gq->whereNull('id_kas_nota')
+        ->where('no_bukti', $baris->no_bukti)
+        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi);
+    } else {
+      $gq->where('id', $baris->id);
+    }
+    $grup = $gq->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+
+    return ['sekolahId' => $sekolahId, 'baris' => $baris, 'kunci' => $kunci, 'grup' => $grup];
+  }
+
+  /** Sekolah aktif dari konteks baris BKU (untuk method master & ubah/hapus snapshot). */
+  private function sekolahDariBaris(Request $request, int $id): ?int
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return null;
+    }
+
+    $ada = BosKasUmum::where('id', $id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->exists();
+
+    return $ada ? $sekolahId : null;
+  }
+
+  /** Bentuk array snapshot penerima untuk respons JSON editor. */
+  private function snapshotKeArray(BosSpjPenerima $p): array
+  {
+    return [
+      'id' => $p->id,
+      'ptk_id' => $p->ptk_id,
+      'penerima_id' => $p->penerima_id,
+      'nama' => $p->nama,
+      'nip' => $p->nip,
+      'pangkat_gol' => $p->pangkat_gol,
+      'nik' => $p->nik,
+      'no_rekening' => $p->no_rekening,
+      'nama_bank' => $p->nama_bank,
+      'volume' => (float) $p->volume,
+      'satuan' => (float) $p->satuan,
+      'pph_persen' => (float) $p->pph_persen,
+      'jumlah' => $p->jumlah,
+      'pph' => $p->pph,
+      'diterima' => $p->diterima,
+      'urutan' => (int) $p->urutan,
+    ];
+  }
+
+  /** Urutan berikutnya untuk snapshot baru di satu grup. */
+  private function urutanBerikutnya(int $sekolahId, string $kunci): int
+  {
+    return (int) BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->max('urutan') + 1;
+  }
+
+  /** Aturan validasi snapshot penerima (manual & ubah). */
+  private function aturanSnapshot(): array
+  {
+    return [
+      'nama' => 'required|string|max:255',
+      'nip' => 'nullable|string|max:18',
+      'pangkat_gol' => 'nullable|string|max:100',
+      'nik' => 'nullable|digits:16',
+      'no_rekening' => 'nullable|string|max:30',
+      'nama_bank' => 'nullable|string|max:100',
+      'volume' => 'required|numeric|min:0',
+      'satuan' => 'required|numeric|min:0',
+      'pph_persen' => 'required|numeric|min:0|max:100',
+    ];
+  }
+
+  /** Aturan validasi induk penerima non-PTK. */
+  private function aturanMaster(): array
+  {
+    return [
+      'nama' => 'required|string|max:255',
+      'nik' => 'nullable|digits:16',
+      'nip' => 'nullable|string|max:18',
+      'pangkat_gol' => 'nullable|string|max:100',
+      'alamat' => 'nullable|string|max:1000',
+      'no_rekening' => 'nullable|string|max:30',
+      'nama_bank' => 'nullable|string|max:100',
+    ];
+  }
+
+  /** Data awal editor penerima untuk satu grup transaksi BKU. */
+  public function penerimaData(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'baris' => $baris, 'kunci' => $kunci, 'grup' => $grup] = $konteks;
+
+    $ringkas = $this->dataKwitansi($sekolahId, $grup, 0);
+
+    $penerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->orderBy('urutan')
+      ->orderBy('id')
+      ->get()
+      ->map(fn(BosSpjPenerima $p) => $this->snapshotKeArray($p))
+      ->all();
+
+    $sumberPtk = Ptk::where('sekolah_id', $sekolahId)
+      ->where('status', 'aktif')
+      ->orderBy('nama_ptk')
+      ->get()
+      ->map(fn(Ptk $p) => [
+        'id' => $p->id,
+        'nama' => $p->nama_lengkap,
+        'nip' => $p->nip,
+        'pangkat_golongan' => $p->pangkat_golongan,
+        'nik' => $p->nik,
+        'no_rekening' => $p->no_rekening,
+        'nama_bank' => $p->nama_bank,
+      ])
+      ->all();
+
+    $sumberPenerima = Penerima::where('sekolah_id', $sekolahId)
+      ->orderBy('nama')
+      ->get()
+      ->map(fn(Penerima $p) => [
+        'id' => $p->id,
+        'nama' => $p->nama,
+        'nik' => $p->nik,
+        'nip' => $p->nip,
+        'pangkat_gol' => $p->pangkat_gol,
+        'alamat' => $p->alamat,
+        'no_rekening' => $p->no_rekening,
+        'nama_bank' => $p->nama_bank,
+      ])
+      ->all();
+
+    return response()->json([
+      'grup' => [
+        'kunci' => $kunci,
+        'baris_id' => $baris->id,
+        'no_bukti' => $ringkas['no_bukti'],
+        'uraian' => $ringkas['uraian'],
+        'tanggal' => $ringkas['tanggal'],
+        'total' => $ringkas['total'],
+      ],
+      'penerima' => $penerima,
+      'sumber_ptk' => $sumberPtk,
+      'sumber_penerima' => $sumberPenerima,
+    ]);
+  }
+
+  /** Tambahkan penerima ke grup dari daftar PTK (snapshot data PTK saat ini). */
+  public function penerimaTambahPtk(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $validated = $request->validate([
+      'ptk_ids' => 'required|array|min:1',
+      'ptk_ids.*' => 'integer|exists:tabel_ptk,id',
+    ]);
+
+    $sudahAda = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->whereNotNull('ptk_id')
+      ->pluck('ptk_id')
+      ->map(fn($v) => (int) $v)
+      ->all();
+
+    $daftarPtk = Ptk::whereIn('id', $validated['ptk_ids'])
+      ->where('sekolah_id', $sekolahId)
+      ->get();
+
+    $urutan = $this->urutanBerikutnya($sekolahId, $kunci);
+    $ditambahkan = 0;
+    foreach ($daftarPtk as $ptk) {
+      if (in_array((int) $ptk->id, $sudahAda, true)) {
+        continue;
+      }
+      BosSpjPenerima::create([
+        'sekolah_id' => $sekolahId,
+        'grup_kunci' => $kunci,
+        'ptk_id' => $ptk->id,
+        'penerima_id' => null,
+        'nama' => $ptk->nama_lengkap,
+        'nip' => $ptk->nip,
+        'pangkat_gol' => $ptk->pangkat_golongan,
+        'nik' => $ptk->nik,
+        'no_rekening' => $ptk->no_rekening,
+        'nama_bank' => $ptk->nama_bank,
+        'volume' => 1,
+        'satuan' => 0,
+        'pph_persen' => 0,
+        'urutan' => $urutan++,
+      ]);
+      $ditambahkan++;
+    }
+
+    return response()->json([
+      'success' => true,
+      'message' => $ditambahkan > 0
+        ? $ditambahkan . ' penerima dari PTK ditambahkan.'
+        : 'Semua PTK terpilih sudah ada di daftar penerima grup ini.',
+      'ditambahkan' => $ditambahkan,
+    ]);
+  }
+
+  /** Tambahkan penerima ke grup dari induk penerima non-PTK (snapshot). */
+  public function penerimaTambahMaster(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $validated = $request->validate([
+      'penerima_ids' => 'required|array|min:1',
+      'penerima_ids.*' => 'integer|exists:tabel_penerima,id',
+    ]);
+
+    $sudahAda = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->whereNotNull('penerima_id')
+      ->pluck('penerima_id')
+      ->map(fn($v) => (int) $v)
+      ->all();
+
+    $daftarMaster = Penerima::whereIn('id', $validated['penerima_ids'])
+      ->where('sekolah_id', $sekolahId)
+      ->get();
+
+    $urutan = $this->urutanBerikutnya($sekolahId, $kunci);
+    $ditambahkan = 0;
+    foreach ($daftarMaster as $master) {
+      if (in_array((int) $master->id, $sudahAda, true)) {
+        continue;
+      }
+      BosSpjPenerima::create([
+        'sekolah_id' => $sekolahId,
+        'grup_kunci' => $kunci,
+        'ptk_id' => null,
+        'penerima_id' => $master->id,
+        'nama' => $master->nama,
+        'nip' => $master->nip,
+        'pangkat_gol' => $master->pangkat_gol,
+        'nik' => $master->nik,
+        'no_rekening' => $master->no_rekening,
+        'nama_bank' => $master->nama_bank,
+        'volume' => 1,
+        'satuan' => 0,
+        'pph_persen' => 0,
+        'urutan' => $urutan++,
+      ]);
+      $ditambahkan++;
+    }
+
+    return response()->json([
+      'success' => true,
+      'message' => $ditambahkan > 0
+        ? $ditambahkan . ' penerima dari tabel penerima ditambahkan.'
+        : 'Semua penerima terpilih sudah ada di daftar penerima grup ini.',
+      'ditambahkan' => $ditambahkan,
+    ]);
+  }
+
+  /** Tambahkan penerima manual (ketikan bebas) ke grup; opsional sekalian disimpan ke induk. */
+  public function penerimaSimpan(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $validated = $request->validate($this->aturanSnapshot() + [
+      'simpan_master' => 'nullable|boolean',
+    ]);
+
+    $penerimaId = null;
+    if (!empty($validated['simpan_master'])) {
+      $master = Penerima::create([
+        'sekolah_id' => $sekolahId,
+        'nama' => $validated['nama'],
+        'nik' => $validated['nik'] ?? null,
+        'nip' => $validated['nip'] ?? null,
+        'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+        'alamat' => null,
+        'no_rekening' => $validated['no_rekening'] ?? null,
+        'nama_bank' => $validated['nama_bank'] ?? null,
+      ]);
+      $penerimaId = $master->id;
+    }
+
+    $snapshot = BosSpjPenerima::create([
+      'sekolah_id' => $sekolahId,
+      'grup_kunci' => $kunci,
+      'ptk_id' => null,
+      'penerima_id' => $penerimaId,
+      'nama' => $validated['nama'],
+      'nip' => $validated['nip'] ?? null,
+      'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'nik' => $validated['nik'] ?? null,
+      'no_rekening' => $validated['no_rekening'] ?? null,
+      'nama_bank' => $validated['nama_bank'] ?? null,
+      'volume' => $validated['volume'],
+      'satuan' => $validated['satuan'],
+      'pph_persen' => $validated['pph_persen'],
+      'urutan' => $this->urutanBerikutnya($sekolahId, $kunci),
+    ]);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Penerima ditambahkan ke grup ini.',
+      'data' => $this->snapshotKeArray($snapshot),
+    ]);
+  }
+
+  /** Ubah satu snapshot penerima (harus milik grup & sekolah dari baris pada URL). */
+  public function penerimaUbah(Request $request, int $id, int $penerimaId)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $snapshot = BosSpjPenerima::where('id', $penerimaId)
+      ->where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    if (!$snapshot) {
+      return response()->json(['message' => 'Penerima tidak ditemukan di grup ini.'], 404);
+    }
+
+    $validated = $request->validate($this->aturanSnapshot());
+
+    $snapshot->update([
+      'nama' => $validated['nama'],
+      'nip' => $validated['nip'] ?? null,
+      'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'nik' => $validated['nik'] ?? null,
+      'no_rekening' => $validated['no_rekening'] ?? null,
+      'nama_bank' => $validated['nama_bank'] ?? null,
+      'volume' => $validated['volume'],
+      'satuan' => $validated['satuan'],
+      'pph_persen' => $validated['pph_persen'],
+    ]);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Penerima diperbarui.',
+      'data' => $this->snapshotKeArray($snapshot->fresh()),
+    ]);
+  }
+
+  /** Hapus satu snapshot penerima dari grupnya. */
+  public function penerimaHapus(Request $request, int $id, int $penerimaId)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $snapshot = BosSpjPenerima::where('id', $penerimaId)
+      ->where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    if (!$snapshot) {
+      return response()->json(['message' => 'Penerima tidak ditemukan di grup ini.'], 404);
+    }
+
+    $snapshot->delete();
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Penerima dihapus dari grup ini.',
+    ]);
+  }
+
+  /** Buat induk penerima non-PTK baru (konteks sekolah dari baris BKU pada URL). */
+  public function penerimaMasterSimpan(Request $request, int $id)
+  {
+    $sekolahId = $this->sekolahDariBaris($request, $id);
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Baris BKU tidak ditemukan di sekolah aktif.'], 404);
+    }
+
+    $validated = $request->validate($this->aturanMaster());
+
+    $master = Penerima::create([
+      'sekolah_id' => $sekolahId,
+      'nama' => $validated['nama'],
+      'nik' => $validated['nik'] ?? null,
+      'nip' => $validated['nip'] ?? null,
+      'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'alamat' => $validated['alamat'] ?? null,
+      'no_rekening' => $validated['no_rekening'] ?? null,
+      'nama_bank' => $validated['nama_bank'] ?? null,
+    ]);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Penerima baru disimpan ke tabel penerima.',
+      'data' => [
+        'id' => $master->id,
+        'nama' => $master->nama,
+        'nik' => $master->nik,
+        'nip' => $master->nip,
+        'pangkat_gol' => $master->pangkat_gol,
+        'alamat' => $master->alamat,
+        'no_rekening' => $master->no_rekening,
+        'nama_bank' => $master->nama_bank,
+      ],
+    ]);
+  }
+
+  /** Ubah induk penerima non-PTK (harus milik sekolah dari baris pada URL). */
+  public function penerimaMasterUbah(Request $request, int $id, int $masterId)
+  {
+    $sekolahId = $this->sekolahDariBaris($request, $id);
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Baris BKU tidak ditemukan di sekolah aktif.'], 404);
+    }
+
+    $master = Penerima::where('id', $masterId)
+      ->where('sekolah_id', $sekolahId)
+      ->first();
+    if (!$master) {
+      return response()->json(['message' => 'Penerima tidak ditemukan di tabel penerima sekolah ini.'], 404);
+    }
+
+    $validated = $request->validate($this->aturanMaster());
+
+    $master->update([
+      'nama' => $validated['nama'],
+      'nik' => $validated['nik'] ?? null,
+      'nip' => $validated['nip'] ?? null,
+      'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'alamat' => $validated['alamat'] ?? null,
+      'no_rekening' => $validated['no_rekening'] ?? null,
+      'nama_bank' => $validated['nama_bank'] ?? null,
+    ]);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Data penerima di tabel penerima diperbarui.',
+    ]);
+  }
+
+  /** Hapus induk penerima non-PTK (snapshot di grup tidak ikut terhapus). */
+  public function penerimaMasterHapus(Request $request, int $id, int $masterId)
+  {
+    $sekolahId = $this->sekolahDariBaris($request, $id);
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Baris BKU tidak ditemukan di sekolah aktif.'], 404);
+    }
+
+    $master = Penerima::where('id', $masterId)
+      ->where('sekolah_id', $sekolahId)
+      ->first();
+    if (!$master) {
+      return response()->json(['message' => 'Penerima tidak ditemukan di tabel penerima sekolah ini.'], 404);
+    }
+
+    $master->delete();
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Penerima dihapus dari tabel penerima.',
     ]);
   }
 

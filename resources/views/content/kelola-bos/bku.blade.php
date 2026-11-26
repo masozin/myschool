@@ -2,6 +2,14 @@
 
 @section('title', 'BKU BOS')
 
+@section('vendor-style')
+  @vite(['resources/assets/vendor/libs/animate-css/animate.scss', 'resources/assets/vendor/libs/sweetalert2/sweetalert2.scss'])
+@endsection
+
+@section('vendor-script')
+  @vite(['resources/assets/vendor/libs/sweetalert2/sweetalert2.js'])
+@endsection
+
 @section('content')
 
   {{-- Pemilih konteks sekolah untuk Admin --}}
@@ -218,6 +226,8 @@
           <div class="col-12 d-flex gap-2">
             <button type="submit" class="btn btn-primary"><i class="icon-base ri ri-filter-3-line me-1"></i>Saring</button>
             <a href="{{ url('/kelola-bos/bku') }}" class="btn btn-outline-secondary">Atur Ulang</a>
+            <a href="{{ route('kelola-bos.bku.kwitansi-massal', request()->query()) }}" target="_blank"
+              class="btn btn-outline-primary"><i class="icon-base ri ri-receipt-line me-1"></i>Cetak Kwitansi</a>
           </div>
         </form>
       </div>
@@ -270,6 +280,17 @@
                       data-alias="{{ $aliasUraian ?? '' }}">
                       <i class="icon-base ri ri-pencil-line"></i></button>
                   @endif
+                  @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
+                    <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
+                      class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                      title="Cetak kwitansi (per nota)"><i class="icon-base ri ri-receipt-line"></i></a>
+                    <button type="button" class="btn btn-sm btn-icon btn-text-success p-0 ms-1 align-baseline"
+                      title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
+                      <i class="icon-base ri ri-team-line"></i>@if (($jumlahPenerima[$b->id] ?? 0) > 0)<span
+                          class="badge rounded-pill bg-success lencana-penerima"
+                          style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>@endif
+                    </button>
+                  @endif
                 </td>
                 <td>{{ $b->nama_toko ?? '-' }}</td>
                 <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
@@ -299,6 +320,8 @@
     @if ($bisaTulisAlias)
       @include('content.kelola-bos.partials.modal-alias')
     @endif
+
+    @include('content.kelola-bos.partials.modal-penerima')
   @endif
 
 @endsection

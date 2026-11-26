@@ -14,9 +14,9 @@
   <div class="card">
     <div class="card-header border-bottom d-flex justify-content-between align-items-center">
       <h5 class="card-title mb-0">Manajemen Data PTK</h5>
-      <button id="tambah-ptk" class="btn btn-primary btn-tambah" data-bs-toggle="offcanvas" data-bs-target="#offcanvasPtk">
+      <a href="{{ route('ptk.create') }}" id="tambah-ptk" class="btn btn-primary btn-tambah">
         <i class="ri-add-line me-1"></i> Tambah PTK
-      </button>
+      </a>
     </div>
     <div class="card-datatable text-nowrap">
       <table class="datatables-basic table table-bordered hover" id="tabel-ptk"
@@ -34,143 +34,6 @@
           </tr>
         </thead>
       </table>
-    </div>
-  </div>
-
-  <div class="offcanvas
-        offcanvas-end" tabindex="-1" id="offcanvasPtk" aria-labelledby="offcanvasPtkLabel">
-    <div class="offcanvas-header border-bottom">
-      <h5 id="offcanvas-label" class="offcanvas-title">Tambah PTK Baru</h5>
-      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body mx-0 flex-grow-0 h-100">
-      <form class="add-new-ptk pt-0" id="form-ptk">
-        <input type="hidden" name="id" id="ptk-id">
-
-        <div class="form-floating form-floating-outline mb-5">
-          <input type="text" class="form-control" id="nama_ptk" name="nama_ptk" placeholder="Nama (tanpa gelar)" />
-          <label for="nama_ptk">Nama (tanpa gelar)</label>
-        </div>
-
-        <div class="row">
-          <div class="col-5">
-            <div class="form-floating form-floating-outline mb-5">
-              <input type="text" class="form-control" id="gelar_depan" name="gelar_depan"
-                placeholder="Gelar Depan" />
-              <label for="gelar_depan">Gelar Depan</label>
-            </div>
-          </div>
-          <div class="col-7">
-            <div class="form-floating form-floating-outline mb-5">
-              <input type="text" class="form-control" id="gelar_belakang" name="gelar_belakang"
-                placeholder="Gelar Belakang" />
-              <label for="gelar_belakang">Gelar Belakang</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <input type="text" class="form-control" id="nip" name="nip" placeholder="NIP (18 Digit)"
-            maxlength="18" />
-          <label for="nip">NIP (Opsional)</label>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <input type="text" class="form-control" id="kode" name="kode"
-            placeholder="Kode Guru (mis. GR-01)" maxlength="20" />
-          <label for="kode">Kode Guru (untuk jadwal, opsional)</label>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <input type="text" class="form-control" id="tempat_lahir" name="tempat_lahir"
-            placeholder="Tempat Lahir" maxlength="100" />
-          <label for="tempat_lahir">Tempat Lahir (opsional)</label>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <input type="date" class="form-control" id="tanggal_lahir" name="tanggal_lahir" />
-          <label for="tanggal_lahir">Tanggal Lahir (opsional, untuk ucapan ulang tahun)</label>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <select id="jenis_kelamin" name="jenis_kelamin" class="form-select">
-            <option value="">Pilih Jenis Kelamin</option>
-            <option value="L">Laki-laki</option>
-            <option value="P">Perempuan</option>
-          </select>
-          <label for="jenis_kelamin">Jenis Kelamin</label>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <select id="jabatan" name="jabatan" class="form-select">
-            <option value="">pilih jabatan</option>
-            <option value="Kepala Sekolah">Kepala Sekolah</option>
-            <option value="Operator Sekolah">Operator Sekolah</option>
-            <option value="Guru">Guru</option>
-            <option value="Tata Usaha">Tata Usaha</option>
-            <option value="Pustakawan">Pustakawan</option>
-          </select>
-          <label for="jabatan">Jabatan</label>
-        </div>
-
-        <div class="mb-5">
-          <label class="form-label">Peran Tambahan</label>
-          @foreach (\App\Models\Ptk::PERAN_TERKELOLA as $peran)
-            <div class="form-check">
-              <input class="form-check-input peran-tambahan-item" type="checkbox" name="peran_tambahan[]"
-                value="{{ $peran }}" id="peran-tambahan-{{ $loop->index }}" />
-              <label class="form-check-label" for="peran-tambahan-{{ $loop->index }}">{{ $peran }}</label>
-            </div>
-          @endforeach
-          <small class="text-muted">Peran di luar jabatan utama — mis. guru yang juga operator atau bendahara
-            sekolah. Boleh lebih dari satu.</small>
-        </div>
-
-        <div class="form-floating form-floating-outline mb-5">
-          <select id="jenis_kepegawaian" name="jenis_kepegawaian" class="form-select">
-            <option value="">pilih jenis kepegawaian</option>
-            <option value="PNS">PNS</option>
-            <option value="PPPK">PPPK</option>
-            <option value="Honorer">Honorer</option>
-
-          </select>
-          <label for="jenis_kepegawaian">Jenis kepegawaian</label>
-        </div>
-
-        <div class="mb-5">
-          <label class="form-label" for="photo">Foto PTK (opsional — bisa dipotong 2×3 / 3×4 / 4×6, otomatis dikompresi)</label>
-          <div class="d-flex align-items-start gap-3">
-            <img id="photo-preview" src="{{ asset('assets/img/avatars/1.png') }}"
-              class="rounded object-fit-cover" width="72" height="72" alt="Pratinjau foto PTK" />
-            <div class="flex-grow-1">
-              <input type="file" class="form-control crop-foto" id="photo" name="photo" accept="image/png,image/jpeg" data-preview="#photo-preview" />
-              <div class="form-check mt-2" id="hapus-photo-wrap" style="display: none">
-                <input class="form-check-input" type="checkbox" id="hapus_photo" name="hapus_photo" value="1" />
-                <label class="form-check-label" for="hapus_photo">Hapus foto saat ini saat disimpan</label>
-              </div>
-              <small class="text-muted">Foto tampil di profil pengguna, navbar, dan website sekolah.</small>
-            </div>
-          </div>
-        </div>
-
-        @hasrole('Admin')
-          <div class="form-floating form-floating-outline mb-5">
-            <select id="sekolah_id" name="sekolah_id" class="select2 form-select">
-              <option value="">pilih sekolah</option>
-              @foreach ($dataSekolah as $sekolah)
-                <option value="{{ $sekolah->id }}">
-                  {{ $sekolah->detailPerSemester->nama_sekolah ?? 'Nama tidak diatur' }}
-                  ({{ $sekolah->npsn }})
-                </option>
-              @endforeach
-            </select>
-            <label for="sekolah_id">Sekolah</label>
-          </div>
-        @endhasrole
-
-        <button type="submit" id="submit" class="btn btn-primary me-sm-3 me-1 data-submit">Simpan</button>
-        <button type="reset" class="btn btn-outline-danger" data-bs-dismiss="offcanvas">Batal</button>
-      </form>
     </div>
   </div>
 
@@ -208,61 +71,16 @@
     </div>
   </div>
 
-  @include('_partials.crop-foto')
 @endsection
 
 @section('page-script')
   <script>
     document.addEventListener('DOMContentLoaded', function() {
 
-      // --- 1. INISIALISASI SELECT2 (Tetap jQuery) ---
-      const initSelect2 = () => {
-        $('.select2').each(function() {
-          const $this = $(this);
-          $this.select2({
-            placeholder: '-- pilih --',
-            dropdownParent: $('#offcanvasPtk')
-          });
-        });
-      };
-      initSelect2();
-
       const tabelPtk = document.getElementById('tabel-ptk');
-      const formPtk = document.getElementById('form-ptk');
-      const offcanvasElement = document.getElementById('offcanvasPtk');
-
-      let saveMode = 'add';
-      let globalId = null;
 
       // Ambil isAdmin dari data-attribute tabel
       const isAdmin = @json(auth()->user()->hasRole('Admin'));
-      // const isAdmin = window.hasRole('Admin');
-      const judulForm = document.getElementById('offcanvas-label'); // Sesuaikan dengan ID di Blade
-
-      // --- Peran Tambahan (multi-role) ---
-      // Checkbox yang sama dengan jabatan utama dinonaktifkan dan
-      // dibersihkan: peran itu sudah tercakup sebagai peran utama.
-      const segarkanPeranTambahan = () => {
-        const jabatan = document.getElementById('jabatan').value;
-        document.querySelectorAll('.peran-tambahan-item').forEach(cb => {
-          if (cb.value === jabatan) {
-            cb.checked = false;
-            cb.disabled = true;
-          } else {
-            cb.disabled = false;
-          }
-        });
-      };
-
-      const isiPeranTambahan = daftar => {
-        const terpilih = Array.isArray(daftar) ? daftar : [];
-        document.querySelectorAll('.peran-tambahan-item').forEach(cb => {
-          cb.checked = terpilih.includes(cb.value);
-        });
-        segarkanPeranTambahan();
-      };
-
-      document.getElementById('jabatan').addEventListener('change', segarkanPeranTambahan);
 
       // 1. Inisialisasi Kolom
       let columns = [{
@@ -381,9 +199,8 @@
 
                 return (
                   '<div class="d-flex align-items-center gap-4">' +
-                  `<button class="btn btn-icon btn-text-secondary btn-sm rounded-pill edit-data" data-id="${full['id']}"
-      data-bs-toggle="offcanvas" data-bs-target="#offcanvasPtk"><i
-        class="icon-base ri ri-edit-box-line icon-22px"></i></button>` +
+                  `<a class="btn btn-icon btn-text-secondary btn-sm rounded-pill edit-data" href="{{ url('/ptk') }}/${full['id']}/ubah"><i
+        class="icon-base ri ri-edit-box-line icon-22px"></i></a>` +
                   '<button class="btn btn-icon btn-text-secondary btn-sm rounded-pill dropdown-toggle hide-arrow" data-bs-toggle="dropdown"><i class="icon-base ri ri-more-2-line icon-22px"></i></button>' +
                   '<div class="dropdown-menu dropdown-menu-end m-0">' +
                   '<a href="#" class="dropdown-item">View</a>' +
@@ -497,219 +314,8 @@
         }
       }
 
-      // 3. Form Validation
-      let fv;
-      if (formPtk) {
-        fv = FormValidation.formValidation(formPtk, {
-          fields: {
-            nama_ptk: {
-              validators: {
-                notEmpty: {
-                  message: 'Nama harus diisi'
-                }
-              }
-            },
-            jenis_kelamin: {
-              validators: {
-                notEmpty: {
-                  message: 'Pilih jenis kelamin'
-                }
-              }
-            },
-            jabatan: {
-              validators: {
-                notEmpty: {
-                  message: 'Jabatan harus diisi'
-                }
-              }
-            },
-            nip: {
-              validators: {
-                regexp: {
-                  regexp: /^[0-9]+$/,
-                  message: 'NIP hanya boleh angka'
-                }
-              }
-            }
-          },
-          plugins: {
-            trigger: new FormValidation.plugins.Trigger(),
-            bootstrap5: new FormValidation.plugins.Bootstrap5({
-              eleValidClass: '',
-              rowSelector: '.mb-5'
-            }),
-            submitButton: new FormValidation.plugins.SubmitButton(),
-            autoFocus: new FormValidation.plugins.AutoFocus()
-          }
-        }).on('core.form.valid', async function() {
-          const formData = new FormData(formPtk);
-          // Gunakan POST untuk simpan, dan POST dengan _method=PUT untuk update jika diperlukan
-          const url = saveMode === 'add' ? '/ptk' : `/ptk/${globalId}`;
-          const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-          const submitBtn = document.getElementById('submit');
-          if (saveMode !== 'add') {
-            formData.append('_method', 'PUT');
-          }
-
-          // UI Loading
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>';
-
-          try {
-            const response = await fetch(url, {
-              method: 'POST',
-              body: formData,
-              headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest',
-                Accept: 'application/json'
-              } // Tambahkan ini agar Laravel kirim JSON
-            });
-
-            const res = await response.json();
-
-            if (response.ok) {
-              Swal.fire({
-                icon: 'success',
-                title: 'Berhasil',
-                text: res.message
-              });
-              bootstrap.Offcanvas.getInstance(offcanvasElement).hide();
-              // Reset Form & Validasi
-              formPtk.reset();
-              fv.resetForm(true);
-              segarkanPeranTambahan();
-              window.dtPtk.ajax.reload(null, false);
-            } else if (response.status === 422) {
-              const errors = res.errors;
-              let errorList = '';
-
-              Object.keys(errors).forEach(key => {
-                errorList += `<li>${errors[key][0]}</li>`;
-                // Periksa apakah field terdaftar di FormValidation
-                if (fv.fields[key]) {
-                  // Ambil semua validator yang terdaftar untuk field ini (regexp, notEmpty, dll)
-                  const validators = Object.keys(fv.fields[key].validators);
-                  // Gunakan validator pertama yang tersedia sebagai target pesan
-                  const firstValidator = validators[0];
-
-                  // 1. Tandai field sebagai Invalid
-                  fv.updateFieldStatus(key, 'Invalid', firstValidator);
-
-                  // 2. Cari elemen pesan error yang dibuat oleh fv
-                  // fv biasanya membuat elemen dengan class .invalid-feedback atau di dalam container fv-plugins-message-container
-                  const container = formPtk.querySelector(
-                    `[data-field="${key}"][data-validator="${firstValidator}"]`);
-
-                  if (container) {
-                    container.innerText = errors[key][0]; // Isi dengan pesan dari Laravel
-                    container.style.display = 'block'; // Pastikan terlihat
-                  }
-                }
-              });
-              Swal.fire({
-                icon: 'error',
-                title: 'Gagal Validasi',
-                html: `<ul style="text-align:left;">${errorList}</ul>`,
-                customClass: {
-                  confirmButton: 'btn btn-primary'
-                }
-              });
-            } else {
-              throw new Error(res.message || 'Terjadi kesalahan sistem');
-            }
-          } catch (error) {
-            Swal.fire({
-              icon: 'error',
-              title: 'Oops...',
-              text: error.message,
-              customClass: {
-                confirmButton: 'btn btn-primary'
-              }
-            });
-          } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Simpan';
-          }
-        });
-      }
-
-      // Pratinjau + potong foto ditangani _partials/crop-foto (class crop-foto).
-
-      // 4. Event Delegation
+      // 3. Event Delegation
       document.addEventListener('click', async function(e) {
-        // Tombol Tambah (Pastikan tombol di card-header punya class atau ID ini)
-        if (e.target.closest('[data-bs-target="#offcanvasPtk"]') && !e.target.closest('.edit-data')) {
-          saveMode = 'add';
-          formPtk.reset();
-          fv.resetForm(true);
-          segarkanPeranTambahan();
-          judulForm.innerHTML = 'Tambah PTK Baru';
-          document.getElementById('photo-preview').src = '{{ asset('assets/img/avatars/1.png') }}';
-          document.getElementById('hapus-photo-wrap').style.display = 'none';
-        }
-
-        // Tombol Edit
-        const editBtn = e.target.closest('.edit-data');
-        if (editBtn) {
-          saveMode = 'edit';
-          judulForm.innerHTML = 'Edit Data PTK';
-
-          fv.resetForm(true);
-
-          // 1. Dapatkan element <tr> terdekat dari tombol yang diklik
-          const tr = e.target.closest('tr');
-
-          // 2. Ambil data baris tersebut melalui instance DataTable
-          const data = window.dtPtk.row(tr).data();
-
-          if (data) {
-            // 3. Masukkan data langsung ke form
-            globalId = data.id; // Ambil ID dari objek data
-
-            document.getElementById('ptk-id').value = data.id;
-            document.getElementById('nama_ptk').value = data.nama_ptk;
-            document.getElementById('gelar_depan').value = data.gelar_depan || '';
-            document.getElementById('gelar_belakang').value = data.gelar_belakang || '';
-            document.getElementById('tempat_lahir').value = data.tempat_lahir || '';
-            document.getElementById('tanggal_lahir').value = data.tanggal_lahir ? String(data.tanggal_lahir).slice(0, 10) : '';
-
-            // Foto: pratinjau dari route aliran + opsi hapus bila ada foto
-            const pratinjauFoto = document.getElementById('photo-preview');
-            const bungkusHapus = document.getElementById('hapus-photo-wrap');
-            document.getElementById('photo').value = '';
-            document.getElementById('hapus_photo').checked = false;
-            if (data.photo) {
-              pratinjauFoto.src = '/ptk/' + data.id + '/foto';
-              bungkusHapus.style.display = '';
-            } else {
-              pratinjauFoto.src = '{{ asset('assets/img/avatars/1.png') }}';
-              bungkusHapus.style.display = 'none';
-            }
-            document.getElementById('nip').value = data.nip || '';
-            document.getElementById('kode').value = data.kode || '';
-            document.getElementById('jenis_kelamin').value = data.jenis_kelamin || '';
-            document.getElementById('jabatan').value = data.jabatan || '';
-            isiPeranTambahan(data.peran_tambahan || []);
-            document.getElementById('jenis_kepegawaian').value = data.jenis_kepegawaian || '';
-
-            // Jika Admin, set value Select2/Select Sekolah
-            if (isAdmin && data.sekolah_id) {
-              $('#sekolah_id').val(data.sekolah_id).trigger('change');
-            }
-
-            // 4. Tampilkan offcanvas (Bootstrap 5)
-            const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasElement);
-            offcanvas.show();
-          } else {
-            Swal.fire({
-              icon: 'error',
-              title: 'Error',
-              text: 'Data tidak ditemukan di tabel'
-            });
-          }
-        }
-
         // Tombol Hapus
         const hapusBtn = e.target.closest('.hapus-ptk');
         if (hapusBtn) {

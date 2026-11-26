@@ -15,7 +15,7 @@ class Ptk extends Model
   use HasFactory, SoftDeletes;
 
   protected $table = 'tabel_ptk';
-  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'kode', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'jabatan', 'peran_tambahan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
+  protected $fillable = ['nama_ptk', 'gelar_depan', 'gelar_belakang', 'nip', 'nik', 'alamat', 'no_rekening', 'nama_bank', 'kode', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'jabatan', 'peran_tambahan', 'jenis_kepegawaian', 'user_id', 'sekolah_id', 'photo', 'status', 'tanggal_keluar'];
 
   /**
    * Daftar role baku aplikasi (nama role bersifat case sensitive).
@@ -145,6 +145,36 @@ class Ptk extends Model
   public function rombelDiampu(): HasMany
   {
     return $this->hasMany(Rombel::class, 'ptk_id');
+  }
+
+  // Relasi: Riwayat kepangkatan, terbaru dulu (untuk SPJ/daftar penerima)
+  public function riwayatPangkat(): HasMany
+  {
+    return $this->hasMany(PtkRiwayatPangkat::class, 'ptk_id')
+      ->orderByDesc('tmt')
+      ->orderByDesc('id');
+  }
+
+  /** Entri riwayat pangkat terbaru (yang berlaku saat ini), atau null. */
+  public function pangkatTerakhir(): ?PtkRiwayatPangkat
+  {
+    return $this->riwayatPangkat()->first();
+  }
+
+  /**
+   * "Pangkat / Golongan" dari entri riwayat terbaru, mis.
+   * "Penata / III/c" — dipakai daftar penerima SPJ. Null bila PTK
+   * belum memiliki riwayat kepangkatan sama sekali.
+   */
+  public function getPangkatGolonganAttribute(): ?string
+  {
+    $terakhir = $this->pangkatTerakhir();
+
+    if (!$terakhir) {
+      return null;
+    }
+
+    return trim($terakhir->pangkat . ' / ' . $terakhir->golongan);
   }
 
   // Helper: Mengecek apakah PTK adalah wali kelas di semester tertentu

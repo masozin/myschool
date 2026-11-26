@@ -344,12 +344,17 @@ Route::controller(PtkController::class)
   ->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/data', 'data')->name('data');
+    Route::get('/create', 'buat')->name('create');
+    Route::get('/{id}/ubah', 'ubah')->name('ubah');
     Route::get('/{id}/edit', 'edit')->name('edit');
     Route::post('/', 'store')->name('store');
     Route::put('/{id}', 'update')->name('update');
     Route::delete('/{id}', 'destroy')->name('destroy');
     Route::post('/{id}/generate-akun', 'generateAkun')->name('generate-akun');
     Route::post('/{id}/status', 'updateStatus')->name('status');
+    Route::get('/{id}/pangkat', 'daftarPangkat')->name('pangkat.index');
+    Route::post('/{id}/pangkat', 'simpanPangkat')->name('pangkat.store');
+    Route::delete('/{id}/pangkat/{riwayatId}', 'hapusPangkat')->name('pangkat.destroy');
   });
 
 
@@ -858,6 +863,35 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/bku', 'bku')->name('bku')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    // SPJ Kwitansi (Fase 1) — cetak PDF kwitansi per nota
+    // dari baris belanja BKU; mengikuti akses baca BKU.
+    Route::get('/bku/kwitansi-massal', 'cetakKwitansiMassal')->name('bku.kwitansi-massal')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    Route::get('/bku/kwitansi/{id}', 'cetakKwitansi')->name('bku.kwitansi')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    // SPJ Penerima (Fase 2) — editor daftar penerima per
+    // grup transaksi BKU (modal di halaman BKU, semua
+    // JSON). Baca mengikuti akses BKU; tulis hanya Admin
+    // & Operator Sekolah. Semua URL membawa id baris BKU
+    // agar konteks sekolah selalu berasal dari baris itu.
+    Route::get('/bku/{id}/penerima', 'penerimaData')->name('bku.penerima.data')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    Route::post('/bku/{id}/penerima/ptk', 'penerimaTambahPtk')->name('bku.penerima.ptk')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/{id}/penerima/master', 'penerimaTambahMaster')->name('bku.penerima.master')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/{id}/penerima', 'penerimaSimpan')->name('bku.penerima.simpan')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::put('/bku/{id}/penerima/{penerimaId}', 'penerimaUbah')->name('bku.penerima.ubah')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::delete('/bku/{id}/penerima/{penerimaId}', 'penerimaHapus')->name('bku.penerima.hapus')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/{id}/penerima-master', 'penerimaMasterSimpan')->name('bku.penerima-master.simpan')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::put('/bku/{id}/penerima-master/{masterId}', 'penerimaMasterUbah')->name('bku.penerima-master.ubah')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::delete('/bku/{id}/penerima-master/{masterId}', 'penerimaMasterHapus')->name('bku.penerima-master.hapus')
+      ->middleware('role:Admin|Operator Sekolah');
     Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')
