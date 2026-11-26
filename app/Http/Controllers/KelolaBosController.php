@@ -14,6 +14,7 @@ use App\Models\BosRefKode;
 use App\Models\BosRefRekening;
 use App\Models\BosSinkronLog;
 use App\Models\BosSinkronToken;
+use App\Models\BosSpjGrup;
 use App\Models\BosSpjPenerima;
 use App\Models\Penerima;
 use App\Models\Ptk;
@@ -1421,6 +1422,7 @@ class KelolaBosController extends Controller
         'bisaTulisAlias' => false,
         'bisaTulisPenerima' => false,
         'jumlahPenerima' => [],
+        'metaGrup' => [],
         'tahunTerpilih' => null,
       ]);
     }
@@ -1504,6 +1506,11 @@ class KelolaBosController extends Controller
         'bos_ref_bku.nama_bku',
         'bos_ref_bku.kode_bku',
         'bos_kas_nota.nama_toko',
+        // Penanda SIPLah per baris untuk lencana di kolom
+        // Toko/Penerima — diambil dari join nota yang sudah
+        // ada (relasi nota() tidak bisa di-eager-load di
+        // sini: ia menyaring sekolah dari $this model).
+        'bos_kas_nota.is_beli_di_siplah',
       ])
       ->selectRaw("(SELECT nama_rekening FROM bos_ref_rekening r
         WHERE r.kode_rekening = bos_kas_umum.kode_rekening
@@ -1554,6 +1561,28 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Meta grup SPJ (status & nomor VA) untuk lencana di
+    // kolom Toko/Penerima — pola yang sama: satu query
+    // menurut kunci grup, dipetakan ke id baris. Baris
+    // tanpa meta tidak masuk peta (bawaan: Belum, VA
+    // kosong, tidak ditampilkan).
+    $metaGrup = [];
+    if ($kunciPerBaris) {
+      $daftarMeta = BosSpjGrup::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', array_unique(array_values($kunciPerBaris)))
+        ->get()
+        ->keyBy('grup_kunci');
+      foreach ($kunciPerBaris as $barisId => $kunci) {
+        $meta = $daftarMeta->get($kunci);
+        if ($meta) {
+          $metaGrup[$barisId] = [
+            'status' => $meta->status,
+            'nomor_va' => $meta->nomor_va,
+          ];
+        }
+      }
+    }
+
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
@@ -1569,6 +1598,7 @@ class KelolaBosController extends Controller
       'bisaTulisAlias' => $this->bisaTulisAlias(),
       'bisaTulisPenerima' => $this->bisaTulisAlias(),
       'jumlahPenerima' => $jumlahPenerima,
+      'metaGrup' => $metaGrup,
     ]);
   }
 
@@ -2057,6 +2087,31 @@ class KelolaBosController extends Controller
       ])
       ->all();
 
+    // Meta grup: penanda SIPLah + nomor invoice dari nota
+    // grup (nota baris pertama yang punya nota), dan
+    // status / nomor VA dari tabel kerja bos_spj_grup.
+    // Nomor VA tidak ada di data ARKAS (details nota
+    // hanya memuat invoice) — ia isian manual di meta.
+    $nota = null;
+    $barisNota = collect($grup)->first(fn($b) => !empty($b->id_kas_nota));
+    if ($barisNota) {
+      $nota = BosKasNota::where('id_arkas', $barisNota->id_kas_nota)
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->first();
+    }
+    $invoiceSiplah = null;
+    $detailNota = is_array($nota?->details)
+      ? $nota->details
+      : json_decode((string) ($nota?->details ?? ''), true);
+    if (is_array($detailNota)) {
+      $invoiceSiplah = $detailNota['siplahResponse']['invoice_number'] ?? null;
+    }
+
+    $meta = BosSpjGrup::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+
     return response()->json([
       'grup' => [
         'kunci' => $kunci,
@@ -2065,10 +2120,51 @@ class KelolaBosController extends Controller
         'uraian' => $ringkas['uraian'],
         'tanggal' => $ringkas['tanggal'],
         'total' => $ringkas['total'],
+        'siplah' => (bool) ($nota?->is_beli_di_siplah ?? false),
+        'invoice_siplah' => $invoiceSiplah,
+        'nomor_va' => $meta?->nomor_va,
+        'status' => $meta?->status ?? 'belum',
       ],
+      'bisa_tulis' => $this->bisaTulisAlias(),
       'penerima' => $penerima,
       'sumber_ptk' => $sumberPtk,
       'sumber_penerima' => $sumberPenerima,
+    ]);
+  }
+
+  /**
+   * Simpan meta grup SPJ: saklar status (belum / lunas /
+   * selesai) dan nomor VA pembayaran SIPLah (manual).
+   * Baris meta dibuat malas lewat updateOrCreate menurut
+   * (sekolah, grup_kunci) dari baris BKU pada URL.
+   */
+  public function penerimaGrupUbah(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $validated = $request->validate([
+      'status' => 'required|in:' . implode(',', BosSpjGrup::STATUS),
+      'nomor_va' => 'nullable|string|max:50',
+    ]);
+
+    $nomorVa = isset($validated['nomor_va']) && trim((string) $validated['nomor_va']) !== ''
+      ? trim((string) $validated['nomor_va'])
+      : null;
+
+    $meta = BosSpjGrup::updateOrCreate(
+      ['sekolah_id' => $sekolahId, 'grup_kunci' => $kunci],
+      ['status' => $validated['status'], 'nomor_va' => $nomorVa]
+    );
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Keterangan grup SPJ diperbarui.',
+      'status' => $meta->status,
+      'nomor_va' => $meta->nomor_va,
     ]);
   }
 

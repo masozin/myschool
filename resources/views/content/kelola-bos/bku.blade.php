@@ -284,15 +284,41 @@
                     <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
                       class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                       title="Cetak kwitansi (per nota)"><i class="icon-base ri ri-receipt-line"></i></a>
-                    <button type="button" class="btn btn-sm btn-icon btn-text-success p-0 ms-1 align-baseline"
-                      title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
-                      <i class="icon-base ri ri-team-line"></i>@if (($jumlahPenerima[$b->id] ?? 0) > 0)<span
-                          class="badge rounded-pill bg-success lencana-penerima"
-                          style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>@endif
-                    </button>
                   @endif
                 </td>
-                <td>{{ $b->nama_toko ?? '-' }}</td>
+                <td>
+                  {{ $b->nama_toko ?? '-' }}
+                  @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
+                    @php
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null];
+                    @endphp
+                    {{-- Lencana meta grup: SIPLah (dari nota), status
+                         (Belum tidak ditampilkan), dan nomor VA. Wadah
+                         selalu dirender untuk baris belanja agar JS
+                         modal bisa memperbaruinya tanpa muat ulang. --}}
+                    <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
+                      @if (!empty($b->is_beli_di_siplah))
+                        <span class="badge bg-info">SIPLah</span>
+                      @endif
+                      @if ($metaBaris['status'] === 'lunas')
+                        <span class="badge bg-success lencana-status-grup">Lunas</span>
+                      @elseif ($metaBaris['status'] === 'selesai')
+                        <span class="badge bg-primary lencana-status-grup">Selesai</span>
+                      @endif
+                      @if (!empty($metaBaris['nomor_va']))
+                        <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
+                      @endif
+                    </div>
+                    <div class="mt-1">
+                      <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
+                        title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
+                        <i class="icon-base ri ri-team-line me-1"></i>Penerima@if (($jumlahPenerima[$b->id] ?? 0) > 0)<span
+                            class="badge rounded-pill bg-success lencana-penerima"
+                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>@endif
+                      </button>
+                    </div>
+                  @endif
+                </td>
                 <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
                 <td class="text-end fw-semibold">{{ number_format($b->saldo, 0, ',', '.') }}</td>
               </tr>

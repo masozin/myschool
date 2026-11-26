@@ -24,6 +24,57 @@
           <span class="text-muted">Memuat…</span>
         </div>
 
+        {{-- Meta grup SPJ: saklar status Belum/Lunas/Selesai
+             (tersimpan otomatis, hanya peran tulis) dan nomor
+             VA untuk grup SIPLah — isian manual karena data
+             ARKAS/SIPLah hanya menyediakan nomor invoice.
+             Peran baca melihatnya sebagai lencana teks. --}}
+        <div class="border rounded p-3 mb-3" id="penerima-meta-grup">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="fw-semibold">Keterangan SPJ</span>
+            <span id="meta-siplah-info"></span>
+            <span class="small text-success d-none" id="meta-simpan-info"><i
+                class="ri ri-check-line me-1"></i>Tersimpan</span>
+          </div>
+          <div class="d-flex flex-wrap gap-4 mt-2">
+            <div>
+              <div class="small text-muted mb-1">Status</div>
+              @if ($bisaTulisPenerima)
+                <div class="btn-group btn-group-sm" role="group" aria-label="Status grup SPJ">
+                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-belum" value="belum"
+                    autocomplete="off">
+                  <label class="btn btn-outline-secondary" for="meta-status-belum">Belum</label>
+                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-lunas" value="lunas"
+                    autocomplete="off">
+                  <label class="btn btn-outline-success" for="meta-status-lunas">Lunas</label>
+                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-selesai" value="selesai"
+                    autocomplete="off">
+                  <label class="btn btn-outline-primary" for="meta-status-selesai">Selesai</label>
+                </div>
+              @endif
+              <span id="meta-status-baca"></span>
+            </div>
+            <div id="meta-va-wrap" class="d-none" style="min-width: 280px;">
+              <label class="form-label small text-muted mb-1" for="meta-nomor-va">Nomor Virtual Account</label>
+              @if ($bisaTulisPenerima)
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="meta-nomor-va" maxlength="50"
+                    placeholder="Nomor VA pembayaran SIPLah">
+                  <button type="button" class="btn btn-primary" id="btn-simpan-va">Simpan VA</button>
+                </div>
+              @else
+                <div class="fw-semibold" id="meta-va-baca">-</div>
+              @endif
+            </div>
+          </div>
+          <div class="form-text mt-2">
+            @if ($bisaTulisPenerima)
+              Status tersimpan otomatis begitu diganti.
+            @endif
+            Nomor VA diisi manual — data ARKAS/SIPLah hanya menyediakan nomor invoice.
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="table table-sm table-bordered align-middle mb-2">
             <thead>
@@ -323,6 +374,115 @@
         '</span></div>';
     }
 
+    // ── Meta grup: saklar status & nomor VA SIPLah ──
+    function gambarMeta() {
+      var g = data.grup || {};
+
+      var info = '';
+      if (g.siplah) {
+        info = '<span class="badge bg-info">SIPLah</span>';
+        if (g.invoice_siplah) {
+          info += ' <span class="small text-muted">Invoice: ' + lolosHtml(g.invoice_siplah) + '</span>';
+        }
+      }
+      $('meta-siplah-info').innerHTML = info;
+
+      if (bisaTulis) {
+        var radio = modalEl.querySelector(
+          'input[name="meta-status"][value="' + (g.status || 'belum') + '"]');
+        if (radio) radio.checked = true;
+      } else {
+        var labelStatus = {
+          belum: ['bg-label-secondary', 'Belum'],
+          lunas: ['bg-success', 'Lunas'],
+          selesai: ['bg-primary', 'Selesai']
+        }[g.status || 'belum'];
+        $('meta-status-baca').innerHTML =
+          '<span class="badge ' + labelStatus[0] + '">' + labelStatus[1] + '</span>';
+      }
+
+      // Kolom VA hanya untuk grup SIPLah.
+      var vaWrap = $('meta-va-wrap');
+      if (g.siplah) {
+        vaWrap.classList.remove('d-none');
+        if (bisaTulis) {
+          $('meta-nomor-va').value = g.nomor_va || '';
+        } else {
+          $('meta-va-baca').textContent = g.nomor_va || '-';
+        }
+      } else {
+        vaWrap.classList.add('d-none');
+      }
+    }
+
+    // Perbarui lencana status & VA pada sel baris BKU yang
+    // membuka modal ini, tanpa memuat ulang halaman.
+    function segarkanMetaBaris() {
+      var btn = document.querySelector('[data-penerima-baris][data-id="' + barisId + '"]');
+      if (!btn) return;
+      var sel = btn.closest('td');
+      var wadah = sel ? sel.querySelector('.meta-grup-baris') : null;
+      if (!wadah) return;
+      var g = data.grup || {};
+
+      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
+      if (g.status === 'lunas' || g.status === 'selesai') {
+        if (!lencanaStatus) {
+          lencanaStatus = document.createElement('span');
+          var vaEl = wadah.querySelector('.lencana-va-grup');
+          if (vaEl) {
+            wadah.insertBefore(lencanaStatus, vaEl);
+          } else {
+            wadah.appendChild(lencanaStatus);
+          }
+        }
+        lencanaStatus.className = 'badge lencana-status-grup ' +
+          (g.status === 'lunas' ? 'bg-success' : 'bg-primary');
+        lencanaStatus.textContent = g.status === 'lunas' ? 'Lunas' : 'Selesai';
+      } else if (lencanaStatus) {
+        lencanaStatus.remove();
+      }
+
+      var lencanaVa = wadah.querySelector('.lencana-va-grup');
+      if (g.nomor_va) {
+        if (!lencanaVa) {
+          lencanaVa = document.createElement('span');
+          lencanaVa.className = 'small text-muted lencana-va-grup';
+          wadah.appendChild(lencanaVa);
+        }
+        lencanaVa.textContent = 'VA: ' + g.nomor_va;
+      } else if (lencanaVa) {
+        lencanaVa.remove();
+      }
+    }
+
+    function tandaiMetaTersimpan() {
+      var el = $('meta-simpan-info');
+      if (!el) return;
+      el.classList.remove('d-none');
+      clearTimeout(tandaiMetaTersimpan._t);
+      tandaiMetaTersimpan._t = setTimeout(function() {
+        el.classList.add('d-none');
+      }, 2000);
+    }
+
+    async function simpanMeta(status, nomorVa) {
+      try {
+        var res = await kirim(urlDasar + '/' + barisId + '/penerima-grup', 'PUT', {
+          status: status,
+          nomor_va: nomorVa || null
+        });
+        data.grup.status = res.status;
+        data.grup.nomor_va = res.nomor_va;
+        gambarMeta();
+        segarkanMetaBaris();
+        tandaiMetaTersimpan();
+      } catch (e) {
+        gambarMeta(); // kembalikan saklar ke nilai yang tersimpan
+        gagal(e);
+      }
+    }
+
     function gambarTabel() {
       var tbody = $('penerima-tbody');
       var daftar = data.penerima || [];
@@ -462,6 +622,7 @@
 
     function gambarSemua() {
       gambarInfo();
+      gambarMeta();
       gambarTabel();
       gambarSumberPtk();
       gambarSumberMaster();
@@ -606,6 +767,9 @@
         sembunyikanFormMaster();
       }
       $('penerima-info-grup').innerHTML = '<span class="text-muted">Memuat…</span>';
+      $('meta-siplah-info').innerHTML = '';
+      $('meta-status-baca').innerHTML = '';
+      $('meta-va-wrap').classList.add('d-none');
       $('penerima-tbody').innerHTML = '<tr><td colspan="' + (bisaTulis ? 10 : 9) +
         '" class="text-center text-muted">Memuat…</td></tr>';
       $('penerima-selisih').innerHTML = '';
@@ -655,6 +819,27 @@
       $('btn-simpan-master').addEventListener('click', simpanMaster);
       $('btn-simpan-snapshot').addEventListener('click', simpanSnapshot);
       $('btn-batal-edit').addEventListener('click', kosongkanFormSnapshot);
+
+      // Saklar status meta grup: tersimpan otomatis begitu
+      // diganti (PUT penerima-grup, membawa VA saat ini).
+      modalEl.querySelectorAll('input[name="meta-status"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+          if (!data || !data.grup) return;
+          var va = data.grup.siplah ?
+            $('meta-nomor-va').value.trim() :
+            (data.grup.nomor_va || '');
+          simpanMeta(radio.value, va || null);
+        });
+      });
+
+      $('btn-simpan-va').addEventListener('click', function() {
+        if (!data || !data.grup) return;
+        var terpilih = modalEl.querySelector('input[name="meta-status"]:checked');
+        simpanMeta(
+          terpilih ? terpilih.value : (data.grup.status || 'belum'),
+          $('meta-nomor-va').value.trim() || null
+        );
+      });
 
       // Aksi per baris di dalam modal (delegasi klik)
       modalEl.addEventListener('click', async function(e) {

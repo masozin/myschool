@@ -892,6 +892,10 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah');
     Route::delete('/bku/{id}/penerima-master/{masterId}', 'penerimaMasterHapus')->name('bku.penerima-master.hapus')
       ->middleware('role:Admin|Operator Sekolah');
+    // Meta grup SPJ — saklar status (belum/lunas/selesai)
+    // & nomor VA SIPLah (manual) per grup transaksi.
+    Route::put('/bku/{id}/penerima-grup', 'penerimaGrupUbah')->name('bku.penerima.grup')
+      ->middleware('role:Admin|Operator Sekolah');
     Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')
