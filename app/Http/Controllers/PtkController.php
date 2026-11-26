@@ -31,6 +31,41 @@ class PtkController extends Controller
     return view('content.ptk.index', compact('dataSekolah'));
   }
 
+  /**
+   * Data pendukung form PTK (halaman penuh): daftar sekolah hanya
+   * untuk Admin, sama seperti yang disiapkan index().
+   */
+  private function dataFormPtk(): array
+  {
+    $dataSekolah = [];
+
+    if (Auth::user()->hasRole('Admin')) {
+      $dataSekolah = Sekolah::with(['detailTerbaru' => function ($q) {
+        $q->select('id', 'nama_sekolah');
+      }])->get();
+    }
+
+    return $dataSekolah;
+  }
+
+  /** Halaman form tambah PTK (mode buat: tanpa data PTK). */
+  public function buat()
+  {
+    $dataSekolah = $this->dataFormPtk();
+    $ptk = null;
+
+    return view('content.ptk.form', compact('dataSekolah', 'ptk'));
+  }
+
+  /** Halaman form ubah PTK (mode ubah: nilai diisi server-side). */
+  public function ubah($id)
+  {
+    $ptk = Ptk::findOrFail($id); // SekolahScope membatasi ke sekolah pengguna
+    $dataSekolah = $this->dataFormPtk();
+
+    return view('content.ptk.form', compact('dataSekolah', 'ptk'));
+  }
+
   public function data()
   {
     // Mengambil data PTK beserta relasi sekolahnya
@@ -61,7 +96,7 @@ class PtkController extends Controller
       'photo'         => 'nullable|image|mimes:jpeg,png,jpg,webp|max:10240',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip',
-      'npwp'          => 'nullable|string|max:30',
+      'nik'           => 'nullable|digits:16|unique:tabel_ptk,nik',
       'alamat'        => 'nullable|string|max:1000',
       'no_rekening'   => 'nullable|string|max:30',
       'nama_bank'     => 'nullable|string|max:100',
@@ -151,7 +186,7 @@ class PtkController extends Controller
       'photo'         => $pathFoto,
       'kode'          => $validated['kode'] ?? null,
       'nip'           => $validated['nip'],
-      'npwp'          => $validated['npwp'] ?? null,
+      'nik'           => $validated['nik'] ?? null,
       'alamat'        => $validated['alamat'] ?? null,
       'no_rekening'   => $validated['no_rekening'] ?? null,
       'nama_bank'     => $validated['nama_bank'] ?? null,
@@ -189,7 +224,7 @@ class PtkController extends Controller
       'hapus_photo'   => 'nullable|boolean',
       'kode'          => 'nullable|string|max:20',
       'nip'           => 'nullable|digits:18|unique:tabel_ptk,nip,' . $id,
-      'npwp'          => 'nullable|string|max:30',
+      'nik'           => 'nullable|digits:16|unique:tabel_ptk,nik,' . $id,
       'alamat'        => 'nullable|string|max:1000',
       'no_rekening'   => 'nullable|string|max:30',
       'nama_bank'     => 'nullable|string|max:100',

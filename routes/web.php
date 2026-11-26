@@ -344,6 +344,8 @@ Route::controller(PtkController::class)
   ->group(function () {
     Route::get('/', 'index')->name('index');
     Route::get('/data', 'data')->name('data');
+    Route::get('/create', 'buat')->name('create');
+    Route::get('/{id}/ubah', 'ubah')->name('ubah');
     Route::get('/{id}/edit', 'edit')->name('edit');
     Route::post('/', 'store')->name('store');
     Route::put('/{id}', 'update')->name('update');
