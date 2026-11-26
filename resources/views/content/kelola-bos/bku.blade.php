@@ -312,9 +312,11 @@
                     <div class="mt-1">
                       <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
                         title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
-                        <i class="icon-base ri ri-team-line me-1"></i>Penerima@if (($jumlahPenerima[$b->id] ?? 0) > 0)<span
-                            class="badge rounded-pill bg-success lencana-penerima"
-                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>@endif
+                        <i class="icon-base ri ri-team-line me-1"></i>Penerima
+                        @if (($jumlahPenerima[$b->id] ?? 0) > 0)
+                          <span class="badge rounded-pill bg-success lencana-penerima"
+                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
+                        @endif
                       </button>
                     </div>
                   @endif
