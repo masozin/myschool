@@ -858,6 +858,12 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/bku', 'bku')->name('bku')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    // SPJ Kwitansi (Fase 1) — cetak PDF kwitansi per nota
+    // dari baris belanja BKU; mengikuti akses baca BKU.
+    Route::get('/bku/kwitansi-massal', 'cetakKwitansiMassal')->name('bku.kwitansi-massal')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    Route::get('/bku/kwitansi/{id}', 'cetakKwitansi')->name('bku.kwitansi')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')

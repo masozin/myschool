@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BosAnggaran;
+use App\Models\BosKasNota;
 use App\Models\BosKasUmum;
 use App\Models\BosNamaAlias;
 use App\Models\BosRapbs;
@@ -13,7 +14,10 @@ use App\Models\BosRefKode;
 use App\Models\BosRefRekening;
 use App\Models\BosSinkronLog;
 use App\Models\BosSinkronToken;
+use App\Models\Ptk;
 use App\Models\Sekolah;
+use App\Support\Terbilang;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -1539,6 +1543,308 @@ class KelolaBosController extends Controller
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
     ]);
+  }
+
+  // ── SPJ Kwitansi (Fase 1) ─────────────────────────────
+  //
+  // Kwitansi SPJ dibuat dari baris belanja BKU, digabung
+  // per nota / nomor bukti (disetujui user 2026-11-26):
+  // satu nota ARKAS adalah satu pembayaran ke satu toko,
+  // jadi satu kwitansi per nota — baris-baris barangnya
+  // menjadi rincian di badan kwitansi. Nomor urut
+  // kwitansi adalah posisi grup dalam tahun transaksinya
+  // (deterministik, tanpa tabel penyimpanan).
+
+  /** Memo penandatangan per sekolah selama satu request. */
+  private array $memoPenandatangan = [];
+
+  /** Kunci pengelompokan kwitansi untuk satu baris BKU. */
+  private function kunciGrupKwitansi(BosKasUmum $b): string
+  {
+    if (!empty($b->id_kas_nota)) {
+      return 'nota:' . $b->id_kas_nota;
+    }
+
+    $noBukti = trim((string) ($b->no_bukti ?? ''));
+    if ($noBukti !== '') {
+      return 'bukti:' . $noBukti . '|' . ($b->tanggal_transaksi?->format('Y-m-d') ?? '');
+    }
+
+    return 'baris:' . $b->id;
+  }
+
+  /**
+   * Kelompokkan baris-baris menjadi grup kwitansi. Hanya
+   * baris belanja (JENIS_BELANJA) yang belum terhapus.
+   *
+   * @return array<string, BosKasUmum[]>
+   */
+  private function grupKwitansi($baris): array
+  {
+    $grup = [];
+    foreach ($baris as $b) {
+      if ($b->soft_delete) {
+        continue;
+      }
+      if (!in_array((int) $b->id_ref_bku, self::JENIS_BELANJA, true)) {
+        continue;
+      }
+      $grup[$this->kunciGrupKwitansi($b)][] = $b;
+    }
+
+    return $grup;
+  }
+
+  /** Urutkan grup menurut tanggal transaksi paling awal grup, lalu id baris terkecil grup. */
+  private function urutkanGrupKwitansi(array $grup): array
+  {
+    $meta = fn(array $rows) => [
+      collect($rows)->map(fn($r) => $r->tanggal_transaksi?->getTimestamp() ?? 0)->min(),
+      collect($rows)->min('id'),
+    ];
+    uasort($grup, fn($a, $b) => $meta($a) <=> $meta($b));
+
+    return $grup;
+  }
+
+  /** Posisi grup (1-based) di antara semua grup belanja sekolah pada tahun itu. */
+  private function nomorUrutKwitansi(int $sekolahId, string $kunciGrup, int $tahun): int
+  {
+    $baris = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->whereYear('tanggal_transaksi', $tahun)
+      ->orderBy('tanggal_transaksi')
+      ->orderBy('id')
+      ->get();
+
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+    $posisi = array_search($kunciGrup, array_keys($grup), true);
+
+    return $posisi === false ? 0 : $posisi + 1;
+  }
+
+  /**
+   * Penandatangan kwitansi: Kepala Sekolah dari detail
+   * sekolah (cadangan PTK ber-jabatan Kepala Sekolah) dan
+   * Bendahara dari PTK (jabatan atau peran tambahan).
+   *
+   * @return array{kepala: array{nama: ?string, nip: ?string}, bendahara: array{nama: ?string, nip: ?string}}
+   */
+  private function penandatangan(int $sekolahId, $sekolah): array
+  {
+    if (isset($this->memoPenandatangan[$sekolahId])) {
+      return $this->memoPenandatangan[$sekolahId];
+    }
+
+    $kepala = ['nama' => null, 'nip' => null];
+    $detail = $sekolah?->detailTerbaru;
+    if ($detail && trim((string) $detail->kepala_sekolah) !== '') {
+      $kepala = ['nama' => $detail->kepala_sekolah, 'nip' => $detail->nip];
+    } else {
+      $ptkKepala = Ptk::where('sekolah_id', $sekolahId)
+        ->where('jabatan', 'Kepala Sekolah')
+        ->where('status', 'aktif')
+        ->first();
+      if ($ptkKepala) {
+        $kepala = ['nama' => $ptkKepala->nama_lengkap, 'nip' => $ptkKepala->nip];
+      }
+    }
+
+    $bendahara = ['nama' => null, 'nip' => null];
+    $ptkBendahara = Ptk::where('sekolah_id', $sekolahId)
+      ->where('status', 'aktif')
+      ->where(function ($q) {
+        $q->where('jabatan', 'Bendahara')
+          ->orWhereJsonContains('peran_tambahan', 'Bendahara');
+      })
+      ->first();
+    if ($ptkBendahara) {
+      $bendahara = ['nama' => $ptkBendahara->nama_lengkap, 'nip' => $ptkBendahara->nip];
+    }
+
+    return $this->memoPenandatangan[$sekolahId] = [
+      'kepala' => $kepala,
+      'bendahara' => $bendahara,
+    ];
+  }
+
+  /** Susun data satu kwitansi dari grup barisnya. */
+  private function dataKwitansi(int $sekolahId, array $grup, int $nomorUrut): array
+  {
+    $grup = array_values($grup);
+    $pertama = $grup[0];
+
+    $nota = null;
+    if (!empty($pertama->id_kas_nota)) {
+      $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->first();
+    }
+
+    $total = array_sum(array_map(fn($b) => (float) $b->saldo, $grup));
+
+    $rekeningUnik = collect($grup)->pluck('kode_rekening')->filter()->unique()->values();
+    $kodeRekening = $rekeningUnik->count() === 1
+      ? $rekeningUnik->first()
+      : ($nota->kode_rekening ?? null);
+
+    $fmtVolume = function ($v) {
+      if ($v === null) {
+        return null;
+      }
+      $s = number_format((float) $v, 2, ',', '.');
+      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    };
+
+    $tanggal = $nota->tanggal_nota ?? $pertama->tanggal_transaksi;
+    $sekolah = Sekolah::with('detailTerbaru')->find($sekolahId);
+
+    return [
+      'nomor' => str_pad((string) $nomorUrut, 3, '0', STR_PAD_LEFT),
+      'no_bukti' => $nota->no_bukti ?? ($pertama->no_bukti ?? null),
+      'kode_rekening' => $kodeRekening,
+      'uraian' => count($grup) === 1
+        ? $pertama->uraian
+        : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut',
+      'rincian' => array_map(fn($b) => [
+        'uraian' => $b->uraian,
+        'kode_rekening' => $b->kode_rekening,
+        'volume' => $fmtVolume($b->volume),
+        'saldo' => (float) $b->saldo,
+      ], $grup),
+      'total' => $total,
+      'terbilang' => Terbilang::rupiah($total),
+      'tanggal' => $tanggal?->format('d-m-Y'),
+      'penerima' => $nota->nama_toko ?? null,
+      'ttd' => $this->penandatangan($sekolahId, $sekolah),
+    ];
+  }
+
+  /** Cetak kwitansi untuk grup nota/bukti dari satu baris BKU. */
+  public function cetakKwitansi(Request $request, int $id)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+    if (!$sekolahId) {
+      abort(404);
+    }
+
+    $baris = BosKasUmum::where('id', $id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->first();
+    if (!$baris) {
+      abort(404);
+    }
+
+    $kunci = $this->kunciGrupKwitansi($baris);
+
+    $q = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
+    if (str_starts_with($kunci, 'nota:')) {
+      $q->where('id_kas_nota', $baris->id_kas_nota);
+    } elseif (str_starts_with($kunci, 'bukti:')) {
+      $q->whereNull('id_kas_nota')
+        ->where('no_bukti', $baris->no_bukti)
+        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi);
+    } else {
+      $q->where('id', $baris->id);
+    }
+    $grup = $q->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+
+    $tahun = (int) ($baris->tanggal_transaksi?->format('Y') ?? now()->format('Y'));
+    $nomor = $this->nomorUrutKwitansi($sekolahId, $kunci, $tahun);
+    $data = $this->dataKwitansi($sekolahId, $grup, $nomor);
+
+    return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
+      'daftarKwitansi' => [$data],
+      'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
+    ])->setPaper('a4', 'portrait')
+      ->stream('kwitansi-' . ($data['no_bukti'] ?? $id) . '.pdf');
+  }
+
+  /** Cetak kwitansi semua transaksi belanja sesuai saringan halaman BKU. */
+  public function cetakKwitansiMassal(Request $request)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+    if (!$sekolahId) {
+      abort(404);
+    }
+
+    // Saringan sama seperti bku(), selalu dibatasi jenis belanja.
+    $dasar = fn() => BosKasUmum::query()
+      ->from('bos_kas_umum')
+      ->leftJoin('bos_ref_bku', function ($j) {
+        $j->on('bos_ref_bku.id_ref_bku', '=', 'bos_kas_umum.id_ref_bku');
+      })
+      ->leftJoin('bos_kas_nota', function ($j) {
+        $j->on('bos_kas_nota.id_arkas', '=', 'bos_kas_umum.id_kas_nota')
+          ->on('bos_kas_nota.sekolah_id', '=', 'bos_kas_umum.sekolah_id');
+      })
+      ->where('bos_kas_umum.sekolah_id', $sekolahId)
+      ->where('bos_kas_umum.soft_delete', false);
+
+    $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+    $daftarTahun = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->selectRaw(($driver === 'mysql'
+        ? 'YEAR(tanggal_transaksi)'
+        : "CAST(strftime('%Y', tanggal_transaksi) AS INTEGER)") . ' as tahun')
+      ->distinct()
+      ->orderByDesc('tahun')
+      ->pluck('tahun')
+      ->map(fn($t) => (int) $t)
+      ->all();
+    $tahunEfektif = $this->tahunEfektif($request, $daftarTahun);
+
+    $saring = function ($q) use ($request, $tahunEfektif) {
+      $q->when($tahunEfektif !== null, fn($x) => $x->whereYear('bos_kas_umum.tanggal_transaksi', $tahunEfektif))
+        ->when($request->filled('bulan'), fn($x) => $x->whereMonth('bos_kas_umum.tanggal_transaksi', $request->integer('bulan')))
+        ->when($request->filled('jenis'), fn($x) => $x->where('bos_kas_umum.id_ref_bku', $request->integer('jenis')))
+        ->when($request->filled('rekening'), fn($x) => $x->where('bos_kas_umum.kode_rekening', $request->input('rekening')))
+        ->when($request->filled('cari'), function ($x) use ($request) {
+          $cari = '%' . $request->input('cari') . '%';
+          $x->where(function ($y) use ($cari) {
+            $y->where('bos_kas_umum.uraian', 'like', $cari)
+              ->orWhere('bos_kas_umum.no_bukti', 'like', $cari)
+              ->orWhere('bos_kas_nota.nama_toko', 'like', $cari);
+          });
+        });
+      return $q;
+    };
+
+    $baris = $saring($dasar())
+      ->whereIn('bos_kas_umum.id_ref_bku', self::JENIS_BELANJA)
+      ->select('bos_kas_umum.*')
+      ->orderBy('bos_kas_umum.tanggal_transaksi')
+      ->orderBy('bos_kas_umum.id')
+      ->get();
+
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+
+    if (!$grup) {
+      return redirect()->route('kelola-bos.bku', $request->query())
+        ->with('error', 'Tidak ada transaksi belanja pada saringan ini.');
+    }
+
+    $daftarKwitansi = [];
+    foreach ($grup as $kunci => $rows) {
+      $tahunGrup = (int) (collect($rows)->map(fn($r) => $r->tanggal_transaksi?->format('Y'))->filter()->min()
+        ?? now()->format('Y'));
+      $nomor = $this->nomorUrutKwitansi($sekolahId, (string) $kunci, $tahunGrup);
+      $daftarKwitansi[] = $this->dataKwitansi($sekolahId, $rows, $nomor);
+    }
+
+    return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
+      'daftarKwitansi' => $daftarKwitansi,
+      'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
+    ])->setPaper('a4', 'portrait')
+      ->stream('kwitansi-massal.pdf');
   }
 
   // ── Token sinkron (Fase 1.12, lapisan kerja) ──────────
