@@ -1624,25 +1624,37 @@ class KelolaBosController extends Controller
       }
     }
 
-    // Meta grup SPJ (status & nomor VA) untuk lencana di
-    // kolom Toko/Penerima — pola yang sama: satu query
-    // menurut kunci grup, dipetakan ke id baris. Baris
-    // tanpa meta tidak masuk peta (bawaan: Belum, VA
-    // kosong, tidak ditampilkan).
+    // Meta grup SPJ (status, nomor VA, kategori
+    // non-barang) untuk lencana di kolom Toko/Penerima —
+    // pola yang sama: satu query menurut kunci grup,
+    // dipetakan ke id baris. SETIAP baris belanja kini
+    // mendapat entri: baris tanpa meta memakai bawaan
+    // status 'belum' & VA kosong, dan kategori non-barang
+    // efektif = override manual (kolom non_barang) bila
+    // terisi, selain itu hasil deteksi dari kode rekening
+    // baris-baris grup yang tampil di halaman ini.
     $metaGrup = [];
     if ($kunciPerBaris) {
       $daftarMeta = BosSpjGrup::where('sekolah_id', $sekolahId)
         ->whereIn('grup_kunci', array_unique(array_values($kunciPerBaris)))
         ->get()
         ->keyBy('grup_kunci');
+      $grupPerKunci = [];
+      foreach ($baris as $b) {
+        $kunciBaris = $kunciPerBaris[$b->id] ?? null;
+        if ($kunciBaris !== null) {
+          $grupPerKunci[$kunciBaris][] = $b;
+        }
+      }
       foreach ($kunciPerBaris as $barisId => $kunci) {
         $meta = $daftarMeta->get($kunci);
-        if ($meta) {
-          $metaGrup[$barisId] = [
-            'status' => $meta->status,
-            'nomor_va' => $meta->nomor_va,
-          ];
-        }
+        $manual = $meta && !is_null($meta->non_barang) ? (bool) $meta->non_barang : null;
+        $metaGrup[$barisId] = [
+          'status' => $meta->status ?? 'belum',
+          'nomor_va' => $meta->nomor_va ?? null,
+          'non_barang_manual' => $manual,
+          'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupPerKunci[$kunci] ?? []),
+        ];
       }
     }
 
@@ -1909,6 +1921,70 @@ class KelolaBosController extends Controller
     }
 
     return $daftar;
+  }
+
+  /**
+   * Deteksi kategori non-barang dari kode rekening
+   * (struktur kode rekening belanja daerah yang dipakai
+   * ARKAS). Non-barang = pembayaran ke ORANG (sasaran
+   * dokumen Tanda Terima), bukan pembelian barang dari
+   * toko. Aturannya, menurut segmen kode yang dipisah
+   * titik:
+   * - 5.1.01...    Belanja Pegawai (honorarium &
+   *                tambahan penghasilan) → non-barang.
+   *                Contoh: 5.1.01.02.01.0001.
+   * - 5.1.02.04... Belanja Perjalanan Dinas (transport
+   *                orang) → non-barang.
+   *                Contoh: 5.1.02.04.01.0003.
+   * - 5.1.02.02.01... Belanja Jasa Kantor rincian
+   *                honorarium (narasumber / moderator /
+   *                panitia) & belanja jasa tenaga
+   *                (administrasi, pendidikan,
+   *                kebersihan, keamanan, ahli, dst)
+   *                → non-barang. Contoh:
+   *                5.1.02.02.01.0003, 5.1.02.02.01.0026.
+   * Di luar itu barang: mis. 5.1.02.01.01.0024 (belanja
+   * barang pakai habis / ATK) dan 5.2... (belanja
+   * modal). Kode kosong / tak dikenal → barang.
+   * Hasil deteksi bisa diganti manual per grup lewat
+   * kolom non_barang di bos_spj_grup (null = otomatis).
+   */
+  private function deteksiNonBarang(?string $kodeRekening): bool
+  {
+    if (!$kodeRekening) {
+      return false;
+    }
+    $s = explode('.', trim($kodeRekening));
+    if (($s[0] ?? '') !== '5' || ($s[1] ?? '') !== '1') {
+      return false;
+    }
+    // Belanja Pegawai (5.1.01...): honorarium & tambahan penghasilan.
+    if (($s[2] ?? '') === '01') {
+      return true;
+    }
+    // Belanja Perjalanan Dinas (5.1.02.04...): transport orang.
+    if (($s[2] ?? '') === '02' && ($s[3] ?? '') === '04') {
+      return true;
+    }
+    // Belanja Jasa Kantor (5.1.02.02.01...): honorarium narasumber/
+    // moderator/panitia & belanja jasa tenaga (administrasi,
+    // pendidikan, kebersihan, keamanan, ahli, dst) — pembayaran
+    // ke orang, bukan pembelian barang dari toko.
+    if (($s[2] ?? '') === '02' && ($s[3] ?? '') === '02' && ($s[4] ?? '') === '01') {
+      return true;
+    }
+    return false;
+  }
+
+  /** Grup dianggap non-barang bila SALAH SATU barisnya terdeteksi non-barang. */
+  private function deteksiNonBarangGrup(array $grup): bool
+  {
+    foreach ($grup as $b) {
+      if ($this->deteksiNonBarang($b->kode_rekening ?? null)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Cetak kwitansi untuk grup nota/bukti dari satu baris BKU. */
@@ -2244,6 +2320,14 @@ class KelolaBosController extends Controller
       ->where('grup_kunci', $kunci)
       ->first();
 
+    // Kategori grup: deteksi otomatis dari kode rekening
+    // baris-baris grup, dengan override manual dari
+    // kolom non_barang meta (null = ikut deteksi).
+    $deteksiNonBarang = $this->deteksiNonBarangGrup($grup);
+    $nonBarangManual = $meta
+      ? (is_null($meta->non_barang) ? null : (bool) $meta->non_barang)
+      : null;
+
     return response()->json([
       'grup' => [
         'kunci' => $kunci,
@@ -2256,6 +2340,9 @@ class KelolaBosController extends Controller
         'invoice_siplah' => $invoiceSiplah,
         'nomor_va' => $meta?->nomor_va,
         'status' => $meta?->status ?? 'belum',
+        'non_barang_deteksi' => $deteksiNonBarang,
+        'non_barang_manual' => $nonBarangManual,
+        'non_barang' => $nonBarangManual ?? $deteksiNonBarang,
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
       'penerima' => $penerima,
@@ -2266,7 +2353,10 @@ class KelolaBosController extends Controller
 
   /**
    * Simpan meta grup SPJ: saklar status (belum /
-   * selesai) dan nomor VA pembayaran SIPLah (manual).
+   * selesai), nomor VA pembayaran SIPLah (manual), dan
+   * override kategori non_barang (opsional — hanya
+   * diubah bila request memuat kuncinya; nilainya boleh
+   * null untuk kembali ke deteksi otomatis).
    * Baris meta dibuat malas lewat updateOrCreate menurut
    * (sekolah, grup_kunci) dari baris BKU pada URL.
    */
@@ -2276,27 +2366,43 @@ class KelolaBosController extends Controller
     if (!$konteks) {
       return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
     }
-    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci, 'grup' => $grupBaris] = $konteks;
 
     $validated = $request->validate([
       'status' => 'required|in:' . implode(',', BosSpjGrup::STATUS),
       'nomor_va' => 'nullable|string|max:50',
+      'non_barang' => 'nullable|boolean',
     ]);
 
     $nomorVa = isset($validated['nomor_va']) && trim((string) $validated['nomor_va']) !== ''
       ? trim((string) $validated['nomor_va'])
       : null;
 
+    // Atribut dibangun kondisional: kolom non_barang
+    // hanya disentuh bila pemanggil mengirim kuncinya,
+    // agar pemanggil lama (inline SIPLah & simpanMeta
+    // modal yang hanya mengirim status + nomor_va) tidak
+    // menimpa override kategori yang sudah tersimpan.
+    $atribut = ['status' => $validated['status'], 'nomor_va' => $nomorVa];
+    if ($request->has('non_barang')) {
+      $nb = $request->input('non_barang');
+      $atribut['non_barang'] = is_null($nb) ? null : (bool) $nb;
+    }
+
     $meta = BosSpjGrup::updateOrCreate(
       ['sekolah_id' => $sekolahId, 'grup_kunci' => $kunci],
-      ['status' => $validated['status'], 'nomor_va' => $nomorVa]
+      $atribut
     );
+
+    $manual = is_null($meta->non_barang) ? null : (bool) $meta->non_barang;
 
     return response()->json([
       'success' => true,
       'message' => 'Keterangan grup SPJ diperbarui.',
       'status' => $meta->status,
       'nomor_va' => $meta->nomor_va,
+      'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupBaris),
+      'non_barang_manual' => $manual,
     ]);
   }
 

@@ -47,6 +47,18 @@
               @endif
               <span id="meta-status-baca"></span>
             </div>
+            <div>
+              <div class="small text-muted mb-1">Kategori</div>
+              @if ($bisaTulisPenerima)
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="meta-nonbarang-saklar">
+                  <label class="form-check-label" for="meta-nonbarang-saklar">Non-barang</label>
+                </div>
+                <div class="form-text" id="meta-nonbarang-info"></div>
+                <button type="button" class="btn btn-link btn-sm p-0 d-none" id="btn-nonbarang-otomatis">Ikuti deteksi otomatis</button>
+              @endif
+              <span id="meta-nonbarang-baca"></span>
+            </div>
             <div id="meta-va-wrap" class="d-none" style="min-width: 280px;">
               <label class="form-label small text-muted mb-1" for="meta-nomor-va">Nomor Virtual Account</label>
               @if ($bisaTulisPenerima)
@@ -425,6 +437,32 @@
           '<span class="badge ' + label[0] + '">' + label[1] + '</span>';
       }
 
+      // Kategori non-barang: saklar mengikuti nilai
+      // efektif (override manual menang atas deteksi
+      // otomatis dari kode rekening).
+      if (bisaTulis) {
+        var saklarNb = $('meta-nonbarang-saklar');
+        if (saklarNb) saklarNb.checked = !!g.non_barang;
+        var infoNb = $('meta-nonbarang-info');
+        if (infoNb) {
+          infoNb.textContent = (g.non_barang_manual === null || g.non_barang_manual === undefined) ?
+            'Deteksi otomatis dari kode rekening.' :
+            'Diatur manual — deteksi otomatis diabaikan.';
+        }
+        var btnOtomatis = $('btn-nonbarang-otomatis');
+        if (btnOtomatis) {
+          if (g.non_barang_manual === null || g.non_barang_manual === undefined) {
+            btnOtomatis.classList.add('d-none');
+          } else {
+            btnOtomatis.classList.remove('d-none');
+          }
+        }
+      } else {
+        $('meta-nonbarang-baca').innerHTML = g.non_barang ?
+          '<span class="badge bg-warning text-dark">Non-barang</span>' :
+          '<span class="badge bg-label-secondary">Barang</span>';
+      }
+
       // Kolom VA hanya untuk grup SIPLah.
       var vaWrap = $('meta-va-wrap');
       if (g.siplah) {
@@ -466,6 +504,26 @@
         lencanaStatus.remove();
       }
 
+      var lencanaNb = wadah.querySelector('.lencana-nonbarang-grup');
+      if (g.non_barang) {
+        if (!lencanaNb) {
+          lencanaNb = document.createElement('span');
+          lencanaNb.className = 'badge bg-warning text-dark lencana-nonbarang-grup';
+          lencanaNb.textContent = 'Non-barang';
+          var statusEl = wadah.querySelector('.lencana-status-grup');
+          var vaElNb = wadah.querySelector('.lencana-va-grup');
+          if (statusEl) {
+            wadah.insertBefore(lencanaNb, statusEl);
+          } else if (vaElNb) {
+            wadah.insertBefore(lencanaNb, vaElNb);
+          } else {
+            wadah.appendChild(lencanaNb);
+          }
+        }
+      } else if (lencanaNb) {
+        lencanaNb.remove();
+      }
+
       var lencanaVa = wadah.querySelector('.lencana-va-grup');
       if (g.nomor_va) {
         if (!lencanaVa) {
@@ -497,6 +555,31 @@
         });
         data.grup.status = res.status;
         data.grup.nomor_va = res.nomor_va;
+        gambarMeta();
+        segarkanMetaBaris();
+        tandaiMetaTersimpan();
+      } catch (e) {
+        gambarMeta(); // kembalikan saklar ke nilai yang tersimpan
+        gagal(e);
+      }
+    }
+
+    // Simpan kategori non-barang lewat endpoint meta yang
+    // sama (status & VA saat ini ikut dikirim karena status
+    // wajib di server). nonBarang: true/false dari saklar,
+    // atau null untuk kembali ikut deteksi otomatis.
+    async function simpanKategori(nonBarang) {
+      if (!data || !data.grup) return;
+      try {
+        var res = await kirim(urlDasar + '/' + barisId + '/penerima-grup', 'PUT', {
+          status: (data.grup.status === 'selesai') ? 'selesai' : 'belum',
+          nomor_va: data.grup.siplah ?
+            ($('meta-nomor-va').value.trim() || null) :
+            (data.grup.nomor_va || null),
+          non_barang: nonBarang
+        });
+        data.grup.non_barang = res.non_barang;
+        data.grup.non_barang_manual = res.non_barang_manual;
         gambarMeta();
         segarkanMetaBaris();
         tandaiMetaTersimpan();
@@ -792,6 +875,7 @@
       $('penerima-info-grup').innerHTML = '<span class="text-muted">Memuat…</span>';
       $('meta-siplah-info').innerHTML = '';
       $('meta-status-baca').innerHTML = '';
+      $('meta-nonbarang-baca').innerHTML = '';
       $('meta-va-wrap').classList.add('d-none');
       $('penerima-tbody').innerHTML = '<tr><td colspan="' + (bisaTulis ? 10 : 9) +
         '" class="text-center text-muted">Memuat…</td></tr>';
@@ -924,6 +1008,24 @@
             $('meta-nomor-va').value.trim() :
             (data.grup.nomor_va || '');
           simpanMeta(saklarStatus.checked ? 'selesai' : 'belum', va || null);
+        });
+      }
+
+      // Saklar kategori non-barang: tersimpan otomatis
+      // begitu diganti; tombol reset mengembalikan ke
+      // deteksi otomatis (non_barang = null di server).
+      var saklarNb = $('meta-nonbarang-saklar');
+      if (saklarNb) {
+        saklarNb.addEventListener('change', function() {
+          if (!data || !data.grup) return;
+          simpanKategori(saklarNb.checked);
+        });
+      }
+      var btnNbOtomatis = $('btn-nonbarang-otomatis');
+      if (btnNbOtomatis) {
+        btnNbOtomatis.addEventListener('click', function() {
+          if (!data || !data.grup) return;
+          simpanKategori(null);
         });
       }
 

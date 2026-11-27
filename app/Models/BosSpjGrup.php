@@ -8,15 +8,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Meta satu grup transaksi BKU untuk SPJ (Fase 2
  * lanjutan): status penyelesaian grup ('belum' /
- * 'selesai') dan nomor virtual account
- * pembayaran SIPLah (isian manual — tidak ada di data
- * ARKAS). Grup diidentifikasi teks grup_kunci, kunci
- * yang sama dengan kwitansi Fase 1 dan penerima
- * Fase 2 di KelolaBosController ("nota:{id}" /
- * "bukti:{no}|{tgl}" / "baris:{id}"). Baris meta dibuat
- * malas (updateOrCreate) hanya bila pengguna mengisi
- * status / VA; ketiadaan baris berarti status 'belum'
- * dan VA kosong.
+ * 'selesai'), nomor virtual account pembayaran
+ * SIPLah (isian manual — tidak ada di data ARKAS),
+ * dan kategori non_barang: override manual atas
+ * deteksi otomatis dari kode rekening apakah grup
+ * termasuk non-barang (pembayaran ke orang: honor,
+ * transport, insentif — sasaran Tanda Terima) atau
+ * barang. non_barang null berarti ikut deteksi
+ * otomatis; true/false memaksa kategori. Grup
+ * diidentifikasi teks grup_kunci, kunci yang sama
+ * dengan kwitansi Fase 1 dan penerima Fase 2 di
+ * KelolaBosController ("nota:{id}" / "bukti:{no}|{tgl}"
+ * / "baris:{id}"). Baris meta dibuat malas
+ * (updateOrCreate) hanya bila pengguna mengisi
+ * status / VA / kategori; ketiadaan baris berarti
+ * status 'belum', VA kosong, kategori otomatis.
  */
 class BosSpjGrup extends Model
 {
@@ -36,6 +42,11 @@ class BosSpjGrup extends Model
     'grup_kunci',
     'status',
     'nomor_va',
+    'non_barang',
+  ];
+
+  protected $casts = [
+    'non_barang' => 'boolean',
   ];
 
   public function sekolah(): BelongsTo

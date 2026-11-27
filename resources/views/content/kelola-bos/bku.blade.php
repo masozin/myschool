@@ -315,7 +315,7 @@
                   @endif
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
                     @endphp
                     {{-- Lencana meta grup: SIPLah (dari nota), status
                          (Belum tidak ditampilkan), dan nomor VA. Wadah
@@ -324,6 +324,9 @@
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
+                      @endif
+                      @if (!empty($metaBaris['non_barang']))
+                        <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
                       @endif
                       @if ($metaBaris['status'] === 'selesai')
                         <span class="badge bg-success lencana-status-grup">Selesai</span>
