@@ -1271,7 +1271,9 @@ class KelolaBosController extends Controller
    * batas. Saldo awal ARKAS adalah saldo penutup bulan sebelumnya, jadi
    * hasilnya sama dengan saldo penutup bulan yang bersangkutan.
    *
-   * Pajak: jumlah Pajak Belanja Terima sejak 1 Januari sampai batas.
+   * Pajak: jumlah Pajak Belanja Terima sejak 1 Januari sampai batas,
+   * dikurangi pajak yang melekat pada nota beli di SIPLah (pajaknya
+   * diselesaikan marketplace, tidak dipegang sekolah).
    */
   private function hitungKartuDana(int $sekolahId, ?int $tahun, ?int $bulanSampai): array
   {
@@ -1313,6 +1315,26 @@ class KelolaBosController extends Controller
         ->where('tanggal_transaksi', '>=', $awalTahun)
         ->where('tanggal_transaksi', '<', $sebelum)
         ->sum('saldo');
+
+      // Pajak belanja SIPLah tidak dipegang sekolah
+      // (diselesaikan marketplace lewat pembayaran VA),
+      // jadi dikeluarkan dari kartu jumlah pajak: baris
+      // pajak yang notanya bertanda beli di SIPLah.
+      $pajakSiplah = (float) BosKasUmum::query()
+        ->join('bos_kas_nota', function ($j) {
+          $j->on('bos_kas_nota.id_arkas', '=', 'bos_kas_umum.id_kas_nota')
+            ->on('bos_kas_nota.sekolah_id', '=', 'bos_kas_umum.sekolah_id');
+        })
+        ->where('bos_kas_umum.sekolah_id', $sekolahId)
+        ->where('bos_kas_umum.soft_delete', false)
+        ->where('bos_kas_umum.id_ref_bku', self::JENIS_PAJAK)
+        ->where('bos_kas_umum.tanggal_transaksi', '>=', $awalTahun)
+        ->where('bos_kas_umum.tanggal_transaksi', '<', $sebelum)
+        ->where('bos_kas_nota.soft_delete', false)
+        ->where('bos_kas_nota.is_beli_di_siplah', true)
+        ->sum('bos_kas_umum.saldo');
+
+      $pajak = max(0.0, $pajak - $pajakSiplah);
     }
 
     return ['tahun' => $tahun, 'bulan' => $bulanSampai] + $this->ringkasDana($perJenis, $pajak);
@@ -2511,12 +2533,16 @@ class KelolaBosController extends Controller
       ? trim((string) $validated['nomor_va'])
       : null;
 
-    // Atribut dibangun kondisional: kolom non_barang
-    // hanya disentuh bila pemanggil mengirim kuncinya,
-    // agar pemanggil lama (inline SIPLah & simpanMeta
-    // modal yang hanya mengirim status + nomor_va) tidak
-    // menimpa override kategori yang sudah tersimpan.
-    $atribut = ['status' => $validated['status'], 'nomor_va' => $nomorVa];
+    // Atribut dibangun kondisional: kolom nomor_va dan
+    // non_barang hanya disentuh bila pemanggil mengirim
+    // kuncinya — saklar status di baris tabel hanya
+    // mengirim status sehingga tidak menimpa nomor VA
+    // tersimpan, dan pemanggil lama tidak menimpa
+    // override kategori yang sudah tersimpan.
+    $atribut = ['status' => $validated['status']];
+    if ($request->has('nomor_va')) {
+      $atribut['nomor_va'] = $nomorVa;
+    }
     if ($request->has('non_barang')) {
       $nb = $request->input('non_barang');
       $atribut['non_barang'] = is_null($nb) ? null : (bool) $nb;
@@ -2555,7 +2581,7 @@ class KelolaBosController extends Controller
     if (!$konteks) {
       return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
     }
-    ['sekolahId' => $sekolahId, 'kunci' => $kunci, 'grup' => $grup] = $konteks;
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci, 'grup' => $grup, 'baris' => $barisKonteks] = $konteks;
 
     $manual = str_starts_with($kunci, 'manual:');
     $grupManualId = $manual ? (int) substr($kunci, 7) : null;
@@ -2598,6 +2624,20 @@ class KelolaBosController extends Controller
       ];
     }
 
+    // Meta grup (status & nomor VA) + penanda SIPLah dari
+    // nota grup: modal isi grup memakai ini untuk isian
+    // VA grup SIPLah (VA tidak tercatat di ARKAS).
+    $metaGrup = BosSpjGrup::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    $barisNota = collect($grup)->first(fn($r) => !empty($r->id_kas_nota));
+    $notaGrup = $barisNota
+      ? BosKasNota::where('id_arkas', $barisNota->id_kas_nota)
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->first()
+      : null;
+
     return response()->json([
       'grup' => [
         'kunci' => $kunci,
@@ -2607,6 +2647,10 @@ class KelolaBosController extends Controller
         'jenis' => $jenis,
         'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $grup)),
         'jumlah_baris' => count($grup),
+        'baris_id' => $barisKonteks->id,
+        'siplah' => (bool) ($notaGrup?->is_beli_di_siplah ?? false),
+        'status' => $metaGrup?->status ?? 'belum',
+        'nomor_va' => $metaGrup?->nomor_va,
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
       'baris' => $baris,

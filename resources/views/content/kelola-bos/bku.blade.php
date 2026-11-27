@@ -126,7 +126,7 @@
           tunai. Dihitung per anggaran dari saldo awal bulan terakhir (saldo penutup bulan sebelumnya) ditambah
           transaksi sesudahnya: tunai + pergeseran tunai − kas keluar; non tunai + terima dana + bunga bank − pajak
           bunga − tarik tunai − kas keluar non tunai. Jumlah pajak = pajak belanja yang tercatat sejak Januari s.d.
-          posisi ini, tidak memengaruhi dana. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
+          posisi ini, dikurangi pajak belanja SIPLah (diselesaikan marketplace), tidak memengaruhi dana. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
         @if (!empty($kartuDana['takDikenal']['jml']))
           <div class="small text-warning mt-1"><i class="icon-base ri ri-error-warning-line me-1"></i>{{ $kartuDana['takDikenal']['jml'] }}
             transaksi dengan jenis BKU #{{ implode(', #', $kartuDana['takDikenal']['ids']) }} belum dipetakan dan tidak
@@ -390,9 +390,6 @@
                         {{ $b->nama_toko ?? '-' }}
                       @endif
                     </span>
-                    @if ($namaGrupBaris && $b->nama_toko && !in_array($b->nama_toko, $namaGrupBaris, true))
-                      <div class="small text-muted nama-toko-baris">Toko: {{ $b->nama_toko }}</div>
-                    @endif
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
@@ -409,8 +406,8 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Grup SIPLah tidak memakai editor penerima:
-                           status & nomor VA diisi langsung (inline),
-                           sama seperti baris biasa. --}}
+                           hanya saklar status di baris ini; nomor VA
+                           diisi lewat modal isi grup (klik uraian). --}}
                       @if ($bisaTulisPenerima)
                         <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
                           <div class="form-check form-switch mb-0">
@@ -418,9 +415,6 @@
                               id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
                             <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
                           </div>
-                          <input type="text" class="form-control form-control-sm py-0 meta-inline-va" style="width: 140px;"
-                            placeholder="Nomor VA" value="{{ $metaBaris['nomor_va'] }}">
-                          <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 meta-inline-simpan">Simpan</button>
                         </div>
                       @endif
                     @else
@@ -464,7 +458,16 @@
                 </td>
                 <td>
                   @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
-                  <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
+                  @if (!empty($b->is_beli_di_siplah) && in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
+                    {{-- Baris SIPLah satu baris: uraian bisa diklik
+                         untuk membuka modal isi grup — di sanalah
+                         nomor VA sekarang diisi. --}}
+                    <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
+                      data-grup-anggota data-id="{{ $b->id }}"
+                      title="Lihat rincian & isi nomor VA">{{ $aliasUraian ?? $b->uraian }}</button>
+                  @else
+                    <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
+                  @endif
                   @if ($bisaTulisAlias)
                     <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                       title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
@@ -491,9 +494,6 @@
                       {{ $b->nama_toko ?? '-' }}
                     @endif
                   </span>
-                  @if ($namaGrupBaris && $b->nama_toko && !in_array($b->nama_toko, $namaGrupBaris, true))
-                    <div class="small text-muted nama-toko-baris">Toko: {{ $b->nama_toko }}</div>
-                  @endif
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
                       $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
@@ -518,7 +518,8 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Baris SIPLah tidak memakai editor penerima:
-                           status & nomor VA diisi langsung (inline). --}}
+                           hanya saklar status di baris ini; nomor VA
+                           diisi lewat modal isi grup (klik uraian). --}}
                       @if ($bisaTulisPenerima)
                         <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
                           <div class="form-check form-switch mb-0">
@@ -526,9 +527,6 @@
                               id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
                             <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
                           </div>
-                          <input type="text" class="form-control form-control-sm py-0 meta-inline-va" style="width: 140px;"
-                            placeholder="Nomor VA" value="{{ $metaBaris['nomor_va'] }}">
-                          <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 meta-inline-simpan">Simpan</button>
                         </div>
                       @endif
                     @else
