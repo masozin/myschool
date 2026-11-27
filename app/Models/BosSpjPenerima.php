@@ -18,6 +18,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * dengan pengelompokan kwitansi Fase 1 di
  * KelolaBosController ("nota:{id}" / "bukti:{no}|{tgl}" /
  * "baris:{id}").
+ *
+ * Kolom selesai adalah penanda tuntas per penerima:
+ * status tampil grup yang punya penerima diturunkan
+ * dari penanda ini (semua selesai -> selesai, sebagian
+ * -> selesai sebagian, belum ada -> belum); lihat
+ * KelolaBosController::statusTampilGrup.
  */
 class BosSpjPenerima extends Model
 {
@@ -38,12 +44,14 @@ class BosSpjPenerima extends Model
     'satuan',
     'pph_persen',
     'urutan',
+    'selesai',
   ];
 
   protected $casts = [
     'volume' => 'decimal:2',
     'satuan' => 'decimal:2',
     'pph_persen' => 'decimal:2',
+    'selesai' => 'boolean',
   ];
 
   /** Jumlah kotor penerima ini: volume × satuan (2 desimal). */

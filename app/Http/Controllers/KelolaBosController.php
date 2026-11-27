@@ -1455,6 +1455,7 @@ class KelolaBosController extends Controller
         'metaGrup' => [],
         'kunciPerBaris' => [],
         'barisTampil' => [],
+        'pajakGrup' => [],
         'tahunTerpilih' => null,
       ]);
     }
@@ -1490,6 +1491,12 @@ class KelolaBosController extends Controller
       $q->when($tahunEfektif !== null, fn($x) => $x->whereYear('bos_kas_umum.tanggal_transaksi', $tahunEfektif))
         ->when($request->filled('bulan'), fn($x) => $x->whereMonth('bos_kas_umum.tanggal_transaksi', $request->integer('bulan')))
         ->when($request->filled('jenis'), fn($x) => $x->where('bos_kas_umum.id_ref_bku', $request->integer('jenis')))
+        // Bawaan (tanpa saringan jenis eksplisit): tabel
+        // hanya menampilkan transaksi belanja — baris lain
+        // (terima dana, saldo awal, pajak, tarik tunai, ...)
+        // mengaburkan daftar kerja SPJ. Memilih jenis lain
+        // secara eksplisit tetap menampilkannya.
+        ->when(!$request->filled('jenis'), fn($x) => $x->whereIn('bos_kas_umum.id_ref_bku', self::JENIS_BELANJA))
         ->when($request->filled('rekening'), fn($x) => $x->where('bos_kas_umum.kode_rekening', $request->input('rekening')))
         ->when($request->filled('cari'), function ($x) use ($request) {
           $cari = '%' . $request->input('cari') . '%';
@@ -1654,6 +1661,26 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Statistik penerima per kunci grup (jumlah total &
+    // jumlah yang sudah selesai) untuk status tampil —
+    // satu query teragregasi atas kunci-kunci halaman
+    // ini, pola yang sama dengan pemuatan nama penerima
+    // di atas.
+    $statistikPenerima = [];
+    $kunciHalaman = collect($kunciPerBaris)->unique()->values();
+    if ($kunciHalaman->isNotEmpty()) {
+      $statistikPenerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', $kunciHalaman)
+        ->selectRaw('grup_kunci, COUNT(*) AS jumlah, SUM(CASE WHEN selesai THEN 1 ELSE 0 END) AS jumlah_selesai')
+        ->groupBy('grup_kunci')
+        ->get()
+        ->mapWithKeys(fn($r) => [$r->grup_kunci => [
+          'jumlah' => (int) $r->jumlah,
+          'jumlah_selesai' => (int) $r->jumlah_selesai,
+        ]])
+        ->all();
+    }
+
     // Meta grup SPJ (status, nomor VA, kategori
     // non-barang) untuk lencana di kolom Toko/Penerima —
     // pola yang sama: satu query menurut kunci grup,
@@ -1663,6 +1690,10 @@ class KelolaBosController extends Controller
     // efektif = override manual (kolom non_barang) bila
     // terisi, selain itu hasil deteksi dari kode rekening
     // baris-baris grup yang tampil di halaman ini.
+    // Status tampil: grup berpenerima diturunkan dari
+    // penanda selesai penerimanya (lihat
+    // statusTampilGrup), grup tanpa penerima mengikuti
+    // status meta.
     $metaGrup = [];
     if ($kunciPerBaris) {
       $daftarMeta = BosSpjGrup::where('sekolah_id', $sekolahId)
@@ -1679,8 +1710,17 @@ class KelolaBosController extends Controller
       foreach ($kunciPerBaris as $barisId => $kunci) {
         $meta = $daftarMeta->get($kunci);
         $manual = $meta && !is_null($meta->non_barang) ? (bool) $meta->non_barang : null;
+        $stat = $statistikPenerima[$kunci] ?? null;
+        if ($stat && $stat['jumlah'] > 0) {
+          $statusTampil = $stat['jumlah_selesai'] >= $stat['jumlah']
+            ? 'selesai'
+            : ($stat['jumlah_selesai'] > 0 ? 'sebagian' : 'belum');
+        } else {
+          $statusTampil = ($meta->status ?? 'belum') === 'selesai' ? 'selesai' : 'belum';
+        }
         $metaGrup[$barisId] = [
           'status' => $meta->status ?? 'belum',
+          'status_tampil' => $statusTampil,
           'nomor_va' => $meta->nomor_va ?? null,
           'non_barang_manual' => $manual,
           'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupPerKunci[$kunci] ?? []),
@@ -1750,6 +1790,58 @@ class KelolaBosController extends Controller
       ];
     }
 
+    // Nominal pajak per grup untuk kolom Pajak: baris
+    // Pajak Belanja Terima (jenis pajak) yang notanya
+    // termasuk grup ini, dijumlah per label pajaknya
+    // (PPN / PPh 21 / ... dari labelPajak() baris pajak).
+    // Peta nota -> kunci grup dibangun dari baris halaman
+    // (lewat kunciPerBaris) dan dilengkapi dari anggota
+    // grup pada barisTampil (nota yang anggotanya tidak
+    // tampil semua di halaman ini).
+    $petaNotaKunci = [];
+    foreach ($baris as $b) {
+      $kunciB = $kunciPerBaris[$b->id] ?? null;
+      if ($kunciB && !empty($b->id_kas_nota)) {
+        $petaNotaKunci[$b->id_kas_nota] = $kunciB;
+      }
+    }
+    foreach ($barisTampil as $item) {
+      if (!($item['grup'] ?? null)) {
+        continue;
+      }
+      foreach ($item['grup']['anggota'] as $r) {
+        if (!empty($r->id_kas_nota) && !isset($petaNotaKunci[$r->id_kas_nota])) {
+          $petaNotaKunci[$r->id_kas_nota] = $item['grup']['kunci'];
+        }
+      }
+    }
+    $pajakPerKunci = [];
+    if ($petaNotaKunci) {
+      $barisPajak = BosKasUmum::where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->where('id_ref_bku', self::JENIS_PAJAK)
+        ->whereIn('id_kas_nota', array_keys($petaNotaKunci))
+        ->get();
+      foreach ($barisPajak as $rp) {
+        $kunciP = $petaNotaKunci[$rp->id_kas_nota] ?? null;
+        if (!$kunciP) {
+          continue;
+        }
+        $label = $rp->labelPajak() ?: 'Pajak';
+        $pajakPerKunci[$kunciP][$label] = ($pajakPerKunci[$kunciP][$label] ?? 0.0) + (float) $rp->saldo;
+      }
+    }
+    $pajakGrup = [];
+    foreach ($baris as $b) {
+      $kunciB = $kunciPerBaris[$b->id] ?? null;
+      if ($kunciB && !empty($pajakPerKunci[$kunciB])) {
+        $pajakGrup[$b->id] = collect($pajakPerKunci[$kunciB])
+          ->map(fn($jml, $label) => ['label' => $label, 'jumlah' => $jml])
+          ->values()
+          ->all();
+      }
+    }
+
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
@@ -1774,6 +1866,7 @@ class KelolaBosController extends Controller
       'metaGrup' => $metaGrup,
       'kunciPerBaris' => $kunciPerBaris,
       'barisTampil' => $barisTampil,
+      'pajakGrup' => $pajakGrup,
     ]);
   }
 
@@ -2296,6 +2389,41 @@ class KelolaBosController extends Controller
   // mengintip / mengubah data sekolah ini.
 
   /**
+   * Status tampil satu grup SPJ. Bila grup punya penerima,
+   * status DITURUNKAN dari penanda selesai tiap penerima:
+   * semua selesai -> 'selesai', sebagian -> 'sebagian',
+   * belum ada -> 'belum'. Bila grup tanpa penerima, status
+   * mengikuti meta grup (bos_spj_grup.status).
+   *
+   * @return array{status_tampil: string, jumlah_penerima: int, jumlah_selesai: int}
+   */
+  private function statusTampilGrup(int $sekolahId, string $kunci): array
+  {
+    $jumlah = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->count();
+    if ($jumlah > 0) {
+      $selesai = BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->where('grup_kunci', $kunci)
+        ->where('selesai', true)
+        ->count();
+      return [
+        'status_tampil' => $selesai >= $jumlah ? 'selesai' : ($selesai > 0 ? 'sebagian' : 'belum'),
+        'jumlah_penerima' => $jumlah,
+        'jumlah_selesai' => $selesai,
+      ];
+    }
+    $meta = BosSpjGrup::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    return [
+      'status_tampil' => ($meta?->status ?? 'belum') === 'selesai' ? 'selesai' : 'belum',
+      'jumlah_penerima' => 0,
+      'jumlah_selesai' => 0,
+    ];
+  }
+
+  /**
    * Konteks grup penerima dari satu baris BKU: sekolah
    * aktif, baris, kunci grup, dan baris-baris grupnya.
    * Null bila baris tidak ada di sekolah aktif.
@@ -2360,6 +2488,7 @@ class KelolaBosController extends Controller
       'pph' => $p->pph,
       'diterima' => $p->diterima,
       'urutan' => (int) $p->urutan,
+      'selesai' => (bool) $p->selesai,
     ];
   }
 
@@ -2483,6 +2612,10 @@ class KelolaBosController extends Controller
       ? (is_null($meta->non_barang) ? null : (bool) $meta->non_barang)
       : null;
 
+    // Status tampil grup: diturunkan dari penanda
+    // selesai penerima bila grup punya penerima.
+    $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
+
     return response()->json([
       'grup' => [
         'kunci' => $kunci,
@@ -2495,6 +2628,9 @@ class KelolaBosController extends Controller
         'invoice_siplah' => $invoiceSiplah,
         'nomor_va' => $meta?->nomor_va,
         'status' => $meta?->status ?? 'belum',
+        'status_tampil' => $statusGrup['status_tampil'],
+        'jumlah_penerima' => $statusGrup['jumlah_penerima'],
+        'jumlah_selesai' => $statusGrup['jumlah_selesai'],
         'non_barang_deteksi' => $deteksiNonBarang,
         'non_barang_manual' => $nonBarangManual,
         'non_barang' => $nonBarangManual ?? $deteksiNonBarang,
@@ -2555,6 +2691,8 @@ class KelolaBosController extends Controller
 
     $manual = is_null($meta->non_barang) ? null : (bool) $meta->non_barang;
 
+    $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
+
     return response()->json([
       'success' => true,
       'message' => 'Keterangan grup SPJ diperbarui.',
@@ -2562,6 +2700,9 @@ class KelolaBosController extends Controller
       'nomor_va' => $meta->nomor_va,
       'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupBaris),
       'non_barang_manual' => $manual,
+      'status_tampil' => $statusGrup['status_tampil'],
+      'jumlah_penerima' => $statusGrup['jumlah_penerima'],
+      'jumlah_selesai' => $statusGrup['jumlah_selesai'],
     ]);
   }
 
@@ -2638,6 +2779,10 @@ class KelolaBosController extends Controller
         ->first()
       : null;
 
+    // Status tampil grup: diturunkan dari penanda
+    // selesai penerima bila grup punya penerima.
+    $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
+
     return response()->json([
       'grup' => [
         'kunci' => $kunci,
@@ -2651,6 +2796,9 @@ class KelolaBosController extends Controller
         'siplah' => (bool) ($notaGrup?->is_beli_di_siplah ?? false),
         'status' => $metaGrup?->status ?? 'belum',
         'nomor_va' => $metaGrup?->nomor_va,
+        'status_tampil' => $statusGrup['status_tampil'],
+        'jumlah_penerima' => $statusGrup['jumlah_penerima'],
+        'jumlah_selesai' => $statusGrup['jumlah_selesai'],
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
       'baris' => $baris,
@@ -3260,6 +3408,47 @@ class KelolaBosController extends Controller
       'success' => true,
       'message' => 'Penerima diperbarui.',
       'data' => $this->snapshotKeArray($snapshot->fresh()),
+    ]);
+  }
+
+  /**
+   * Tandai selesai / belum selesai satu snapshot
+   * penerima. Status tampil grup diturunkan dari
+   * penanda ini (lihat statusTampilGrup) dan ikut
+   * dikembalikan agar klien bisa memperbarui lencana
+   * grup tanpa memuat ulang.
+   */
+  public function penerimaSelesaiUbah(Request $request, int $id, int $penerimaId)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci] = $konteks;
+
+    $snapshot = BosSpjPenerima::where('id', $penerimaId)
+      ->where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    if (!$snapshot) {
+      return response()->json(['message' => 'Penerima tidak ditemukan di grup ini.'], 404);
+    }
+
+    $validated = $request->validate([
+      'selesai' => 'required|boolean',
+    ]);
+
+    $snapshot->update(['selesai' => (bool) $validated['selesai']]);
+
+    $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Status penerima diperbarui.',
+      'data' => $this->snapshotKeArray($snapshot->fresh()),
+      'status_tampil' => $statusGrup['status_tampil'],
+      'jumlah_penerima' => $statusGrup['jumlah_penerima'],
+      'jumlah_selesai' => $statusGrup['jumlah_selesai'],
     ]);
   }
 

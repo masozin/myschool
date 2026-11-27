@@ -74,7 +74,8 @@
           </div>
           <div class="form-text mt-2">
             @if ($bisaTulisPenerima)
-              Status tersimpan otomatis begitu diganti.
+              Status grup tanpa penerima tersimpan otomatis begitu diganti; grup yang punya penerima
+              mengikuti saklar selesai per penerima di tabel bawah.
             @endif
             Nomor VA diisi manual — data ARKAS/SIPLah hanya menyediakan nomor invoice.
           </div>
@@ -93,6 +94,7 @@
                 <th class="text-end" style="width: 9rem;">PPh Rp</th>
                 <th class="text-end" style="width: 10rem;">Diterima</th>
                 <th style="width: 11rem;">Rekening</th>
+                <th style="width: 8rem;">Status</th>
                 @if ($bisaTulisPenerima)
                   <th style="width: 6rem;">Aksi</th>
                 @endif
@@ -100,7 +102,7 @@
             </thead>
             <tbody id="penerima-tbody">
               <tr>
-                <td colspan="{{ $bisaTulisPenerima ? 10 : 9 }}" class="text-center text-muted">Memuat…</td>
+                <td colspan="{{ $bisaTulisPenerima ? 11 : 10 }}" class="text-center text-muted">Memuat…</td>
               </tr>
             </tbody>
             <tfoot>
@@ -110,7 +112,7 @@
                 <td></td>
                 <td class="text-end" id="tot-pph">Rp 0</td>
                 <td class="text-end" id="tot-diterima">Rp 0</td>
-                <td colspan="{{ $bisaTulisPenerima ? 2 : 1 }}"></td>
+                <td colspan="{{ $bisaTulisPenerima ? 3 : 2 }}"></td>
               </tr>
             </tfoot>
           </table>
@@ -409,18 +411,49 @@
       }
       $('meta-siplah-info').innerHTML = info;
 
-      if (bisaTulis) {
-        var saklar = $('meta-status-saklar');
-        if (saklar) saklar.checked = (g.status === 'selesai');
+      // Status: bila grup punya penerima, status grup
+      // DITURUNKAN dari penanda selesai tiap penerima —
+      // saklar grup disembunyikan dan #meta-status-baca
+      // menampilkan teks turunannya (juga untuk peran
+      // baca-saja). Bila belum ada penerima, saklar meta
+      // berfungsi seperti biasa. Saklar yang tersembunyi
+      // tetap diselaraskan ke status meta tersimpan agar
+      // pengiriman meta lain (VA, kategori) tidak
+      // mengirim status basi.
+      var saklarStatusMeta = $('meta-status-saklar');
+      if (saklarStatusMeta) saklarStatusMeta.checked = (g.status === 'selesai');
+      var bungkusSaklarStatus = saklarStatusMeta ? saklarStatusMeta.closest('.form-check') : null;
+      if (Number(g.jumlah_penerima || 0) > 0) {
+        if (bungkusSaklarStatus) bungkusSaklarStatus.classList.add('d-none');
+        var stGrup = g.status_tampil || 'belum';
+        var teksStatusGrup;
+        if (stGrup === 'selesai') {
+          teksStatusGrup = 'Selesai — semua penerima selesai';
+        } else if (stGrup === 'sebagian') {
+          teksStatusGrup = 'Selesai Sebagian — ' + Number(g.jumlah_selesai || 0) +
+            ' dari ' + Number(g.jumlah_penerima || 0) + ' penerima';
+        } else {
+          teksStatusGrup = 'Belum Selesai — ' + Number(g.jumlah_selesai || 0) +
+            ' dari ' + Number(g.jumlah_penerima || 0) + ' penerima';
+        }
+        $('meta-status-baca').innerHTML = lolosHtml(teksStatusGrup) +
+          (bisaTulis ?
+            '<div class="form-text">Status diatur per penerima lewat saklar di tabel penerima.</div>' :
+            '');
       } else {
-        var labelStatus = {
-          belum: ['bg-label-secondary', 'Belum'],
-          selesai: ['bg-success', 'Selesai']
-        };
-        var kunciStatus = (g.status === 'selesai') ? 'selesai' : 'belum';
-        var label = labelStatus[kunciStatus];
-        $('meta-status-baca').innerHTML =
-          '<span class="badge ' + label[0] + '">' + label[1] + '</span>';
+        if (bungkusSaklarStatus) bungkusSaklarStatus.classList.remove('d-none');
+        if (bisaTulis) {
+          $('meta-status-baca').innerHTML = '';
+        } else {
+          var labelStatus = {
+            belum: ['bg-label-secondary', 'Belum'],
+            selesai: ['bg-success', 'Selesai']
+          };
+          var kunciStatus = (g.status === 'selesai') ? 'selesai' : 'belum';
+          var label = labelStatus[kunciStatus];
+          $('meta-status-baca').innerHTML =
+            '<span class="badge ' + label[0] + '">' + label[1] + '</span>';
+        }
       }
 
       // Kategori non-barang: saklar mengikuti nilai
@@ -463,6 +496,35 @@
       }
     }
 
+    // Lukis lencana status tampil pada wadah meta satu
+    // baris BKU menurut status_tampil grup: selesai ->
+    // hijau 'Selesai', sebagian -> kuning 'Selesai
+    // Sebagian', belum -> abu 'Belum Selesai'. Lencana
+    // selalu ada (dibuat bila belum ada di wadah).
+    function gambarLencanaStatus(wadah, statusTampil) {
+      if (!wadah) return;
+      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
+      if (!lencanaStatus) {
+        lencanaStatus = document.createElement('span');
+        var vaEl = wadah.querySelector('.lencana-va-grup');
+        if (vaEl) {
+          wadah.insertBefore(lencanaStatus, vaEl);
+        } else {
+          wadah.appendChild(lencanaStatus);
+        }
+      }
+      if (statusTampil === 'selesai') {
+        lencanaStatus.className = 'badge lencana-status-grup bg-success';
+        lencanaStatus.textContent = 'Selesai';
+      } else if (statusTampil === 'sebagian') {
+        lencanaStatus.className = 'badge lencana-status-grup bg-warning text-dark';
+        lencanaStatus.textContent = 'Selesai Sebagian';
+      } else {
+        lencanaStatus.className = 'badge lencana-status-grup bg-secondary';
+        lencanaStatus.textContent = 'Belum Selesai';
+      }
+    }
+
     // Perbarui lencana status & VA pada sel baris BKU yang
     // membuka modal ini, tanpa memuat ulang halaman.
     function segarkanMetaBaris() {
@@ -473,22 +535,7 @@
       if (!wadah) return;
       var g = data.grup || {};
 
-      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
-      if (g.status === 'selesai') {
-        if (!lencanaStatus) {
-          lencanaStatus = document.createElement('span');
-          var vaEl = wadah.querySelector('.lencana-va-grup');
-          if (vaEl) {
-            wadah.insertBefore(lencanaStatus, vaEl);
-          } else {
-            wadah.appendChild(lencanaStatus);
-          }
-        }
-        lencanaStatus.className = 'badge lencana-status-grup bg-success';
-        lencanaStatus.textContent = 'Selesai';
-      } else if (lencanaStatus) {
-        lencanaStatus.remove();
-      }
+      gambarLencanaStatus(wadah, g.status_tampil);
 
       var lencanaNb = wadah.querySelector('.lencana-nonbarang-grup');
       if (g.non_barang) {
@@ -541,6 +588,9 @@
         });
         data.grup.status = res.status;
         data.grup.nomor_va = res.nomor_va;
+        data.grup.status_tampil = res.status_tampil;
+        data.grup.jumlah_penerima = res.jumlah_penerima;
+        data.grup.jumlah_selesai = res.jumlah_selesai;
         gambarMeta();
         segarkanMetaBaris();
         tandaiMetaTersimpan();
@@ -566,6 +616,9 @@
         });
         data.grup.non_barang = res.non_barang;
         data.grup.non_barang_manual = res.non_barang_manual;
+        data.grup.status_tampil = res.status_tampil;
+        data.grup.jumlah_penerima = res.jumlah_penerima;
+        data.grup.jumlah_selesai = res.jumlah_selesai;
         gambarMeta();
         segarkanMetaBaris();
         tandaiMetaTersimpan();
@@ -579,7 +632,7 @@
       var tbody = $('penerima-tbody');
       var daftar = data.penerima || [];
       if (!daftar.length) {
-        tbody.innerHTML = '<tr><td colspan="' + (bisaTulis ? 10 : 9) +
+        tbody.innerHTML = '<tr><td colspan="' + (bisaTulis ? 11 : 10) +
           '" class="text-center text-muted">Belum ada penerima untuk grup ini.</td></tr>';
       } else {
         tbody.innerHTML = daftar.map(function(p, i) {
@@ -600,6 +653,17 @@
               '<button type="button" class="btn btn-sm btn-icon btn-text-danger" data-aksi-hapus="' + p.id +
               '" title="Hapus"><i class="ri ri-delete-bin-line"></i></button></td>';
           }
+          var statusSel;
+          if (bisaTulis) {
+            statusSel = '<td><div class="form-check form-switch mb-0">' +
+              '<input class="form-check-input saklar-selesai-penerima" type="checkbox" data-selesai-id="' +
+              p.id + '"' + (p.selesai ? ' checked' : '') + '>' +
+              '<label class="form-check-label small">Selesai</label></div></td>';
+          } else {
+            statusSel = '<td>' + (p.selesai ?
+              '<span class="badge bg-success">Selesai</span>' :
+              '<span class="badge bg-secondary">Belum</span>') + '</td>';
+          }
           return '<tr>' +
             '<td>' + (i + 1) + '</td>' +
             '<td><div class="fw-semibold">' + lolosHtml(p.nama) + asal + '</div>' +
@@ -610,7 +674,7 @@
             '<td class="text-end">' + fmtPersen(p.pph_persen) + '</td>' +
             '<td class="text-end">' + fmtRp(p.pph) + '</td>' +
             '<td class="text-end fw-semibold">' + fmtRp(p.diterima) + '</td>' +
-            '<td class="small">' + rek + '</td>' + aksi + '</tr>';
+            '<td class="small">' + rek + '</td>' + statusSel + aksi + '</tr>';
         }).join('');
       }
 
@@ -863,73 +927,11 @@
       $('meta-status-baca').innerHTML = '';
       $('meta-nonbarang-baca').innerHTML = '';
       $('meta-va-wrap').classList.add('d-none');
-      $('penerima-tbody').innerHTML = '<tr><td colspan="' + (bisaTulis ? 10 : 9) +
+      $('penerima-tbody').innerHTML = '<tr><td colspan="' + (bisaTulis ? 11 : 10) +
         '" class="text-center text-muted">Memuat…</td></tr>';
       $('penerima-selisih').innerHTML = '';
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
       muat().catch(gagal);
-    });
-
-    // ── Meta inline untuk baris SIPLah di tabel BKU ──
-    // Baris SIPLah tidak membuka modal penerima: hanya saklar
-    // status yang disimpan langsung dari sel Toko/Penerima;
-    // nomor VA diisi lewat modal isi grup (klik uraian).
-    function segarkanMetaInline(wadah, status, nomorVa) {
-      if (!wadah) return;
-      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
-      if (status === 'selesai') {
-        if (!lencanaStatus) {
-          lencanaStatus = document.createElement('span');
-          var vaEl = wadah.querySelector('.lencana-va-grup');
-          if (vaEl) {
-            wadah.insertBefore(lencanaStatus, vaEl);
-          } else {
-            wadah.appendChild(lencanaStatus);
-          }
-        }
-        lencanaStatus.className = 'badge lencana-status-grup bg-success';
-        lencanaStatus.textContent = 'Selesai';
-      } else if (lencanaStatus) {
-        lencanaStatus.remove();
-      }
-
-      var lencanaVa = wadah.querySelector('.lencana-va-grup');
-      if (nomorVa) {
-        if (!lencanaVa) {
-          lencanaVa = document.createElement('span');
-          lencanaVa.className = 'small text-muted lencana-va-grup';
-          wadah.appendChild(lencanaVa);
-        }
-        lencanaVa.textContent = 'VA: ' + nomorVa;
-      } else if (lencanaVa) {
-        lencanaVa.remove();
-      }
-    }
-
-    document.querySelectorAll('[data-meta-inline]').forEach(function(el) {
-      var id = el.getAttribute('data-id');
-      var selStatus = el.querySelector('.meta-inline-status');
-      if (!selStatus) return;
-      var statusTerakhir = selStatus.checked;
-
-      // Hanya status yang dikirim — nomor_va sengaja TIDAK
-      // ikut agar VA tersimpan (diisi lewat modal isi grup)
-      // tidak tertimpa dari saklar baris ini.
-      selStatus.addEventListener('change', async function() {
-        try {
-          var res = await kirim(urlDasar + '/' + id + '/penerima-grup', 'PUT', {
-            status: selStatus.checked ? 'selesai' : 'belum'
-          });
-          statusTerakhir = (res.status === 'selesai');
-          selStatus.checked = statusTerakhir;
-          var sel = el.closest('td');
-          segarkanMetaInline(sel ? sel.querySelector('.meta-grup-baris') : null,
-            res.status, res.nomor_va);
-        } catch (e) {
-          selStatus.checked = statusTerakhir;
-          gagal(e);
-        }
-      });
     });
 
     if (bisaTulis) {
@@ -1013,6 +1015,40 @@
           saklarVa ? (saklarVa.checked ? 'selesai' : 'belum') : ((data.grup.status === 'selesai') ? 'selesai' : 'belum'),
           $('meta-nomor-va').value.trim() || null
         );
+      });
+
+      // Saklar selesai per penerima di tabel penerima
+      // (delegasi change pada tbody): status tampil grup
+      // diturunkan ulang di server dan dikembalikan,
+      // lalu teks turunan di blok Keterangan serta
+      // lencana status di baris BKU diperbarui.
+      $('penerima-tbody').addEventListener('change', async function(e) {
+        var saklarSelesai = e.target.closest('.saklar-selesai-penerima');
+        if (!saklarSelesai) return;
+        var pidSelesai = saklarSelesai.getAttribute('data-selesai-id');
+        try {
+          var resSelesai = await kirim(
+            urlDasar + '/' + barisId + '/penerima/' + pidSelesai + '/selesai', 'PUT', {
+              selesai: saklarSelesai.checked
+            });
+          var targetSelesai = (data.penerima || []).find(function(p) {
+            return Number(p.id) === Number(pidSelesai);
+          });
+          if (targetSelesai && resSelesai.data) {
+            targetSelesai.selesai = !!resSelesai.data.selesai;
+          }
+          data.grup.status_tampil = resSelesai.status_tampil;
+          data.grup.jumlah_penerima = resSelesai.jumlah_penerima;
+          data.grup.jumlah_selesai = resSelesai.jumlah_selesai;
+          gambarMeta();
+          var btnBaris = document.querySelector('[data-penerima-baris][data-id="' + barisId + '"]');
+          var selBaris = btnBaris ? btnBaris.closest('td') : null;
+          gambarLencanaStatus(selBaris ? selBaris.querySelector('.meta-grup-baris') : null,
+            resSelesai.status_tampil);
+        } catch (errSelesai) {
+          saklarSelesai.checked = !saklarSelesai.checked;
+          gagal(errSelesai);
+        }
       });
 
       // Aksi per baris di dalam modal (delegasi klik)

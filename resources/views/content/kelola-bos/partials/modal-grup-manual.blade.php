@@ -98,16 +98,28 @@
             </tfoot>
           </table>
         </div>
-        <div id="isi-grup-va" class="mt-3 d-none">
-          <label class="form-label small fw-semibold" for="isi-grup-va-input">Nomor VA SIPLah</label>
-          <div class="d-flex gap-2">
-            <input type="text" id="isi-grup-va-input" class="form-control form-control-sm"
-              placeholder="Nomor virtual account pembayaran SIPLah" maxlength="50">
-            <button type="button" id="isi-grup-va-simpan" class="btn btn-sm btn-primary text-nowrap">Simpan VA</button>
+        <div id="isi-grup-spj" class="mt-3 d-none">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="fw-semibold small">Keterangan SPJ</span>
+            <span id="isi-grup-status-turunan" class="d-none"></span>
+            <div class="form-check form-switch mb-0" id="isi-grup-status-wrap">
+              <input class="form-check-input" type="checkbox" role="switch" id="isi-grup-status">
+              <label class="form-check-label small" for="isi-grup-status">Selesai</label>
+            </div>
           </div>
-          <div class="small text-muted mt-1">Nomor VA tidak tercatat di ARKAS — isian manual ini tersimpan
-            sebagai keterangan SPJ untuk nota ini. Status selesai/belum diatur dari saklar di baris tabel BKU.</div>
-          <div class="alert alert-danger py-2 px-3 mt-2 d-none" id="isi-grup-va-gagal"></div>
+          <div id="isi-grup-va" class="mt-2 d-none">
+            <label class="form-label small fw-semibold" for="isi-grup-va-input">Nomor VA SIPLah</label>
+            <div class="d-flex gap-2">
+              <input type="text" id="isi-grup-va-input" class="form-control form-control-sm"
+                placeholder="Nomor virtual account pembayaran SIPLah" maxlength="50">
+            </div>
+            <div class="small text-muted mt-1">Nomor VA tidak tercatat di ARKAS — isian manual ini tersimpan
+              sebagai keterangan SPJ untuk nota ini.</div>
+          </div>
+          <div class="mt-2">
+            <button type="button" id="isi-grup-spj-simpan" class="btn btn-sm btn-primary">Simpan Keterangan</button>
+          </div>
+          <div class="alert alert-danger py-2 px-3 mt-2 d-none" id="isi-grup-spj-gagal"></div>
         </div>
         <div id="isi-grup-tulis" class="d-none mt-4">
           <hr>
@@ -434,8 +446,10 @@
     // ── Isi grup ──────────────────────────────────────
     var isiGrupId = null; // id baris perwakilan grup yang sedang dibuka
     var isiGrupManualId = null;
-    var isiGrupVaBarisId = null; // id baris untuk simpan VA (grup SIPLah)
-    var isiGrupVaStatus = 'belum'; // status meta grup SIPLah yang sedang dibuka
+    var isiGrupSpjBarisId = null; // id baris untuk simpan keterangan SPJ
+    var isiGrupSpjStatus = 'belum'; // status meta terakhir dari payload grup
+    var isiGrupSpjJumlahPenerima = 0; // jumlah penerima grup terakhir
+    var isiGrupSpjSiplah = false; // grup terakhir SIPLah atau bukan
 
     async function bukaIsiGrup(barisId) {
       isiGrupId = barisId;
@@ -446,8 +460,8 @@
       $('isi-grup-tbody').innerHTML = '';
       $('isi-grup-total').textContent = '';
       $('isi-grup-tulis').classList.add('d-none');
-      $('isi-grup-va').classList.add('d-none');
-      isiGrupVaBarisId = null;
+      $('isi-grup-spj').classList.add('d-none');
+      isiGrupSpjBarisId = null;
       bootstrap.Modal.getOrCreateInstance($('modal-isi-grup')).show();
       try {
         var res = await kirimGrup(urlDasarGrup + '/' + barisId + '/grup-anggota', 'GET');
@@ -480,17 +494,53 @@
         });
         $('isi-grup-tbody').innerHTML = html;
         $('isi-grup-total').textContent = fmtRp(g.total || 0);
-        // Isian VA hanya untuk grup SIPLah & peran yang
-        // boleh menulis; statusnya tidak diubah dari sini.
-        var tampilVa = !!g.siplah && !!res.bisa_tulis;
-        $('isi-grup-va').classList.toggle('d-none', !tampilVa);
-        if (tampilVa) {
-          isiGrupVaBarisId = g.baris_id;
-          isiGrupVaStatus = g.status || 'belum';
-          $('isi-grup-va-input').value = g.nomor_va || '';
-          $('isi-grup-va-gagal').classList.add('d-none');
+        // Keterangan SPJ (status & VA) hanya untuk peran
+        // yang boleh menulis; peran baca-saja melihat
+        // status dari lencana di tabel BKU. Status grup
+        // berpenerima diturunkan dari penanda selesai
+        // penerima — saklar diganti teks turunan; grup
+        // tanpa penerima memakai saklar meta seperti
+        // biasa. Isian VA hanya untuk grup SIPLah.
+        isiGrupSpjStatus = g.status || 'belum';
+        isiGrupSpjJumlahPenerima = Number(g.jumlah_penerima || 0);
+        isiGrupSpjSiplah = !!g.siplah;
+        var tampilSpj = !!res.bisa_tulis;
+        $('isi-grup-spj').classList.toggle('d-none', !tampilSpj);
+        if (tampilSpj) {
+          isiGrupSpjBarisId = g.baris_id;
+          $('isi-grup-spj-gagal').classList.add('d-none');
+          var turunanSpj = $('isi-grup-status-turunan');
+          var bungkusStatusSpj = $('isi-grup-status-wrap');
+          if (isiGrupSpjJumlahPenerima > 0) {
+            var stSpj = g.status_tampil || 'belum';
+            var teksSpj = stSpj === 'selesai' ? 'Selesai' :
+              (stSpj === 'sebagian' ?
+                'Selesai Sebagian — ' + Number(g.jumlah_selesai || 0) + ' dari ' +
+                isiGrupSpjJumlahPenerima + ' penerima' :
+                'Belum Selesai');
+            var kelasSpj = stSpj === 'selesai' ? 'bg-success' :
+              (stSpj === 'sebagian' ? 'bg-warning text-dark' : 'bg-secondary');
+            turunanSpj.innerHTML = '<span class="badge ' + kelasSpj + '">' + lolosHtml(teksSpj) + '</span>' +
+              ' <span class="small text-muted">diatur per penerima</span>';
+            turunanSpj.classList.remove('d-none');
+            bungkusStatusSpj.classList.add('d-none');
+          } else {
+            turunanSpj.classList.add('d-none');
+            turunanSpj.innerHTML = '';
+            bungkusStatusSpj.classList.remove('d-none');
+            $('isi-grup-status').checked = (isiGrupSpjStatus === 'selesai');
+          }
+          $('isi-grup-va').classList.toggle('d-none', !isiGrupSpjSiplah);
+          if (isiGrupSpjSiplah) {
+            $('isi-grup-va-input').value = g.nomor_va || '';
+          }
+          // Tombol simpan hanya berguna bila ada yang bisa
+          // diubah: saklar status (grup tanpa penerima)
+          // atau isian VA (grup SIPLah).
+          var adaYangDisimpan = isiGrupSpjJumlahPenerima === 0 || isiGrupSpjSiplah;
+          $('isi-grup-spj-simpan').classList.toggle('d-none', !adaYangDisimpan);
         } else {
-          isiGrupVaBarisId = null;
+          isiGrupSpjBarisId = null;
         }
         if (bisaTulisGrup && g.manual) {
           $('isi-grup-nama').value = g.nama_alias || '';
@@ -507,13 +557,35 @@
       bukaIsiGrup(parseInt(btn.getAttribute('data-id'), 10));
     });
 
-    // Perbarui lencana VA pada baris tabel grup yang
-    // uraiannya diklik (tanpa muat ulang halaman).
-    function segarkanVaDiBaris(barisId, nomorVa) {
+    // Perbarui lencana status & VA pada baris tabel grup
+    // yang uraiannya diklik (tanpa muat ulang halaman):
+    // status menurut status_tampil (Selesai / Selesai
+    // Sebagian / Belum Selesai), VA seperti sebelumnya.
+    function segarkanMetaDiBaris(barisId, statusTampil, nomorVa) {
       var btn = document.querySelector('[data-grup-anggota][data-id="' + barisId + '"]');
       var tr = btn ? btn.closest('tr') : null;
       var wadah = tr ? tr.querySelector('.meta-grup-baris') : null;
       if (!wadah) return;
+      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
+      if (!lencanaStatus) {
+        lencanaStatus = document.createElement('span');
+        var vaAda = wadah.querySelector('.lencana-va-grup');
+        if (vaAda) {
+          wadah.insertBefore(lencanaStatus, vaAda);
+        } else {
+          wadah.appendChild(lencanaStatus);
+        }
+      }
+      if (statusTampil === 'selesai') {
+        lencanaStatus.className = 'badge lencana-status-grup bg-success';
+        lencanaStatus.textContent = 'Selesai';
+      } else if (statusTampil === 'sebagian') {
+        lencanaStatus.className = 'badge lencana-status-grup bg-warning text-dark';
+        lencanaStatus.textContent = 'Selesai Sebagian';
+      } else {
+        lencanaStatus.className = 'badge lencana-status-grup bg-secondary';
+        lencanaStatus.textContent = 'Belum Selesai';
+      }
       var lencanaVa = wadah.querySelector('.lencana-va-grup');
       if (nomorVa) {
         if (!lencanaVa) {
@@ -527,26 +599,33 @@
       }
     }
 
-    // Simpan nomor VA grup SIPLah lewat endpoint meta
-    // grup yang sama; status dikirim apa adanya dari
-    // payload grup agar tidak berubah dari modal ini.
-    $('isi-grup-va-simpan').addEventListener('click', async function() {
-      if (!isiGrupVaBarisId) return;
-      var btn = $('isi-grup-va-simpan');
-      var kotakGagal = $('isi-grup-va-gagal');
+    // Simpan keterangan SPJ grup lewat endpoint meta grup:
+    // status dari saklar (grup tanpa penerima) atau status
+    // payload terakhir apa adanya (grup berpenerima —
+    // status tampilnya diturunkan dari penerima, bukan
+    // dari meta); nomor VA hanya dikirim bila grup SIPLah.
+    $('isi-grup-spj-simpan').addEventListener('click', async function() {
+      if (!isiGrupSpjBarisId) return;
+      var btn = $('isi-grup-spj-simpan');
+      var kotakGagal = $('isi-grup-spj-gagal');
       kotakGagal.classList.add('d-none');
       btn.disabled = true;
       try {
-        var res = await kirimGrup(urlDasarGrup + '/' + isiGrupVaBarisId + '/penerima-grup', 'PUT', {
-          status: isiGrupVaStatus,
-          nomor_va: $('isi-grup-va-input').value.trim() || null
-        });
-        isiGrupVaStatus = res.status || isiGrupVaStatus;
-        segarkanVaDiBaris(isiGrupVaBarisId, res.nomor_va);
+        var payloadSpj = {
+          status: isiGrupSpjJumlahPenerima > 0 ?
+            isiGrupSpjStatus :
+            ($('isi-grup-status').checked ? 'selesai' : 'belum')
+        };
+        if (isiGrupSpjSiplah) {
+          payloadSpj.nomor_va = $('isi-grup-va-input').value.trim() || null;
+        }
+        var res = await kirimGrup(urlDasarGrup + '/' + isiGrupSpjBarisId + '/penerima-grup', 'PUT', payloadSpj);
+        isiGrupSpjStatus = res.status || isiGrupSpjStatus;
+        segarkanMetaDiBaris(isiGrupSpjBarisId, res.status_tampil, res.nomor_va);
         btn.textContent = 'Tersimpan';
-        setTimeout(function() { btn.textContent = 'Simpan VA'; }, 1500);
+        setTimeout(function() { btn.textContent = 'Simpan Keterangan'; }, 1500);
       } catch (e) {
-        kotakGagal.textContent = (e && e.message) || 'Gagal menyimpan nomor VA.';
+        kotakGagal.textContent = (e && e.message) || 'Gagal menyimpan keterangan SPJ.';
         kotakGagal.classList.remove('d-none');
       } finally {
         btn.disabled = false;

@@ -884,6 +884,8 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah');
     Route::put('/bku/{id}/penerima/{penerimaId}', 'penerimaUbah')->name('bku.penerima.ubah')
       ->middleware('role:Admin|Operator Sekolah');
+    Route::put('/bku/{id}/penerima/{penerimaId}/selesai', 'penerimaSelesaiUbah')->name('bku.penerima.selesai')
+      ->middleware('role:Admin|Operator Sekolah');
     Route::delete('/bku/{id}/penerima/{penerimaId}', 'penerimaHapus')->name('bku.penerima.hapus')
       ->middleware('role:Admin|Operator Sekolah');
     Route::post('/bku/{id}/penerima-master', 'penerimaMasterSimpan')->name('bku.penerima-master.simpan')

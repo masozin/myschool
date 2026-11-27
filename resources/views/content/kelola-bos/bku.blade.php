@@ -213,7 +213,7 @@
           <div class="col-6 col-md-2">
             <label class="form-label">Jenis BKU</label>
             <select name="jenis" class="form-select">
-              <option value="">Semua jenis</option>
+              <option value="">Semua Belanja</option>
               @foreach ($daftarJenis as $j)
                 <option value="{{ $j->id_ref_bku }}" {{ (int) request('jenis') === (int) $j->id_ref_bku ? 'selected' : '' }}>
                   {{ $j->nama_bku }}</option>
@@ -378,7 +378,7 @@
                   <td>
                     @php
                       $namaGrupBaris = $namaPenerima[$b->id] ?? [];
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
                     @endphp
                     <span class="nama-tampil-baris" data-nama-toko="{{ $b->nama_toko ?? '' }}">
                       @if ($namaGrupBaris)
@@ -397,8 +397,12 @@
                       @if (!empty($metaBaris['non_barang']))
                         <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
                       @endif
-                      @if ($metaBaris['status'] === 'selesai')
+                      @if (($metaBaris['status_tampil'] ?? 'belum') === 'selesai')
                         <span class="badge bg-success lencana-status-grup">Selesai</span>
+                      @elseif (($metaBaris['status_tampil'] ?? 'belum') === 'sebagian')
+                        <span class="badge bg-warning text-dark lencana-status-grup">Selesai Sebagian</span>
+                      @else
+                        <span class="badge bg-secondary lencana-status-grup">Belum Selesai</span>
                       @endif
                       @if (!empty($metaBaris['nomor_va']))
                         <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
@@ -406,17 +410,8 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Grup SIPLah tidak memakai editor penerima:
-                           hanya saklar status di baris ini; nomor VA
-                           diisi lewat modal isi grup (klik uraian). --}}
-                      @if ($bisaTulisPenerima)
-                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
-                          <div class="form-check form-switch mb-0">
-                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
-                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
-                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
-                          </div>
-                        </div>
-                      @endif
+                           status & nomor VA diatur lewat modal isi
+                           grup (klik uraian); di tabel hanya lencana. --}}
                     @else
                       <div class="mt-1">
                         <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
@@ -428,25 +423,19 @@
                           @endif
                         </button>
                       </div>
-                      @if ($bisaTulisPenerima)
-                        {{-- Saklar status SPJ juga untuk belanja
-                             non-SIPLah: menyimpan sendiri (hanya
-                             status) lewat handler meta-inline. --}}
-                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
-                          <div class="form-check form-switch mb-0">
-                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
-                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
-                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
-                          </div>
-                        </div>
-                      @endif
                     @endif
                   </td>
                   <td class="small">
-                    @php
-                      $labelPajakGrup = collect($grupTampil['anggota'])->map(fn($r) => $r->labelPajak())->filter()->unique()->values();
-                    @endphp
-                    {{ $labelPajakGrup->count() === 1 ? $labelPajakGrup->first() : '-' }}
+                    @if (!empty($pajakGrup[$b->id]))
+                      @foreach ($pajakGrup[$b->id] as $pj)
+                        <div>{{ $pj['label'] }} {{ number_format($pj['jumlah'], 0, ',', '.') }}</div>
+                      @endforeach
+                    @else
+                      @php
+                        $labelPajakGrup = collect($grupTampil['anggota'])->map(fn($r) => $r->labelPajak())->filter()->unique()->values();
+                      @endphp
+                      {{ $labelPajakGrup->count() === 1 ? $labelPajakGrup->first() : '-' }}
+                    @endif
                   </td>
                   <td class="text-end fw-semibold">{{ number_format($grupTampil['total'], 0, ',', '.') }}</td>
                 </tr>
@@ -508,12 +497,13 @@
                   </span>
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
                     @endphp
                     {{-- Lencana meta grup: SIPLah (dari nota), status
-                         (Belum tidak ditampilkan), dan nomor VA. Wadah
-                         selalu dirender untuk baris belanja agar JS
-                         modal bisa memperbaruinya tanpa muat ulang. --}}
+                         tampil (Selesai / Selesai Sebagian / Belum
+                         Selesai), dan nomor VA. Wadah selalu dirender
+                         untuk baris belanja agar JS modal bisa
+                         memperbaruinya tanpa muat ulang. --}}
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
@@ -521,8 +511,12 @@
                       @if (!empty($metaBaris['non_barang']))
                         <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
                       @endif
-                      @if ($metaBaris['status'] === 'selesai')
+                      @if (($metaBaris['status_tampil'] ?? 'belum') === 'selesai')
                         <span class="badge bg-success lencana-status-grup">Selesai</span>
+                      @elseif (($metaBaris['status_tampil'] ?? 'belum') === 'sebagian')
+                        <span class="badge bg-warning text-dark lencana-status-grup">Selesai Sebagian</span>
+                      @else
+                        <span class="badge bg-secondary lencana-status-grup">Belum Selesai</span>
                       @endif
                       @if (!empty($metaBaris['nomor_va']))
                         <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
@@ -530,17 +524,8 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Baris SIPLah tidak memakai editor penerima:
-                           hanya saklar status di baris ini; nomor VA
-                           diisi lewat modal isi grup (klik uraian). --}}
-                      @if ($bisaTulisPenerima)
-                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
-                          <div class="form-check form-switch mb-0">
-                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
-                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
-                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
-                          </div>
-                        </div>
-                      @endif
+                           status & nomor VA diatur lewat modal isi
+                           grup (klik uraian); di tabel hanya lencana. --}}
                     @else
                       <div class="mt-1">
                         <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
@@ -552,22 +537,18 @@
                           @endif
                         </button>
                       </div>
-                      @if ($bisaTulisPenerima)
-                        {{-- Saklar status SPJ juga untuk belanja
-                             non-SIPLah: menyimpan sendiri (hanya
-                             status) lewat handler meta-inline. --}}
-                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
-                          <div class="form-check form-switch mb-0">
-                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
-                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
-                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
-                          </div>
-                        </div>
-                      @endif
                     @endif
                   @endif
                 </td>
-                <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
+                <td class="small">
+                  @if (!empty($pajakGrup[$b->id]))
+                    @foreach ($pajakGrup[$b->id] as $pj)
+                      <div>{{ $pj['label'] }} {{ number_format($pj['jumlah'], 0, ',', '.') }}</div>
+                    @endforeach
+                  @else
+                    {{ $b->labelPajak() ?: '-' }}
+                  @endif
+                </td>
                 <td class="text-end fw-semibold">{{ number_format($b->saldo, 0, ',', '.') }}</td>
               </tr>
               @endif
