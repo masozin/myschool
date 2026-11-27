@@ -11,8 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * — dari PTK (ptk_id terisi), dari induk penerima
  * (penerima_id terisi), atau ketikan manual (keduanya
  * kosong). Nilai pembayaran per orang: jumlah = volume ×
- * satuan; pph = potongan PPh dari jumlah menurut
- * pph_persen; diterima = jumlah − pph.
+ * satuan; potongannya kini nominal RUPIAH tersimpan per
+ * komponen (ppn_rp, pph_rp, sspd_rp, admin_rp — isian
+ * bawaan dari pajak nota di BKU, dapat diubah manual);
+ * diterima = jumlah − ppn − pph − sspd − biaya admin.
+ * Kolom pph_persen lama tidak dipakai lagi (potongan
+ * persen sebelum migrasi 2026_11_27_000005 yang mengisi
+ * pph_rp dari persen itu).
  *
  * Grup diidentifikasi teks grup_kunci — kunci yang sama
  * dengan pengelompokan kwitansi Fase 1 di
@@ -43,6 +48,10 @@ class BosSpjPenerima extends Model
     'volume',
     'satuan',
     'pph_persen',
+    'ppn_rp',
+    'pph_rp',
+    'sspd_rp',
+    'admin_rp',
     'urutan',
     'selesai',
   ];
@@ -51,6 +60,10 @@ class BosSpjPenerima extends Model
     'volume' => 'decimal:2',
     'satuan' => 'decimal:2',
     'pph_persen' => 'decimal:2',
+    'ppn_rp' => 'decimal:2',
+    'pph_rp' => 'decimal:2',
+    'sspd_rp' => 'decimal:2',
+    'admin_rp' => 'decimal:2',
     'selesai' => 'boolean',
   ];
 
@@ -60,16 +73,34 @@ class BosSpjPenerima extends Model
     return round((float) $this->volume * (float) $this->satuan, 2);
   }
 
-  /** Potongan PPh dalam rupiah bulat: jumlah × pph_persen / 100. */
-  public function getPphAttribute(): float
+  /** Potongan PPN dalam rupiah (kolom ppn_rp tersimpan). */
+  public function getPpnAttribute(): float
   {
-    return round($this->jumlah * (float) $this->pph_persen / 100, 0);
+    return (float) ($this->ppn_rp ?? 0);
   }
 
-  /** Yang benar-benar diterima: jumlah − pph. */
+  /** Potongan PPh dalam rupiah (kolom pph_rp tersimpan). */
+  public function getPphAttribute(): float
+  {
+    return (float) ($this->pph_rp ?? 0);
+  }
+
+  /** Potongan SSPD dalam rupiah (kolom sspd_rp tersimpan). */
+  public function getSspdAttribute(): float
+  {
+    return (float) ($this->sspd_rp ?? 0);
+  }
+
+  /** Biaya admin dalam rupiah (kolom admin_rp tersimpan). */
+  public function getBiayaAdminAttribute(): float
+  {
+    return (float) ($this->admin_rp ?? 0);
+  }
+
+  /** Yang benar-benar diterima: jumlah − semua potongan. */
   public function getDiterimaAttribute(): float
   {
-    return $this->jumlah - $this->pph;
+    return $this->jumlah - $this->ppn - $this->pph - $this->sspd - $this->biaya_admin;
   }
 
   public function sekolah(): BelongsTo

@@ -378,7 +378,7 @@
                   <td>
                     @php
                       $namaGrupBaris = $namaPenerima[$b->id] ?? [];
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang'];
                     @endphp
                     <span class="nama-tampil-baris" data-nama-toko="{{ $b->nama_toko ?? '' }}">
                       @if ($namaGrupBaris)
@@ -394,8 +394,10 @@
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
                       @endif
-                      @if (!empty($metaBaris['non_barang']))
-                        <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
+                      @if (($metaBaris['kategori'] ?? 'barang') === 'non_barang')
+                        <span class="badge bg-warning text-dark lencana-kategori-grup">Non-barang</span>
+                      @elseif (($metaBaris['kategori'] ?? 'barang') === 'barang_konsumsi')
+                        <span class="badge bg-info lencana-kategori-grup">Barang Konsumsi</span>
                       @endif
                       @if (($metaBaris['status_tampil'] ?? 'belum') === 'selesai')
                         <span class="badge bg-success lencana-status-grup">Selesai</span>
@@ -497,7 +499,7 @@
                   </span>
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang'];
                     @endphp
                     {{-- Lencana meta grup: SIPLah (dari nota), status
                          tampil (Selesai / Selesai Sebagian / Belum
@@ -508,8 +510,10 @@
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
                       @endif
-                      @if (!empty($metaBaris['non_barang']))
-                        <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
+                      @if (($metaBaris['kategori'] ?? 'barang') === 'non_barang')
+                        <span class="badge bg-warning text-dark lencana-kategori-grup">Non-barang</span>
+                      @elseif (($metaBaris['kategori'] ?? 'barang') === 'barang_konsumsi')
+                        <span class="badge bg-info lencana-kategori-grup">Barang Konsumsi</span>
                       @endif
                       @if (($metaBaris['status_tampil'] ?? 'belum') === 'selesai')
                         <span class="badge bg-success lencana-status-grup">Selesai</span>

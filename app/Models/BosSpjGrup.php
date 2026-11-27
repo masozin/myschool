@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * lanjutan): status penyelesaian grup ('belum' /
  * 'selesai'), nomor virtual account pembayaran
  * SIPLah (isian manual — tidak ada di data ARKAS),
- * dan kategori non_barang: override manual atas
- * deteksi otomatis dari kode rekening apakah grup
- * termasuk non-barang (pembayaran ke orang: honor,
- * transport, insentif — sasaran Tanda Terima) atau
- * barang. non_barang null berarti ikut deteksi
- * otomatis; true/false memaksa kategori. Grup
+ * dan kategori: override manual atas deteksi otomatis
+ * dari kode rekening. Nilai sah 'barang' |
+ * 'barang_konsumsi' | 'non_barang' (non-barang =
+ * pembayaran ke orang: honor, transport, insentif —
+ * sasaran Tanda Terima); kategori null berarti ikut
+ * deteksi otomatis. Grup
  * diidentifikasi teks grup_kunci, kunci yang sama
  * dengan kwitansi Fase 1 dan penerima Fase 2 di
  * KelolaBosController ("nota:{id}" / "bukti:{no}|{tgl}"
@@ -43,6 +43,7 @@ class BosSpjGrup extends Model
     'status',
     'nomor_va',
     'non_barang',
+    'kategori',
   ];
 
   protected $casts = [

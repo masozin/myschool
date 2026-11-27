@@ -1681,15 +1681,15 @@ class KelolaBosController extends Controller
         ->all();
     }
 
-    // Meta grup SPJ (status, nomor VA, kategori
-    // non-barang) untuk lencana di kolom Toko/Penerima —
-    // pola yang sama: satu query menurut kunci grup,
-    // dipetakan ke id baris. SETIAP baris belanja kini
-    // mendapat entri: baris tanpa meta memakai bawaan
-    // status 'belum' & VA kosong, dan kategori non-barang
-    // efektif = override manual (kolom non_barang) bila
-    // terisi, selain itu hasil deteksi dari kode rekening
-    // baris-baris grup yang tampil di halaman ini.
+    // Meta grup SPJ (status, nomor VA, kategori) untuk
+    // lencana di kolom Toko/Penerima — pola yang sama:
+    // satu query menurut kunci grup, dipetakan ke id
+    // baris. SETIAP baris belanja kini mendapat entri:
+    // baris tanpa meta memakai bawaan status 'belum' &
+    // VA kosong, dan kategori efektif = override manual
+    // (kolom kategori) bila terisi, selain itu hasil
+    // deteksi dari kode rekening baris-baris grup yang
+    // tampil di halaman ini.
     // Status tampil: grup berpenerima diturunkan dari
     // penanda selesai penerimanya (lihat
     // statusTampilGrup), grup tanpa penerima mengikuti
@@ -1709,7 +1709,6 @@ class KelolaBosController extends Controller
       }
       foreach ($kunciPerBaris as $barisId => $kunci) {
         $meta = $daftarMeta->get($kunci);
-        $manual = $meta && !is_null($meta->non_barang) ? (bool) $meta->non_barang : null;
         $stat = $statistikPenerima[$kunci] ?? null;
         if ($stat && $stat['jumlah'] > 0) {
           $statusTampil = $stat['jumlah_selesai'] >= $stat['jumlah']
@@ -1722,8 +1721,7 @@ class KelolaBosController extends Controller
           'status' => $meta->status ?? 'belum',
           'status_tampil' => $statusTampil,
           'nomor_va' => $meta->nomor_va ?? null,
-          'non_barang_manual' => $manual,
-          'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupPerKunci[$kunci] ?? []),
+          'kategori' => $this->kategoriGrup($grupPerKunci[$kunci] ?? [], $meta)['efektif'],
         ];
       }
     }
@@ -2154,10 +2152,6 @@ class KelolaBosController extends Controller
       $s = number_format((float) $v, 2, ',', '.');
       return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
     };
-    $fmtPersen = function ($v) {
-      $s = number_format((float) $v, 2, ',', '.');
-      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
-    };
 
     $uraian = !empty($dasar['grup_manual'])
       ? $dasar['uraian']
@@ -2173,13 +2167,23 @@ class KelolaBosController extends Controller
           'saldo' => (float) $p->jumlah,
         ],
       ];
-      if ((float) $p->pph > 0) {
-        $rincian[] = [
-          'uraian' => 'Potongan PPh ' . $fmtPersen($p->pph_persen) . '%',
-          'kode_rekening' => null,
-          'volume' => null,
-          'saldo' => -(float) $p->pph,
-        ];
+      // Baris potongan per komponen rupiah — hanya
+      // komponen yang nilainya > 0 yang tampil.
+      $potongan = [
+        ['Potongan PPN', (float) $p->ppn],
+        ['Potongan PPh', (float) $p->pph],
+        ['Potongan SSPD', (float) $p->sspd],
+        ['Biaya Admin', (float) $p->biaya_admin],
+      ];
+      foreach ($potongan as [$labelPotongan, $nilaiPotongan]) {
+        if ($nilaiPotongan > 0) {
+          $rincian[] = [
+            'uraian' => $labelPotongan,
+            'kode_rekening' => null,
+            'volume' => null,
+            'saldo' => -$nilaiPotongan,
+          ];
+        }
       }
 
       $daftar[] = array_merge($dasar, [
@@ -2220,7 +2224,7 @@ class KelolaBosController extends Controller
    * barang pakai habis / ATK) dan 5.2... (belanja
    * modal). Kode kosong / tak dikenal → barang.
    * Hasil deteksi bisa diganti manual per grup lewat
-   * kolom non_barang di bos_spj_grup (null = otomatis).
+   * kolom kategori di bos_spj_grup (null = otomatis).
    */
   private function deteksiNonBarang(?string $kodeRekening): bool
   {
@@ -2258,6 +2262,27 @@ class KelolaBosController extends Controller
       }
     }
     return false;
+  }
+
+  /**
+   * Kategori grup SPJ: 'barang' | 'barang_konsumsi' |
+   * 'non_barang'. Deteksi otomatis hanya membedakan
+   * non-barang (dari kode rekening) vs barang;
+   * 'barang_konsumsi' hanya lewat pilihan manual.
+   * Override manual tersimpan di bos_spj_grup.kategori
+   * (null = ikut deteksi).
+   *
+   * @return array{deteksi: string, manual: ?string, efektif: string}
+   */
+  private function kategoriGrup(array $grup, ?BosSpjGrup $meta): array
+  {
+    $deteksi = $this->deteksiNonBarangGrup($grup) ? 'non_barang' : 'barang';
+    $manual = $meta?->kategori;
+    return [
+      'deteksi' => $deteksi,
+      'manual' => $manual,
+      'efektif' => $manual ?? $deteksi,
+    ];
   }
 
   /** Cetak kwitansi untuk grup nota/bukti dari satu baris BKU. */
@@ -2483,9 +2508,11 @@ class KelolaBosController extends Controller
       'nama_bank' => $p->nama_bank,
       'volume' => (float) $p->volume,
       'satuan' => (float) $p->satuan,
-      'pph_persen' => (float) $p->pph_persen,
       'jumlah' => $p->jumlah,
+      'ppn' => $p->ppn,
       'pph' => $p->pph,
+      'sspd' => $p->sspd,
+      'biaya_admin' => $p->biaya_admin,
       'diterima' => $p->diterima,
       'urutan' => (int) $p->urutan,
       'selesai' => (bool) $p->selesai,
@@ -2512,7 +2539,10 @@ class KelolaBosController extends Controller
       'nama_bank' => 'nullable|string|max:100',
       'volume' => 'required|numeric|min:0',
       'satuan' => 'required|numeric|min:0',
-      'pph_persen' => 'required|numeric|min:0|max:100',
+      'ppn_rp' => 'nullable|numeric|min:0',
+      'pph_rp' => 'nullable|numeric|min:0',
+      'sspd_rp' => 'nullable|numeric|min:0',
+      'admin_rp' => 'nullable|numeric|min:0',
     ];
   }
 
@@ -2606,11 +2636,46 @@ class KelolaBosController extends Controller
 
     // Kategori grup: deteksi otomatis dari kode rekening
     // baris-baris grup, dengan override manual dari
-    // kolom non_barang meta (null = ikut deteksi).
-    $deteksiNonBarang = $this->deteksiNonBarangGrup($grup);
-    $nonBarangManual = $meta
-      ? (is_null($meta->non_barang) ? null : (bool) $meta->non_barang)
-      : null;
+    // kolom kategori meta (null = ikut deteksi).
+    $kategori = $this->kategoriGrup($grup, $meta);
+
+    // Pajak nota menurut BKU (baris Pajak Belanja
+    // Terima yang tertaut nota grup ini), dipetakan
+    // ke bidang potongan: PPN -> ppn, semua PPh ->
+    // pph, SSPD -> sspd. Dipakai sebagai isian
+    // bawaan formulir penerima.
+    $pajakBku = ['ppn' => 0.0, 'pph' => 0.0, 'sspd' => 0.0];
+    $notaIds = collect($grup)->pluck('id_kas_nota')->filter()->unique()->values();
+    if ($notaIds->isNotEmpty()) {
+      $barisPajak = BosKasUmum::where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->where('id_ref_bku', self::JENIS_PAJAK)
+        ->whereIn('id_kas_nota', $notaIds)
+        ->get();
+      foreach ($barisPajak as $rp) {
+        if ($rp->is_ppn) {
+          $pajakBku['ppn'] += (float) $rp->saldo;
+        }
+        if ($rp->is_pph_21 || $rp->is_pph_22 || $rp->is_pph_23 || $rp->is_pph_4) {
+          $pajakBku['pph'] += (float) $rp->saldo;
+        }
+        if ($rp->is_sspd) {
+          $pajakBku['sspd'] += (float) $rp->saldo;
+        }
+      }
+    }
+
+    // Potongan yang sudah dialokasikan ke penerima
+    // tersimpan grup ini.
+    $alokasiPajak = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->selectRaw('COALESCE(SUM(ppn_rp), 0) AS ppn, COALESCE(SUM(pph_rp), 0) AS pph, COALESCE(SUM(sspd_rp), 0) AS sspd')
+      ->first();
+    $pajakTeralokasi = [
+      'ppn' => (float) ($alokasiPajak->ppn ?? 0),
+      'pph' => (float) ($alokasiPajak->pph ?? 0),
+      'sspd' => (float) ($alokasiPajak->sspd ?? 0),
+    ];
 
     // Status tampil grup: diturunkan dari penanda
     // selesai penerima bila grup punya penerima.
@@ -2631,9 +2696,12 @@ class KelolaBosController extends Controller
         'status_tampil' => $statusGrup['status_tampil'],
         'jumlah_penerima' => $statusGrup['jumlah_penerima'],
         'jumlah_selesai' => $statusGrup['jumlah_selesai'],
-        'non_barang_deteksi' => $deteksiNonBarang,
-        'non_barang_manual' => $nonBarangManual,
-        'non_barang' => $nonBarangManual ?? $deteksiNonBarang,
+        'nama_toko' => $nota?->nama_toko,
+        'kategori_deteksi' => $kategori['deteksi'],
+        'kategori_manual' => $kategori['manual'],
+        'kategori' => $kategori['efektif'],
+        'pajak_bku' => $pajakBku,
+        'pajak_teralokasi' => $pajakTeralokasi,
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
       'penerima' => $penerima,
@@ -2645,9 +2713,9 @@ class KelolaBosController extends Controller
   /**
    * Simpan meta grup SPJ: saklar status (belum /
    * selesai), nomor VA pembayaran SIPLah (manual), dan
-   * override kategori non_barang (opsional — hanya
-   * diubah bila request memuat kuncinya; nilainya boleh
-   * null untuk kembali ke deteksi otomatis).
+   * override kategori (opsional — hanya diubah bila
+   * request memuat kuncinya; nilainya boleh null untuk
+   * kembali ke deteksi otomatis).
    * Baris meta dibuat malas lewat updateOrCreate menurut
    * (sekolah, grup_kunci) dari baris BKU pada URL.
    */
@@ -2662,7 +2730,7 @@ class KelolaBosController extends Controller
     $validated = $request->validate([
       'status' => 'required|in:' . implode(',', BosSpjGrup::STATUS),
       'nomor_va' => 'nullable|string|max:50',
-      'non_barang' => 'nullable|boolean',
+      'kategori' => 'nullable|string|in:barang,barang_konsumsi,non_barang',
     ]);
 
     $nomorVa = isset($validated['nomor_va']) && trim((string) $validated['nomor_va']) !== ''
@@ -2670,18 +2738,21 @@ class KelolaBosController extends Controller
       : null;
 
     // Atribut dibangun kondisional: kolom nomor_va dan
-    // non_barang hanya disentuh bila pemanggil mengirim
+    // kategori hanya disentuh bila pemanggil mengirim
     // kuncinya — saklar status di baris tabel hanya
     // mengirim status sehingga tidak menimpa nomor VA
     // tersimpan, dan pemanggil lama tidak menimpa
-    // override kategori yang sudah tersimpan.
+    // override kategori yang sudah tersimpan. Kategori
+    // memakai exists() (bukan has()) karena nilai null
+    // eksplisit berarti "kembali ke deteksi otomatis"
+    // dan has() mengabaikan nilai null.
     $atribut = ['status' => $validated['status']];
     if ($request->has('nomor_va')) {
       $atribut['nomor_va'] = $nomorVa;
     }
-    if ($request->has('non_barang')) {
-      $nb = $request->input('non_barang');
-      $atribut['non_barang'] = is_null($nb) ? null : (bool) $nb;
+    if ($request->exists('kategori')) {
+      $kat = $request->input('kategori');
+      $atribut['kategori'] = ($kat === null || $kat === '') ? null : $kat;
     }
 
     $meta = BosSpjGrup::updateOrCreate(
@@ -2689,7 +2760,7 @@ class KelolaBosController extends Controller
       $atribut
     );
 
-    $manual = is_null($meta->non_barang) ? null : (bool) $meta->non_barang;
+    $kategori = $this->kategoriGrup($grupBaris, $meta);
 
     $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
 
@@ -2698,8 +2769,9 @@ class KelolaBosController extends Controller
       'message' => 'Keterangan grup SPJ diperbarui.',
       'status' => $meta->status,
       'nomor_va' => $meta->nomor_va,
-      'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupBaris),
-      'non_barang_manual' => $manual,
+      'kategori' => $kategori['efektif'],
+      'kategori_manual' => $kategori['manual'],
+      'kategori_deteksi' => $kategori['deteksi'],
       'status_tampil' => $statusGrup['status_tampil'],
       'jumlah_penerima' => $statusGrup['jumlah_penerima'],
       'jumlah_selesai' => $statusGrup['jumlah_selesai'],
@@ -2812,8 +2884,8 @@ class KelolaBosController extends Controller
    * Penerima grup-grup asal digabung berurutan mengikuti
    * urutan grup sumber; meta digabung: status 'selesai'
    * hanya bila semua asal selesai, nomor VA dipertahankan
-   * hanya bila unik, kategori non_barang manual hanya
-   * bila semua asal sama.
+   * hanya bila unik, kategori manual hanya bila semua
+   * asal sama.
    */
   public function grupManualGabung(Request $request)
   {
@@ -2936,16 +3008,15 @@ class KelolaBosController extends Controller
         ->unique()
         ->values();
       $vaBaru = $vaUnik->count() === 1 ? $vaUnik->first() : null;
-      $nbNilai = [];
+      $katNilai = [];
       foreach (array_keys($grupSumber) as $kunciSumber) {
-        $m = $metas->get($kunciSumber);
-        $nbNilai[] = $m && !is_null($m->non_barang) ? (bool) $m->non_barang : null;
+        $katNilai[] = $metas->get($kunciSumber)?->kategori;
       }
-      $nonBarangBaru = count(array_unique($nbNilai, SORT_REGULAR)) === 1 ? $nbNilai[0] : null;
-      if ($statusBaru !== 'belum' || $vaBaru !== null || $nonBarangBaru !== null) {
+      $kategoriBaru = count(array_unique($katNilai, SORT_REGULAR)) === 1 ? $katNilai[0] : null;
+      if ($statusBaru !== 'belum' || $vaBaru !== null || $kategoriBaru !== null) {
         BosSpjGrup::updateOrCreate(
           ['sekolah_id' => $sekolahId, 'grup_kunci' => $kunciBaru],
-          ['status' => $statusBaru, 'nomor_va' => $vaBaru, 'non_barang' => $nonBarangBaru]
+          ['status' => $statusBaru, 'nomor_va' => $vaBaru, 'kategori' => $kategoriBaru]
         );
       }
       BosSpjGrup::where('sekolah_id', $sekolahId)
@@ -3248,6 +3319,10 @@ class KelolaBosController extends Controller
         'volume' => 1,
         'satuan' => 0,
         'pph_persen' => 0,
+        'ppn_rp' => 0,
+        'pph_rp' => 0,
+        'sspd_rp' => 0,
+        'admin_rp' => 0,
         'urutan' => $urutan++,
       ]);
       $ditambahkan++;
@@ -3307,6 +3382,10 @@ class KelolaBosController extends Controller
         'volume' => 1,
         'satuan' => 0,
         'pph_persen' => 0,
+        'ppn_rp' => 0,
+        'pph_rp' => 0,
+        'sspd_rp' => 0,
+        'admin_rp' => 0,
         'urutan' => $urutan++,
       ]);
       $ditambahkan++;
@@ -3362,7 +3441,10 @@ class KelolaBosController extends Controller
       'nama_bank' => $validated['nama_bank'] ?? null,
       'volume' => $validated['volume'],
       'satuan' => $validated['satuan'],
-      'pph_persen' => $validated['pph_persen'],
+      'ppn_rp' => $validated['ppn_rp'] ?? 0,
+      'pph_rp' => $validated['pph_rp'] ?? 0,
+      'sspd_rp' => $validated['sspd_rp'] ?? 0,
+      'admin_rp' => $validated['admin_rp'] ?? 0,
       'urutan' => $this->urutanBerikutnya($sekolahId, $kunci),
     ]);
 
@@ -3401,7 +3483,10 @@ class KelolaBosController extends Controller
       'nama_bank' => $validated['nama_bank'] ?? null,
       'volume' => $validated['volume'],
       'satuan' => $validated['satuan'],
-      'pph_persen' => $validated['pph_persen'],
+      'ppn_rp' => $validated['ppn_rp'] ?? 0,
+      'pph_rp' => $validated['pph_rp'] ?? 0,
+      'sspd_rp' => $validated['sspd_rp'] ?? 0,
+      'admin_rp' => $validated['admin_rp'] ?? 0,
     ]);
 
     return response()->json([

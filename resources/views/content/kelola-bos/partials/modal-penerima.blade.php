@@ -50,14 +50,15 @@
             <div>
               <div class="small text-muted mb-1">Kategori</div>
               @if ($bisaTulisPenerima)
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" id="meta-nonbarang-saklar">
-                  <label class="form-check-label" for="meta-nonbarang-saklar">Non-barang</label>
-                </div>
-                <div class="form-text" id="meta-nonbarang-info"></div>
-                <button type="button" class="btn btn-link btn-sm p-0 d-none" id="btn-nonbarang-otomatis">Ikuti deteksi otomatis</button>
+                <select class="form-select form-select-sm" id="meta-kategori-pilih" style="min-width: 230px;">
+                  <option value="">Otomatis (ikut deteksi)</option>
+                  <option value="barang">Barang</option>
+                  <option value="barang_konsumsi">Barang Konsumsi</option>
+                  <option value="non_barang">Non-barang</option>
+                </select>
+                <div class="form-text" id="meta-kategori-info"></div>
               @endif
-              <span id="meta-nonbarang-baca"></span>
+              <span id="meta-kategori-baca"></span>
             </div>
             <div id="meta-va-wrap" class="d-none" style="min-width: 280px;">
               <label class="form-label small text-muted mb-1" for="meta-nomor-va">Nomor Virtual Account</label>
@@ -90,8 +91,10 @@
                 <th class="text-end" style="width: 6rem;">Vol</th>
                 <th class="text-end" style="width: 9rem;">Satuan</th>
                 <th class="text-end" style="width: 10rem;">Jumlah</th>
-                <th class="text-end" style="width: 6rem;">PPh %</th>
-                <th class="text-end" style="width: 9rem;">PPh Rp</th>
+                <th class="text-end" style="width: 9rem;" data-kolom-pajak="ppn">PPN Rp</th>
+                <th class="text-end" style="width: 9rem;" data-kolom-pajak="pph">PPh Rp</th>
+                <th class="text-end" style="width: 9rem;" data-kolom-pajak="sspd">SSPD Rp</th>
+                <th class="text-end" style="width: 9rem;" data-kolom-pajak="admin">Biaya Admin</th>
                 <th class="text-end" style="width: 10rem;">Diterima</th>
                 <th style="width: 11rem;">Rekening</th>
                 <th style="width: 8rem;">Status</th>
@@ -102,15 +105,17 @@
             </thead>
             <tbody id="penerima-tbody">
               <tr>
-                <td colspan="{{ $bisaTulisPenerima ? 11 : 10 }}" class="text-center text-muted">Memuat…</td>
+                <td colspan="{{ $bisaTulisPenerima ? 13 : 12 }}" class="text-center text-muted">Memuat…</td>
               </tr>
             </tbody>
             <tfoot>
               <tr class="fw-semibold">
                 <td colspan="4" class="text-end">Total</td>
                 <td class="text-end" id="tot-jumlah">Rp 0</td>
-                <td></td>
-                <td class="text-end" id="tot-pph">Rp 0</td>
+                <td class="text-end" id="tot-ppn" data-kolom-pajak="ppn"></td>
+                <td class="text-end" id="tot-pph" data-kolom-pajak="pph"></td>
+                <td class="text-end" id="tot-sspd" data-kolom-pajak="sspd"></td>
+                <td class="text-end" id="tot-admin" data-kolom-pajak="admin"></td>
                 <td class="text-end" id="tot-diterima">Rp 0</td>
                 <td colspan="{{ $bisaTulisPenerima ? 3 : 2 }}"></td>
               </tr>
@@ -229,10 +234,25 @@
                   <input type="number" class="form-control form-control-sm" id="f-satuan" min="0" step="0.01"
                     value="0">
                 </div>
-                <div class="col-4 col-md-2">
-                  <label class="form-label" for="f-pph">PPh % *</label>
-                  <input type="number" class="form-control form-control-sm" id="f-pph" min="0" max="100"
-                    step="0.01" value="0">
+                <div class="col-6 col-md-3" data-kolom-pajak="ppn">
+                  <label class="form-label" for="f-ppn">PPN Rp</label>
+                  <input type="number" class="form-control form-control-sm" id="f-ppn" min="0" step="0.01"
+                    value="0">
+                </div>
+                <div class="col-6 col-md-3" data-kolom-pajak="pph">
+                  <label class="form-label" for="f-pph">PPh Rp</label>
+                  <input type="number" class="form-control form-control-sm" id="f-pph" min="0" step="0.01"
+                    value="0">
+                </div>
+                <div class="col-6 col-md-3" data-kolom-pajak="sspd">
+                  <label class="form-label" for="f-sspd">SSPD Rp</label>
+                  <input type="number" class="form-control form-control-sm" id="f-sspd" min="0" step="0.01"
+                    value="0">
+                </div>
+                <div class="col-6 col-md-3" data-kolom-pajak="admin">
+                  <label class="form-label" for="f-admin">Biaya Admin Rp</label>
+                  <input type="number" class="form-control form-control-sm" id="f-admin" min="0" step="0.01"
+                    value="0">
                 </div>
                 <div class="col-8 col-md-4 d-flex align-items-end" id="wrap-simpan-master">
                   <div class="form-check">
@@ -297,12 +317,6 @@
       return (Number(v) || 0).toLocaleString('id-ID', {
         maximumFractionDigits: 2
       });
-    }
-
-    function fmtPersen(v) {
-      return (Number(v) || 0).toLocaleString('id-ID', {
-        maximumFractionDigits: 2
-      }) + '%';
     }
 
     function subInfo(bagian) {
@@ -398,6 +412,58 @@
         '</span></div>';
     }
 
+    // ── Kategori grup & kolom potongan dinamis ──
+    function labelKategori(k) {
+      if (k === 'non_barang') return 'Non-barang';
+      if (k === 'barang_konsumsi') return 'Barang Konsumsi';
+      return 'Barang';
+    }
+
+    function kelasKategori(k) {
+      if (k === 'non_barang') return 'bg-warning text-dark';
+      if (k === 'barang_konsumsi') return 'bg-info';
+      return 'bg-label-secondary';
+    }
+
+    // Bidang potongan yang tampil menurut kategori grup
+    // efektif: barang -> PPN; barang konsumsi -> PPh &
+    // SSPD; non-barang -> PPh. Biaya admin selalu tampil.
+    function bidangPajakTampil() {
+      var kat = (data && data.grup && data.grup.kategori) || 'barang';
+      return {
+        ppn: kat === 'barang',
+        pph: kat === 'barang_konsumsi' || kat === 'non_barang',
+        sspd: kat === 'barang_konsumsi',
+        admin: true
+      };
+    }
+
+    // Tampilkan / sembunyikan semua elemen ber-atribut
+    // data-kolom-pajak (kepala & kaki tabel, sel baris
+    // penerima, dan pembungkus input formulir).
+    function terapkanKolomPajak() {
+      var tampil = bidangPajakTampil();
+      ['ppn', 'pph', 'sspd', 'admin'].forEach(function(bidang) {
+        modalEl.querySelectorAll('[data-kolom-pajak="' + bidang + '"]').forEach(function(el) {
+          el.classList.toggle('d-none', !tampil[bidang]);
+        });
+      });
+    }
+
+    // Jumlah kolom tabel yang SEDANG tampil: 8 kolom
+    // dasar (No, Nama, Vol, Satuan, Jumlah, Diterima,
+    // Rekening, Status) + bidang pajak tampil + kolom
+    // Aksi untuk peran tulis. Untuk colspan baris
+    // kosong / memuat.
+    function jumlahKolomTampil() {
+      var tampil = bidangPajakTampil();
+      var n = 8;
+      ['ppn', 'pph', 'sspd', 'admin'].forEach(function(bidang) {
+        if (tampil[bidang]) n++;
+      });
+      return n + (bisaTulis ? 1 : 0);
+    }
+
     // ── Meta grup: saklar status & nomor VA SIPLah ──
     function gambarMeta() {
       var g = data.grup || {};
@@ -456,30 +522,26 @@
         }
       }
 
-      // Kategori non-barang: saklar mengikuti nilai
-      // efektif (override manual menang atas deteksi
-      // otomatis dari kode rekening).
+      // Kategori grup: pilihan manual (select) menang
+      // atas deteksi otomatis; tanpa pilihan manual,
+      // kategori efektif = hasil deteksi (barang vs
+      // non-barang dari kode rekening). 'barang_konsumsi'
+      // hanya bisa dipilih manual.
       if (bisaTulis) {
-        var saklarNb = $('meta-nonbarang-saklar');
-        if (saklarNb) saklarNb.checked = !!g.non_barang;
-        var infoNb = $('meta-nonbarang-info');
-        if (infoNb) {
-          infoNb.textContent = (g.non_barang_manual === null || g.non_barang_manual === undefined) ?
-            'Deteksi otomatis dari kode rekening.' :
-            'Diatur manual — deteksi otomatis diabaikan.';
-        }
-        var btnOtomatis = $('btn-nonbarang-otomatis');
-        if (btnOtomatis) {
-          if (g.non_barang_manual === null || g.non_barang_manual === undefined) {
-            btnOtomatis.classList.add('d-none');
-          } else {
-            btnOtomatis.classList.remove('d-none');
-          }
+        var pilihKat = $('meta-kategori-pilih');
+        if (pilihKat) pilihKat.value = g.kategori_manual ?? '';
+        var infoKat = $('meta-kategori-info');
+        if (infoKat) {
+          infoKat.textContent = 'Deteksi otomatis: ' + labelKategori(g.kategori_deteksi) +
+            ' (dari kode rekening).' +
+            ((g.kategori_manual !== null && g.kategori_manual !== undefined) ?
+              ' Sedang diatur manual.' :
+              '');
         }
       } else {
-        $('meta-nonbarang-baca').innerHTML = g.non_barang ?
-          '<span class="badge bg-warning text-dark">Non-barang</span>' :
-          '<span class="badge bg-label-secondary">Barang</span>';
+        $('meta-kategori-baca').innerHTML =
+          '<span class="badge ' + kelasKategori(g.kategori) + '">' +
+          labelKategori(g.kategori) + '</span>';
       }
 
       // Kolom VA hanya untuk grup SIPLah.
@@ -494,6 +556,8 @@
       } else {
         vaWrap.classList.add('d-none');
       }
+
+      terapkanKolomPajak();
     }
 
     // Lukis lencana status tampil pada wadah meta satu
@@ -537,24 +601,24 @@
 
       gambarLencanaStatus(wadah, g.status_tampil);
 
-      var lencanaNb = wadah.querySelector('.lencana-nonbarang-grup');
-      if (g.non_barang) {
-        if (!lencanaNb) {
-          lencanaNb = document.createElement('span');
-          lencanaNb.className = 'badge bg-warning text-dark lencana-nonbarang-grup';
-          lencanaNb.textContent = 'Non-barang';
+      var lencanaKat = wadah.querySelector('.lencana-kategori-grup');
+      if ((g.kategori || 'barang') !== 'barang') {
+        if (!lencanaKat) {
+          lencanaKat = document.createElement('span');
           var statusEl = wadah.querySelector('.lencana-status-grup');
-          var vaElNb = wadah.querySelector('.lencana-va-grup');
+          var vaElKat = wadah.querySelector('.lencana-va-grup');
           if (statusEl) {
-            wadah.insertBefore(lencanaNb, statusEl);
-          } else if (vaElNb) {
-            wadah.insertBefore(lencanaNb, vaElNb);
+            wadah.insertBefore(lencanaKat, statusEl);
+          } else if (vaElKat) {
+            wadah.insertBefore(lencanaKat, vaElKat);
           } else {
-            wadah.appendChild(lencanaNb);
+            wadah.appendChild(lencanaKat);
           }
         }
-      } else if (lencanaNb) {
-        lencanaNb.remove();
+        lencanaKat.className = 'badge lencana-kategori-grup ' + kelasKategori(g.kategori);
+        lencanaKat.textContent = labelKategori(g.kategori);
+      } else if (lencanaKat) {
+        lencanaKat.remove();
       }
 
       var lencanaVa = wadah.querySelector('.lencana-va-grup');
@@ -600,22 +664,22 @@
       }
     }
 
-    // Simpan kategori non-barang lewat endpoint meta yang
-    // sama (status & VA saat ini ikut dikirim karena status
-    // wajib di server). nonBarang: true/false dari saklar,
-    // atau null untuk kembali ikut deteksi otomatis.
-    async function simpanKategori(nonBarang) {
+    // Simpan kategori grup lewat endpoint meta yang sama
+    // (status saat ini ikut dikirim karena status wajib
+    // di server; nomor VA tidak dikirim agar tidak
+    // tertimpa). kategori: 'barang' | 'barang_konsumsi' |
+    // 'non_barang', atau null (pilihan "Otomatis") untuk
+    // kembali ikut deteksi.
+    async function simpanKategori(kategori) {
       if (!data || !data.grup) return;
       try {
         var res = await kirim(urlDasar + '/' + barisId + '/penerima-grup', 'PUT', {
-          status: (data.grup.status === 'selesai') ? 'selesai' : 'belum',
-          nomor_va: data.grup.siplah ?
-            ($('meta-nomor-va').value.trim() || null) :
-            (data.grup.nomor_va || null),
-          non_barang: nonBarang
+          status: data.grup.status,
+          kategori: kategori || null
         });
-        data.grup.non_barang = res.non_barang;
-        data.grup.non_barang_manual = res.non_barang_manual;
+        data.grup.kategori = res.kategori;
+        data.grup.kategori_manual = res.kategori_manual;
+        data.grup.kategori_deteksi = res.kategori_deteksi;
         data.grup.status_tampil = res.status_tampil;
         data.grup.jumlah_penerima = res.jumlah_penerima;
         data.grup.jumlah_selesai = res.jumlah_selesai;
@@ -623,7 +687,7 @@
         segarkanMetaBaris();
         tandaiMetaTersimpan();
       } catch (e) {
-        gambarMeta(); // kembalikan saklar ke nilai yang tersimpan
+        gambarMeta(); // kembalikan pilihan ke nilai yang tersimpan
         gagal(e);
       }
     }
@@ -632,7 +696,7 @@
       var tbody = $('penerima-tbody');
       var daftar = data.penerima || [];
       if (!daftar.length) {
-        tbody.innerHTML = '<tr><td colspan="' + (bisaTulis ? 11 : 10) +
+        tbody.innerHTML = '<tr><td colspan="' + jumlahKolomTampil() +
           '" class="text-center text-muted">Belum ada penerima untuk grup ini.</td></tr>';
       } else {
         tbody.innerHTML = daftar.map(function(p, i) {
@@ -671,8 +735,10 @@
             '<td class="text-end">' + fmtVol(p.volume) + '</td>' +
             '<td class="text-end">' + fmtRp(p.satuan) + '</td>' +
             '<td class="text-end">' + fmtRp(p.jumlah) + '</td>' +
-            '<td class="text-end">' + fmtPersen(p.pph_persen) + '</td>' +
-            '<td class="text-end">' + fmtRp(p.pph) + '</td>' +
+            '<td class="text-end" data-kolom-pajak="ppn">' + (Number(p.ppn || 0) > 0 ? fmtRp(p.ppn) : '-') + '</td>' +
+            '<td class="text-end" data-kolom-pajak="pph">' + (Number(p.pph || 0) > 0 ? fmtRp(p.pph) : '-') + '</td>' +
+            '<td class="text-end" data-kolom-pajak="sspd">' + (Number(p.sspd || 0) > 0 ? fmtRp(p.sspd) : '-') + '</td>' +
+            '<td class="text-end" data-kolom-pajak="admin">' + (Number(p.biaya_admin || 0) > 0 ? fmtRp(p.biaya_admin) : '-') + '</td>' +
             '<td class="text-end fw-semibold">' + fmtRp(p.diterima) + '</td>' +
             '<td class="small">' + rek + '</td>' + statusSel + aksi + '</tr>';
         }).join('');
@@ -681,14 +747,26 @@
       var totJumlah = daftar.reduce(function(s, p) {
         return s + Number(p.jumlah || 0);
       }, 0);
+      var totPpn = daftar.reduce(function(s, p) {
+        return s + Number(p.ppn || 0);
+      }, 0);
       var totPph = daftar.reduce(function(s, p) {
         return s + Number(p.pph || 0);
+      }, 0);
+      var totSspd = daftar.reduce(function(s, p) {
+        return s + Number(p.sspd || 0);
+      }, 0);
+      var totAdmin = daftar.reduce(function(s, p) {
+        return s + Number(p.biaya_admin || 0);
       }, 0);
       var totDiterima = daftar.reduce(function(s, p) {
         return s + Number(p.diterima || 0);
       }, 0);
       $('tot-jumlah').textContent = fmtRp(totJumlah);
+      $('tot-ppn').textContent = fmtRp(totPpn);
       $('tot-pph').textContent = fmtRp(totPph);
+      $('tot-sspd').textContent = fmtRp(totSspd);
+      $('tot-admin').textContent = fmtRp(totAdmin);
       $('tot-diterima').textContent = fmtRp(totDiterima);
 
       var el = $('penerima-selisih');
@@ -707,6 +785,10 @@
       }
 
       segarkanLencana(daftar.length, daftar.map(function(p) { return p.nama; }));
+
+      // Baris-baris baru saja dirender: terapkan lagi
+      // visibilitas kolom potongan menurut kategori.
+      terapkanKolomPajak();
     }
 
     function gambarSumberPtk() {
@@ -802,11 +884,35 @@
       $('f-bank').value = '';
       $('f-volume').value = 1;
       $('f-satuan').value = 0;
+      $('f-ppn').value = 0;
       $('f-pph').value = 0;
+      $('f-sspd').value = 0;
+      $('f-admin').value = 0;
       $('f-simpan-master').checked = false;
       $('wrap-simpan-master').style.display = '';
       $('label-simpan-snapshot').textContent = 'Tambah Penerima';
       $('btn-batal-edit').classList.add('d-none');
+
+      // Isian bawaan dari BKU untuk mode TAMBAH: nama
+      // toko nota (bila nama masih kosong), satuan =
+      // sisa nominal grup yang belum dialokasikan ke
+      // penerima tersimpan, dan potongan pajak = sisa
+      // pajak nota menurut BKU yang belum teralokasi.
+      // Semua bawaan ini dapat diubah manual.
+      var g = (data && data.grup) || {};
+      if (!$('f-nama').value && g.nama_toko) {
+        $('f-nama').value = g.nama_toko;
+      }
+      var jumlahTerpakai = ((data && data.penerima) || []).reduce(function(s, p) {
+        return s + Number(p.jumlah || 0);
+      }, 0);
+      $('f-satuan').value = Math.max(0, Number(g.total || 0) - jumlahTerpakai);
+      var pajakBku = g.pajak_bku || {};
+      var pajakAlo = g.pajak_teralokasi || {};
+      $('f-ppn').value = Math.max(0, Number(pajakBku.ppn || 0) - Number(pajakAlo.ppn || 0));
+      $('f-pph').value = Math.max(0, Number(pajakBku.pph || 0) - Number(pajakAlo.pph || 0));
+      $('f-sspd').value = Math.max(0, Number(pajakBku.sspd || 0) - Number(pajakAlo.sspd || 0));
+      $('f-admin').value = 0;
     }
 
     function isiFormSnapshot(p) {
@@ -820,7 +926,10 @@
       $('f-bank').value = p.nama_bank || '';
       $('f-volume').value = p.volume;
       $('f-satuan').value = p.satuan;
-      $('f-pph').value = p.pph_persen;
+      $('f-ppn').value = p.ppn || 0;
+      $('f-pph').value = p.pph || 0;
+      $('f-sspd').value = p.sspd || 0;
+      $('f-admin').value = p.biaya_admin || 0;
       $('wrap-simpan-master').style.display = 'none';
       $('label-simpan-snapshot').textContent = 'Simpan Perubahan';
       $('btn-batal-edit').classList.remove('d-none');
@@ -838,7 +947,10 @@
         nama_bank: $('f-bank').value.trim() || null,
         volume: parseFloat($('f-volume').value) || 0,
         satuan: parseFloat($('f-satuan').value) || 0,
-        pph_persen: parseFloat($('f-pph').value) || 0
+        ppn_rp: parseFloat($('f-ppn').value) || 0,
+        pph_rp: parseFloat($('f-pph').value) || 0,
+        sspd_rp: parseFloat($('f-sspd').value) || 0,
+        admin_rp: parseFloat($('f-admin').value) || 0
       };
       try {
         var res;
@@ -849,8 +961,8 @@
           res = await kirim(urlDasar + '/' + barisId + '/penerima', 'POST', payload);
         }
         berhasil(res);
-        kosongkanFormSnapshot();
         await muat();
+        kosongkanFormSnapshot();
       } catch (e) {
         gagal(e);
       }
@@ -925,13 +1037,17 @@
       $('penerima-info-grup').innerHTML = '<span class="text-muted">Memuat…</span>';
       $('meta-siplah-info').innerHTML = '';
       $('meta-status-baca').innerHTML = '';
-      $('meta-nonbarang-baca').innerHTML = '';
+      $('meta-kategori-baca').innerHTML = '';
       $('meta-va-wrap').classList.add('d-none');
-      $('penerima-tbody').innerHTML = '<tr><td colspan="' + (bisaTulis ? 11 : 10) +
+      $('penerima-tbody').innerHTML = '<tr><td colspan="' + jumlahKolomTampil() +
         '" class="text-center text-muted">Memuat…</td></tr>';
       $('penerima-selisih').innerHTML = '';
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
-      muat().catch(gagal);
+      muat().then(function() {
+        // Data segar termuat: hitung ulang isian bawaan
+        // formulir tambah penerima dari BKU.
+        if (bisaTulis) kosongkanFormSnapshot();
+      }).catch(gagal);
     });
 
     if (bisaTulis) {
@@ -990,21 +1106,14 @@
         });
       }
 
-      // Saklar kategori non-barang: tersimpan otomatis
-      // begitu diganti; tombol reset mengembalikan ke
-      // deteksi otomatis (non_barang = null di server).
-      var saklarNb = $('meta-nonbarang-saklar');
-      if (saklarNb) {
-        saklarNb.addEventListener('change', function() {
+      // Pilihan kategori grup: tersimpan otomatis begitu
+      // diganti; pilihan "Otomatis" mengirim kategori
+      // null agar server kembali ke deteksi otomatis.
+      var pilihKategori = $('meta-kategori-pilih');
+      if (pilihKategori) {
+        pilihKategori.addEventListener('change', function() {
           if (!data || !data.grup) return;
-          simpanKategori(saklarNb.checked);
-        });
-      }
-      var btnNbOtomatis = $('btn-nonbarang-otomatis');
-      if (btnNbOtomatis) {
-        btnNbOtomatis.addEventListener('click', function() {
-          if (!data || !data.grup) return;
-          simpanKategori(null);
+          simpanKategori(pilihKategori.value);
         });
       }
 
