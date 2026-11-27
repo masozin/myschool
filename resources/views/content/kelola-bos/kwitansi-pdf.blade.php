@@ -185,7 +185,7 @@
               </tr>
             </table>
 
-            @if (count($k['rincian']) > 1)
+            @if (count($k['rincian']) > 1 || !empty($k['tampil_rincian']))
               <table class="rincian">
                 <thead>
                   <tr>

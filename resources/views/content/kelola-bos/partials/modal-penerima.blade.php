@@ -24,7 +24,7 @@
           <span class="text-muted">Memuat…</span>
         </div>
 
-        {{-- Meta grup SPJ: saklar status Belum/Lunas/Selesai
+        {{-- Meta grup SPJ: saklar status Belum/Selesai
              (tersimpan otomatis, hanya peran tulis) dan nomor
              VA untuk grup SIPLah — isian manual karena data
              ARKAS/SIPLah hanya menyediakan nomor invoice.
@@ -40,16 +40,9 @@
             <div>
               <div class="small text-muted mb-1">Status</div>
               @if ($bisaTulisPenerima)
-                <div class="btn-group btn-group-sm" role="group" aria-label="Status grup SPJ">
-                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-belum" value="belum"
-                    autocomplete="off">
-                  <label class="btn btn-outline-secondary" for="meta-status-belum">Belum</label>
-                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-lunas" value="lunas"
-                    autocomplete="off">
-                  <label class="btn btn-outline-success" for="meta-status-lunas">Lunas</label>
-                  <input type="radio" class="btn-check" name="meta-status" id="meta-status-selesai" value="selesai"
-                    autocomplete="off">
-                  <label class="btn btn-outline-primary" for="meta-status-selesai">Selesai</label>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="meta-status-saklar">
+                  <label class="form-check-label" for="meta-status-saklar">Selesai</label>
                 </div>
               @endif
               <span id="meta-status-baca"></span>
@@ -419,17 +412,17 @@
       $('meta-siplah-info').innerHTML = info;
 
       if (bisaTulis) {
-        var radio = modalEl.querySelector(
-          'input[name="meta-status"][value="' + (g.status || 'belum') + '"]');
-        if (radio) radio.checked = true;
+        var saklar = $('meta-status-saklar');
+        if (saklar) saklar.checked = (g.status === 'selesai');
       } else {
         var labelStatus = {
           belum: ['bg-label-secondary', 'Belum'],
-          lunas: ['bg-success', 'Lunas'],
-          selesai: ['bg-primary', 'Selesai']
-        }[g.status || 'belum'];
+          selesai: ['bg-success', 'Selesai']
+        };
+        var kunciStatus = (g.status === 'selesai') ? 'selesai' : 'belum';
+        var label = labelStatus[kunciStatus];
         $('meta-status-baca').innerHTML =
-          '<span class="badge ' + labelStatus[0] + '">' + labelStatus[1] + '</span>';
+          '<span class="badge ' + label[0] + '">' + label[1] + '</span>';
       }
 
       // Kolom VA hanya untuk grup SIPLah.
@@ -457,7 +450,7 @@
       var g = data.grup || {};
 
       var lencanaStatus = wadah.querySelector('.lencana-status-grup');
-      if (g.status === 'lunas' || g.status === 'selesai') {
+      if (g.status === 'selesai') {
         if (!lencanaStatus) {
           lencanaStatus = document.createElement('span');
           var vaEl = wadah.querySelector('.lencana-va-grup');
@@ -467,9 +460,8 @@
             wadah.appendChild(lencanaStatus);
           }
         }
-        lencanaStatus.className = 'badge lencana-status-grup ' +
-          (g.status === 'lunas' ? 'bg-success' : 'bg-primary');
-        lencanaStatus.textContent = g.status === 'lunas' ? 'Lunas' : 'Selesai';
+        lencanaStatus.className = 'badge lencana-status-grup bg-success';
+        lencanaStatus.textContent = 'Selesai';
       } else if (lencanaStatus) {
         lencanaStatus.remove();
       }
@@ -814,7 +806,7 @@
     function segarkanMetaInline(wadah, status, nomorVa) {
       if (!wadah) return;
       var lencanaStatus = wadah.querySelector('.lencana-status-grup');
-      if (status === 'lunas' || status === 'selesai') {
+      if (status === 'selesai') {
         if (!lencanaStatus) {
           lencanaStatus = document.createElement('span');
           var vaEl = wadah.querySelector('.lencana-va-grup');
@@ -824,9 +816,8 @@
             wadah.appendChild(lencanaStatus);
           }
         }
-        lencanaStatus.className = 'badge lencana-status-grup ' +
-          (status === 'lunas' ? 'bg-success' : 'bg-primary');
-        lencanaStatus.textContent = status === 'lunas' ? 'Lunas' : 'Selesai';
+        lencanaStatus.className = 'badge lencana-status-grup bg-success';
+        lencanaStatus.textContent = 'Selesai';
       } else if (lencanaStatus) {
         lencanaStatus.remove();
       }
@@ -850,17 +841,17 @@
       var inpVa = el.querySelector('.meta-inline-va');
       var btnSimpan = el.querySelector('.meta-inline-simpan');
       if (!selStatus || !inpVa || !btnSimpan) return;
-      var statusTerakhir = selStatus.value;
+      var statusTerakhir = selStatus.checked;
       var timerTersimpan = null;
 
       async function simpanInline() {
         try {
           var res = await kirim(urlDasar + '/' + id + '/penerima-grup', 'PUT', {
-            status: selStatus.value,
+            status: selStatus.checked ? 'selesai' : 'belum',
             nomor_va: inpVa.value.trim() || null
           });
-          statusTerakhir = res.status;
-          selStatus.value = res.status;
+          statusTerakhir = (res.status === 'selesai');
+          selStatus.checked = statusTerakhir;
           inpVa.value = res.nomor_va || '';
           var sel = el.closest('td');
           segarkanMetaInline(sel ? sel.querySelector('.meta-grup-baris') : null,
@@ -871,7 +862,7 @@
             btnSimpan.textContent = 'Simpan';
           }, 1500);
         } catch (e) {
-          selStatus.value = statusTerakhir;
+          selStatus.checked = statusTerakhir;
           gagal(e);
         }
       }
@@ -925,21 +916,22 @@
 
       // Saklar status meta grup: tersimpan otomatis begitu
       // diganti (PUT penerima-grup, membawa VA saat ini).
-      modalEl.querySelectorAll('input[name="meta-status"]').forEach(function(radio) {
-        radio.addEventListener('change', function() {
+      var saklarStatus = $('meta-status-saklar');
+      if (saklarStatus) {
+        saklarStatus.addEventListener('change', function() {
           if (!data || !data.grup) return;
           var va = data.grup.siplah ?
             $('meta-nomor-va').value.trim() :
             (data.grup.nomor_va || '');
-          simpanMeta(radio.value, va || null);
+          simpanMeta(saklarStatus.checked ? 'selesai' : 'belum', va || null);
         });
-      });
+      }
 
       $('btn-simpan-va').addEventListener('click', function() {
         if (!data || !data.grup) return;
-        var terpilih = modalEl.querySelector('input[name="meta-status"]:checked');
+        var saklarVa = $('meta-status-saklar');
         simpanMeta(
-          terpilih ? terpilih.value : (data.grup.status || 'belum'),
+          saklarVa ? (saklarVa.checked ? 'selesai' : 'belum') : ((data.grup.status === 'selesai') ? 'selesai' : 'belum'),
           $('meta-nomor-va').value.trim() || null
         );
       });

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Meta satu grup transaksi BKU untuk SPJ (Fase 2
  * lanjutan): status penyelesaian grup ('belum' /
- * 'lunas' / 'selesai') dan nomor virtual account
+ * 'selesai') dan nomor virtual account
  * pembayaran SIPLah (isian manual — tidak ada di data
  * ARKAS). Grup diidentifikasi teks grup_kunci, kunci
  * yang sama dengan kwitansi Fase 1 dan penerima
@@ -23,12 +23,11 @@ class BosSpjGrup extends Model
   protected $table = 'bos_spj_grup';
 
   /** Nilai status yang sah (saklar keterangan grup). */
-  public const STATUS = ['belum', 'lunas', 'selesai'];
+  public const STATUS = ['belum', 'selesai'];
 
   /** Label tampilan per nilai status. */
   public const STATUS_LABEL = [
     'belum' => 'Belum',
-    'lunas' => 'Lunas',
     'selesai' => 'Selesai',
   ];
 

@@ -1413,6 +1413,11 @@ class KelolaBosController extends Controller
       return view('content.kelola-bos.bku', $konteks + [
         'baris' => null,
         'totalNominal' => 0,
+        'totalAnggaran' => 0,
+        'tahunAnggaran' => (int) now()->format('Y'),
+        'sumberTerpilih' => null,
+        'namaSumberTerpilih' => null,
+        'daftarSumberDana' => collect(),
         'daftarTahun' => [],
         'daftarJenis' => collect(),
         'daftarRekening' => collect(),
@@ -1472,6 +1477,39 @@ class KelolaBosController extends Controller
     };
 
     $totalNominal = (float) $saring($dasar())->sum('bos_kas_umum.saldo');
+
+    // Angka kepala halaman: total anggaran tahun berjalan
+    // (tahun efektif halaman; "semua tahun" = tahun kalender
+    // berjalan) untuk sumber dana terpilih — menggantikan
+    // total nominal saringan yang menjumlah semua jenis BKU
+    // sekaligus sehingga uang yang sama terhitung berulang.
+    // Pilihan sumber mengikuti pola Kertas Kerja: parameter
+    // tidak dikirim = bawaan (BOS Reguler bila ada); dikirim
+    // kosong secara eksplisit = semua sumber dana. Totalnya
+    // jumlah baris RAPBS versi disetujui terakhir, definisi
+    // yang sama dengan ringkasan Kertas Kerja.
+    $tahunAnggaran = $tahunEfektif ?? (int) now()->format('Y');
+    $kelompok = $this->kelompokVersi($sekolahId);
+    $sumberTerpilih = $request->filled('sumber_dana')
+      ? $request->integer('sumber_dana')
+      : ($request->has('sumber_dana') ? null : $this->sumberBawaan($kelompok, $tahunAnggaran));
+    $idsAnggaran = $this->pilihVersiIds($kelompok, $tahunAnggaran, $sumberTerpilih, null);
+    $totalAnggaran = $idsAnggaran
+      ? (float) BosRapbs::where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->whereIn('id_anggaran_arkas', $idsAnggaran)
+        ->sum('jumlah')
+      : 0.0;
+    $namaSumberTerpilih = null;
+    if ($sumberTerpilih !== null) {
+      foreach ($kelompok as $k) {
+        if ($k['tahun'] === $tahunAnggaran && $k['sumber'] === $sumberTerpilih) {
+          $namaSumberTerpilih = $k['nama_sumber'];
+          break;
+        }
+      }
+      $namaSumberTerpilih ??= 'Sumber dana #' . $sumberTerpilih;
+    }
 
     // Kartu dana & anggaran di atas tabel (tidak ikut saringan
     // jenis/rekening/pencarian). Saat "Semua tahun" dipilih, kartu dana
@@ -1611,6 +1649,11 @@ class KelolaBosController extends Controller
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
+      'totalAnggaran' => $totalAnggaran,
+      'tahunAnggaran' => $tahunAnggaran,
+      'sumberTerpilih' => $sumberTerpilih,
+      'namaSumberTerpilih' => $namaSumberTerpilih,
+      'daftarSumberDana' => $this->daftarSumberDana($sekolahId),
       'kartuDana' => $kartuDana,
       'kartuAnggaran' => $kartuAnggaran,
       'daftarTahun' => $daftarTahun,
@@ -1805,6 +1848,69 @@ class KelolaBosController extends Controller
     ];
   }
 
+  /** Daftar kwitansi untuk satu grup: per penerima SPJ bila grup
+   *  sudah punya penerima, selain itu satu kwitansi per nota. */
+  private function daftarKwitansiGrup(int $sekolahId, string $kunci, array $grup, int $nomorUrut): array
+  {
+    $grup = array_values($grup);
+    $dasar = $this->dataKwitansi($sekolahId, $grup, $nomorUrut);
+
+    $penerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->orderBy('urutan')
+      ->orderBy('id')
+      ->get();
+    if ($penerima->isEmpty()) {
+      return [$dasar];
+    }
+
+    $fmtVolume = function ($v) {
+      if ($v === null) {
+        return null;
+      }
+      $s = number_format((float) $v, 2, ',', '.');
+      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    };
+    $fmtPersen = function ($v) {
+      $s = number_format((float) $v, 2, ',', '.');
+      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    };
+
+    $uraian = count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian;
+
+    $daftar = [];
+    foreach ($penerima as $i => $p) {
+      $rincian = [
+        [
+          'uraian' => $uraian,
+          'kode_rekening' => $dasar['kode_rekening'],
+          'volume' => $fmtVolume((float) $p->volume),
+          'saldo' => (float) $p->jumlah,
+        ],
+      ];
+      if ((float) $p->pph > 0) {
+        $rincian[] = [
+          'uraian' => 'Potongan PPh ' . $fmtPersen($p->pph_persen) . '%',
+          'kode_rekening' => null,
+          'volume' => null,
+          'saldo' => -(float) $p->pph,
+        ];
+      }
+
+      $daftar[] = array_merge($dasar, [
+        'nomor' => $dasar['nomor'] . '-' . ($i + 1),
+        'uraian' => $uraian,
+        'rincian' => $rincian,
+        'total' => (float) $p->diterima,
+        'terbilang' => Terbilang::rupiah((float) $p->diterima),
+        'penerima' => $p->nama,
+        'tampil_rincian' => true,
+      ]);
+    }
+
+    return $daftar;
+  }
+
   /** Cetak kwitansi untuk grup nota/bukti dari satu baris BKU. */
   public function cetakKwitansi(Request $request, int $id)
   {
@@ -1841,13 +1947,13 @@ class KelolaBosController extends Controller
 
     $tahun = (int) ($baris->tanggal_transaksi?->format('Y') ?? now()->format('Y'));
     $nomor = $this->nomorUrutKwitansi($sekolahId, $kunci, $tahun);
-    $data = $this->dataKwitansi($sekolahId, $grup, $nomor);
+    $daftar = $this->daftarKwitansiGrup($sekolahId, $kunci, $grup, $nomor);
 
     return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
-      'daftarKwitansi' => [$data],
+      'daftarKwitansi' => $daftar,
       'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
     ])->setPaper('a4', 'portrait')
-      ->stream('kwitansi-' . ($data['no_bukti'] ?? $id) . '.pdf');
+      ->stream('kwitansi-' . ($daftar[0]['no_bukti'] ?? $id) . '.pdf');
   }
 
   /** Cetak kwitansi semua transaksi belanja sesuai saringan halaman BKU. */
@@ -1920,7 +2026,7 @@ class KelolaBosController extends Controller
       $tahunGrup = (int) (collect($rows)->map(fn($r) => $r->tanggal_transaksi?->format('Y'))->filter()->min()
         ?? now()->format('Y'));
       $nomor = $this->nomorUrutKwitansi($sekolahId, (string) $kunci, $tahunGrup);
-      $daftarKwitansi[] = $this->dataKwitansi($sekolahId, $rows, $nomor);
+      $daftarKwitansi = array_merge($daftarKwitansi, $this->daftarKwitansiGrup($sekolahId, (string) $kunci, $rows, $nomor));
     }
 
     return Pdf::loadView('content.kelola-bos.kwitansi-pdf', [
@@ -2159,7 +2265,7 @@ class KelolaBosController extends Controller
   }
 
   /**
-   * Simpan meta grup SPJ: saklar status (belum / lunas /
+   * Simpan meta grup SPJ: saklar status (belum /
    * selesai) dan nomor VA pembayaran SIPLah (manual).
    * Baris meta dibuat malas lewat updateOrCreate menurut
    * (sekolah, grup_kunci) dari baris BKU pada URL.

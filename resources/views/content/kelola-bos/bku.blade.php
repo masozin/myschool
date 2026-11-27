@@ -65,8 +65,9 @@
           </p>
         </div>
         <div class="text-end">
-          <div class="text-muted small">Total nominal sesuai saringan</div>
-          <h5 class="mb-0">Rp {{ number_format($totalNominal, 0, ',', '.') }}</h5>
+          <div class="text-muted small">Anggaran {{ $tahunAnggaran ?? now()->format('Y') }} &middot;
+            {{ $namaSumberTerpilih ?? 'Semua Sumber Dana' }}</div>
+          <h5 class="mb-0">Rp {{ number_format($totalAnggaran ?? 0, 0, ',', '.') }}</h5>
         </div>
       </div>
     </div>
@@ -199,6 +200,17 @@
             </select>
           </div>
           <div class="col-6 col-md-2">
+            <label class="form-label">Sumber Dana</label>
+            <select name="sumber_dana" class="form-select">
+              <option value="">Semua</option>
+              @foreach ($daftarSumberDana ?? [] as $sd)
+                <option value="{{ $sd->id_ref_sumber_dana }}"
+                  {{ ($sumberTerpilih ?? null) === (int) $sd->id_ref_sumber_dana ? 'selected' : '' }}>
+                  {{ $sd->nama_sumber_dana }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
             <label class="form-label">Jenis BKU</label>
             <select name="jenis" class="form-select">
               <option value="">Semua jenis</option>
@@ -208,7 +220,7 @@
               @endforeach
             </select>
           </div>
-          <div class="col-6 col-md-3">
+          <div class="col-6 col-md-2">
             <label class="form-label">Rekening</label>
             <select name="rekening" class="form-select">
               <option value="">Semua rekening</option>
@@ -218,7 +230,7 @@
               @endforeach
             </select>
           </div>
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-2">
             <label class="form-label">Pencarian</label>
             <input type="text" name="cari" class="form-control" value="{{ request('cari') }}"
               placeholder="Uraian, no bukti, nama toko…">
@@ -313,10 +325,8 @@
                       @if (!empty($b->is_beli_di_siplah))
                         <span class="badge bg-info">SIPLah</span>
                       @endif
-                      @if ($metaBaris['status'] === 'lunas')
-                        <span class="badge bg-success lencana-status-grup">Lunas</span>
-                      @elseif ($metaBaris['status'] === 'selesai')
-                        <span class="badge bg-primary lencana-status-grup">Selesai</span>
+                      @if ($metaBaris['status'] === 'selesai')
+                        <span class="badge bg-success lencana-status-grup">Selesai</span>
                       @endif
                       @if (!empty($metaBaris['nomor_va']))
                         <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
@@ -327,11 +337,11 @@
                            status & nomor VA diisi langsung (inline). --}}
                       @if ($bisaTulisPenerima)
                         <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
-                          <select class="form-select form-select-sm py-0 meta-inline-status" style="width: auto;" title="Status SPJ">
-                            <option value="belum" @selected($metaBaris['status'] === 'belum')>Belum</option>
-                            <option value="lunas" @selected($metaBaris['status'] === 'lunas')>Lunas</option>
-                            <option value="selesai" @selected($metaBaris['status'] === 'selesai')>Selesai</option>
-                          </select>
+                          <div class="form-check form-switch mb-0">
+                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
+                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
+                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
+                          </div>
                           <input type="text" class="form-control form-control-sm py-0 meta-inline-va" style="width: 140px;"
                             placeholder="Nomor VA" value="{{ $metaBaris['nomor_va'] }}">
                           <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 meta-inline-simpan">Simpan</button>
