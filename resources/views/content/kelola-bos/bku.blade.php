@@ -428,6 +428,18 @@
                           @endif
                         </button>
                       </div>
+                      @if ($bisaTulisPenerima)
+                        {{-- Saklar status SPJ juga untuk belanja
+                             non-SIPLah: menyimpan sendiri (hanya
+                             status) lewat handler meta-inline. --}}
+                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
+                          <div class="form-check form-switch mb-0">
+                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
+                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
+                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
+                          </div>
+                        </div>
+                      @endif
                     @endif
                   </td>
                   <td class="small">
@@ -540,6 +552,18 @@
                           @endif
                         </button>
                       </div>
+                      @if ($bisaTulisPenerima)
+                        {{-- Saklar status SPJ juga untuk belanja
+                             non-SIPLah: menyimpan sendiri (hanya
+                             status) lewat handler meta-inline. --}}
+                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
+                          <div class="form-check form-switch mb-0">
+                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
+                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
+                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
+                          </div>
+                        </div>
+                      @endif
                     @endif
                   @endif
                 </td>
