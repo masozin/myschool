@@ -896,6 +896,20 @@ Route::controller(KelolaBosController::class)
     // & nomor VA SIPLah (manual) per grup transaksi.
     Route::put('/bku/{id}/penerima-grup', 'penerimaGrupUbah')->name('bku.penerima.grup')
       ->middleware('role:Admin|Operator Sekolah');
+    // SPJ Grup Manual — gabung beberapa nota / pecah satu
+    // nota menjadi grup SPJ bernama alias (lapisan SPJ,
+    // data ARKAS tidak diubah). Isi grup dibaca mengikuti
+    // akses BKU; penulisan hanya Admin & Operator Sekolah.
+    Route::get('/bku/{id}/grup-anggota', 'grupAnggota')->name('bku.grup-anggota')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    Route::post('/bku/grup-manual/gabung', 'grupManualGabung')->name('bku.grup-manual.gabung')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/grup-manual/pecah', 'grupManualPecah')->name('bku.grup-manual.pecah')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/grup-manual/batal', 'grupManualBatal')->name('bku.grup-manual.batal')
+      ->middleware('role:Admin|Operator Sekolah');
+    Route::post('/bku/grup-manual/{grupId}/nama', 'grupManualUbahNama')->name('bku.grup-manual.nama')
+      ->middleware('role:Admin|Operator Sekolah');
     Route::get('/perbandingan', 'perbandingan')->name('perbandingan')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/referensi/barang', 'referensiBarang')->name('referensi.barang')

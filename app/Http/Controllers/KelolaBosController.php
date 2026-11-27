@@ -15,6 +15,8 @@ use App\Models\BosRefRekening;
 use App\Models\BosSinkronLog;
 use App\Models\BosSinkronToken;
 use App\Models\BosSpjGrup;
+use App\Models\BosSpjGrupAnggota;
+use App\Models\BosSpjGrupManual;
 use App\Models\BosSpjPenerima;
 use App\Models\Penerima;
 use App\Models\Ptk;
@@ -1429,6 +1431,8 @@ class KelolaBosController extends Controller
         'jumlahPenerima' => [],
         'namaPenerima' => [],
         'metaGrup' => [],
+        'kunciPerBaris' => [],
+        'barisTampil' => [],
         'tahunTerpilih' => null,
       ]);
     }
@@ -1584,9 +1588,13 @@ class KelolaBosController extends Controller
     // kunci grup kwitansi, lalu dipetakan ke id baris.
     $jumlahPenerima = [];
     $kunciPerBaris = [];
+    // Keanggotaan grup manual (gabung/pecah nota) menimpa
+    // pengelompokan bawaan ARKAS — peta dibangun sekali
+    // untuk seluruh baris halaman ini.
+    $petaManual = $this->petaGrupManual($sekolahId, $baris->getCollection()->pluck('id')->all());
     foreach ($baris as $b) {
       if (in_array((int) $b->id_ref_bku, self::JENIS_BELANJA, true)) {
-        $kunciPerBaris[$b->id] = $this->kunciGrupKwitansi($b);
+        $kunciPerBaris[$b->id] = $this->kunciGrupKwitansi($b, $petaManual);
       }
     }
     if ($kunciPerBaris) {
@@ -1658,6 +1666,67 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Daftar tampil tabel: grup manual yang tersentuh
+    // halaman ini diringkas jadi SATU item pada posisi
+    // anggota pertamanya (menurut urutan halaman); anggota
+    // lain dari grup yang sama tidak di-render terpisah.
+    // Item grup membawa data ringkas seluruh grup (semua
+    // anggota, bukan hanya yang tampil di halaman ini).
+    $barisTampil = [];
+    $grupManualDiHalaman = []; // grupId => data ringkas
+    if ($petaManual) {
+      $grupIds = collect($petaManual)->map(fn($k) => (int) substr($k, 7))->unique()->values();
+      $daftarGrupManual = BosSpjGrupManual::where('sekolah_id', $sekolahId)
+        ->whereIn('id', $grupIds)
+        ->get()
+        ->keyBy('id');
+      foreach ($grupIds as $gid) {
+        $gm = $daftarGrupManual->get($gid);
+        if (!$gm) {
+          continue;
+        }
+        $repSeed = null;
+        foreach ($baris as $b) {
+          if (($petaManual[$b->id] ?? null) === 'manual:' . $gid) {
+            $repSeed = $b;
+            break;
+          }
+        }
+        if (!$repSeed) {
+          continue;
+        }
+        $anggota = $this->barisGrupKwitansi($sekolahId, $repSeed, 'manual:' . $gid);
+        if (!$anggota) {
+          continue;
+        }
+        $kunciAsal = collect($anggota)->map(fn($r) => $this->kunciGrupKwitansi($r))->unique();
+        $grupManualDiHalaman[$gid] = [
+          'id' => $gid,
+          'nama' => $gm->nama,
+          'jenis' => $kunciAsal->count() > 1 ? 'gabungan' : 'pecahan',
+          'anggota' => $anggota,
+          'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $anggota)),
+          'perwakilan' => $repSeed,
+        ];
+      }
+    }
+    $tampilGrup = [];
+    foreach ($baris as $b) {
+      $kunciB = $kunciPerBaris[$b->id] ?? null;
+      if ($kunciB && str_starts_with($kunciB, 'manual:')) {
+        $gid = (int) substr($kunciB, 7);
+        if (isset($tampilGrup[$gid])) {
+          continue;
+        }
+        $tampilGrup[$gid] = true;
+        if (isset($grupManualDiHalaman[$gid])) {
+          $barisTampil[] = ['tipe' => 'grup', 'b' => $grupManualDiHalaman[$gid]['perwakilan'], 'gm' => $grupManualDiHalaman[$gid]];
+        }
+        continue;
+      }
+      $barisTampil[] = ['tipe' => 'baris', 'b' => $b, 'gm' => null];
+    }
+
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
@@ -1680,6 +1749,8 @@ class KelolaBosController extends Controller
       'jumlahPenerima' => $jumlahPenerima,
       'namaPenerima' => $namaPenerima,
       'metaGrup' => $metaGrup,
+      'kunciPerBaris' => $kunciPerBaris,
+      'barisTampil' => $barisTampil,
     ]);
   }
 
@@ -1696,9 +1767,75 @@ class KelolaBosController extends Controller
   /** Memo penandatangan per sekolah selama satu request. */
   private array $memoPenandatangan = [];
 
-  /** Kunci pengelompokan kwitansi untuk satu baris BKU. */
-  private function kunciGrupKwitansi(BosKasUmum $b): string
+  /** Peta baris → kunci grup manual ('manual:{id}') untuk sekumpulan id baris. */
+  private function petaGrupManual(int $sekolahId, array $barisIds): array
   {
+    if (!$barisIds) {
+      return [];
+    }
+
+    return BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+      ->whereIn('bos_kas_umum_id', $barisIds)
+      ->pluck('grup_manual_id', 'bos_kas_umum_id')
+      ->map(fn($g) => 'manual:' . $g)
+      ->all();
+  }
+
+  /** Kunci grup efektif satu baris: grup manual menang atas pengelompokan ARKAS. */
+  private function kunciGrupEfektif(int $sekolahId, BosKasUmum $b): string
+  {
+    $peta = $this->petaGrupManual($sekolahId, [$b->id]);
+
+    return $peta[$b->id] ?? $this->kunciGrupKwitansi($b);
+  }
+
+  /**
+   * Baris-baris satu grup kwitansi menurut kunci efektif,
+   * urut tanggal lalu id. Untuk kunci bawaan ARKAS
+   * (nota/bukti), baris yang sedang menjadi anggota grup
+   * manual TIDAK ikut — pengelompokan efektif mereka
+   * adalah grup manualnya, konsisten dengan grupKwitansi()
+   * yang mengelompokkan koleksi menurut kunci efektif
+   * per baris.
+   */
+  private function barisGrupKwitansi(int $sekolahId, BosKasUmum $baris, string $kunci): array
+  {
+    $q = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
+    if (str_starts_with($kunci, 'manual:')) {
+      $grupId = (int) substr($kunci, 7);
+      $ids = BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+        ->where('grup_manual_id', $grupId)
+        ->pluck('bos_kas_umum_id');
+      $q->whereIn('id', $ids);
+    } elseif (str_starts_with($kunci, 'nota:')) {
+      $q->where('id_kas_nota', $baris->id_kas_nota)
+        ->whereNotIn('id', BosSpjGrupAnggota::where('sekolah_id', $sekolahId)->select('bos_kas_umum_id'));
+    } elseif (str_starts_with($kunci, 'bukti:')) {
+      $q->whereNull('id_kas_nota')
+        ->where('no_bukti', $baris->no_bukti)
+        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi)
+        ->whereNotIn('id', BosSpjGrupAnggota::where('sekolah_id', $sekolahId)->select('bos_kas_umum_id'));
+    } else {
+      $q->where('id', $baris->id);
+    }
+
+    return $q->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+  }
+
+  /**
+   * Kunci pengelompokan kwitansi untuk satu baris BKU.
+   * Bila peta grup manual diberikan dan baris ini anggota
+   * grup manual, kunci manual yang berlaku; selain itu
+   * pengelompokan bawaan ARKAS (nota → bukti → baris).
+   */
+  private function kunciGrupKwitansi(BosKasUmum $b, ?array $petaManual = null): string
+  {
+    if ($petaManual !== null && isset($petaManual[$b->id])) {
+      return $petaManual[$b->id];
+    }
+
     if (!empty($b->id_kas_nota)) {
       return 'nota:' . $b->id_kas_nota;
     }
@@ -1717,7 +1854,7 @@ class KelolaBosController extends Controller
    *
    * @return array<string, BosKasUmum[]>
    */
-  private function grupKwitansi($baris): array
+  private function grupKwitansi($baris, ?array $petaManual = null): array
   {
     $grup = [];
     foreach ($baris as $b) {
@@ -1727,7 +1864,7 @@ class KelolaBosController extends Controller
       if (!in_array((int) $b->id_ref_bku, self::JENIS_BELANJA, true)) {
         continue;
       }
-      $grup[$this->kunciGrupKwitansi($b)][] = $b;
+      $grup[$this->kunciGrupKwitansi($b, $petaManual)][] = $b;
     }
 
     return $grup;
@@ -1756,7 +1893,8 @@ class KelolaBosController extends Controller
       ->orderBy('id')
       ->get();
 
-    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+    $peta = $this->petaGrupManual($sekolahId, $baris->pluck('id')->all());
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris, $peta));
     $posisi = array_search($kunciGrup, array_keys($grup), true);
 
     return $posisi === false ? 0 : $posisi + 1;
@@ -1813,6 +1951,19 @@ class KelolaBosController extends Controller
     $grup = array_values($grup);
     $pertama = $grup[0];
 
+    // Grup manual: nama aliasnya menjadi uraian
+    // pembayaran kwitansi (menggantikan uraian baris /
+    // teks generik) — keanggotaan cukup dicek dari baris
+    // pertama karena seluruh grup berbagi kunci yang sama.
+    $grupManual = null;
+    $anggotaManual = BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+      ->where('bos_kas_umum_id', $pertama->id)
+      ->first();
+    if ($anggotaManual) {
+      $grupManual = BosSpjGrupManual::where('sekolah_id', $sekolahId)
+        ->find($anggotaManual->grup_manual_id);
+    }
+
     $nota = null;
     if (!empty($pertama->id_kas_nota)) {
       $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
@@ -1843,9 +1994,13 @@ class KelolaBosController extends Controller
       'nomor' => str_pad((string) $nomorUrut, 3, '0', STR_PAD_LEFT),
       'no_bukti' => $nota->no_bukti ?? ($pertama->no_bukti ?? null),
       'kode_rekening' => $kodeRekening,
-      'uraian' => count($grup) === 1
-        ? $pertama->uraian
-        : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut',
+      'uraian' => $grupManual
+        ? $grupManual->nama
+        : (count($grup) === 1
+          ? $pertama->uraian
+          : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut'),
+      'grup_manual' => (bool) $grupManual,
+      'nama_alias' => $grupManual?->nama,
       'rincian' => array_map(fn($b) => [
         'uraian' => $b->uraian,
         'kode_rekening' => $b->kode_rekening,
@@ -1888,7 +2043,9 @@ class KelolaBosController extends Controller
       return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
     };
 
-    $uraian = count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian;
+    $uraian = !empty($dasar['grup_manual'])
+      ? $dasar['uraian']
+      : (count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian);
 
     $daftar = [];
     foreach ($penerima as $i => $p) {
@@ -2005,21 +2162,8 @@ class KelolaBosController extends Controller
       abort(404);
     }
 
-    $kunci = $this->kunciGrupKwitansi($baris);
-
-    $q = BosKasUmum::where('sekolah_id', $sekolahId)
-      ->where('soft_delete', false)
-      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
-    if (str_starts_with($kunci, 'nota:')) {
-      $q->where('id_kas_nota', $baris->id_kas_nota);
-    } elseif (str_starts_with($kunci, 'bukti:')) {
-      $q->whereNull('id_kas_nota')
-        ->where('no_bukti', $baris->no_bukti)
-        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi);
-    } else {
-      $q->where('id', $baris->id);
-    }
-    $grup = $q->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+    $kunci = $this->kunciGrupEfektif($sekolahId, $baris);
+    $grup = $this->barisGrupKwitansi($sekolahId, $baris, $kunci);
 
     $tahun = (int) ($baris->tanggal_transaksi?->format('Y') ?? now()->format('Y'));
     $nomor = $this->nomorUrutKwitansi($sekolahId, $kunci, $tahun);
@@ -2090,7 +2234,8 @@ class KelolaBosController extends Controller
       ->orderBy('bos_kas_umum.id')
       ->get();
 
-    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris));
+    $peta = $this->petaGrupManual($sekolahId, $baris->pluck('id')->all());
+    $grup = $this->urutkanGrupKwitansi($this->grupKwitansi($baris, $peta));
 
     if (!$grup) {
       return redirect()->route('kelola-bos.bku', $request->query())
@@ -2150,21 +2295,8 @@ class KelolaBosController extends Controller
       return null;
     }
 
-    $kunci = $this->kunciGrupKwitansi($baris);
-
-    $gq = BosKasUmum::where('sekolah_id', $sekolahId)
-      ->where('soft_delete', false)
-      ->whereIn('id_ref_bku', self::JENIS_BELANJA);
-    if (str_starts_with($kunci, 'nota:')) {
-      $gq->where('id_kas_nota', $baris->id_kas_nota);
-    } elseif (str_starts_with($kunci, 'bukti:')) {
-      $gq->whereNull('id_kas_nota')
-        ->where('no_bukti', $baris->no_bukti)
-        ->whereDate('tanggal_transaksi', $baris->tanggal_transaksi);
-    } else {
-      $gq->where('id', $baris->id);
-    }
-    $grup = $gq->orderBy('tanggal_transaksi')->orderBy('id')->get()->all();
+    $kunci = $this->kunciGrupEfektif($sekolahId, $baris);
+    $grup = $this->barisGrupKwitansi($sekolahId, $baris, $kunci);
 
     return ['sekolahId' => $sekolahId, 'baris' => $baris, 'kunci' => $kunci, 'grup' => $grup];
   }
@@ -2403,6 +2535,478 @@ class KelolaBosController extends Controller
       'nomor_va' => $meta->nomor_va,
       'non_barang' => $manual ?? $this->deteksiNonBarangGrup($grupBaris),
       'non_barang_manual' => $manual,
+    ]);
+  }
+
+  // ── SPJ Grup Manual (gabung / pecah nota) ────────────
+  //
+  // Pengelompokan manual menimpa pengelompokan bawaan
+  // ARKAS lewat tabel bos_spj_grup_manual +
+  // bos_spj_grup_anggota (kunci grup "manual:{id}").
+  // Data cermin ARKAS tidak pernah diubah; membatalkan
+  // grup manual mengembalikan baris-barisnya ke
+  // pengelompokan nota / nomor bukti seperti semula.
+
+  /** Isi satu grup transaksi BKU (modal isi grup & modal pecah di halaman BKU). */
+  public function grupAnggota(Request $request, int $id)
+  {
+    $konteks = $this->konteksGrupPenerima($request, $id);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci, 'grup' => $grup] = $konteks;
+
+    $manual = str_starts_with($kunci, 'manual:');
+    $grupManualId = $manual ? (int) substr($kunci, 7) : null;
+    $gm = $grupManualId
+      ? BosSpjGrupManual::where('sekolah_id', $sekolahId)->find($grupManualId)
+      : null;
+
+    $jenis = null;
+    if ($manual) {
+      $kunciAsal = collect($grup)->map(fn($r) => $this->kunciGrupKwitansi($r))->unique();
+      $jenis = $kunciAsal->count() > 1 ? 'gabungan' : 'pecahan';
+    }
+
+    // Nama rekening per baris: ref rekening dipilih
+    // menurut kode + tahun transaksi baris (satu kode
+    // punya nama per tahun di ref ARKAS) — pola yang sama
+    // dengan subquery nama_rekening di bku().
+    $kodeUnik = collect($grup)->pluck('kode_rekening')->filter()->unique()->values();
+    $namaPerKodeTahun = [];
+    if ($kodeUnik->isNotEmpty()) {
+      $refRekening = BosRefRekening::whereIn('kode_rekening', $kodeUnik)
+        ->get(['kode_rekening', 'nama_rekening', 'tahun']);
+      foreach ($refRekening as $r) {
+        $namaPerKodeTahun[$r->kode_rekening . '|' . $r->tahun] = $r->nama_rekening;
+      }
+    }
+
+    $baris = [];
+    foreach ($grup as $r) {
+      $baris[] = [
+        'id' => $r->id,
+        'tanggal' => $r->tanggal_transaksi?->format('d-m-Y'),
+        'no_bukti' => $r->no_bukti,
+        'uraian' => $r->uraian,
+        'kode_rekening' => $r->kode_rekening,
+        'nama_rekening' => $r->kode_rekening
+          ? ($namaPerKodeTahun[$r->kode_rekening . '|' . $r->tanggal_transaksi?->format('Y')] ?? null)
+          : null,
+        'nominal' => (float) $r->saldo,
+      ];
+    }
+
+    return response()->json([
+      'grup' => [
+        'kunci' => $kunci,
+        'manual' => $manual,
+        'grup_manual_id' => $grupManualId,
+        'nama_alias' => $gm?->nama,
+        'jenis' => $jenis,
+        'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $grup)),
+        'jumlah_baris' => count($grup),
+      ],
+      'bisa_tulis' => $this->bisaTulisAlias(),
+      'baris' => $baris,
+    ]);
+  }
+
+  /**
+   * Gabung beberapa grup transaksi BKU menjadi satu grup
+   * manual bernama alias. Seluruh anggota tiap grup yang
+   * tersentuh pilihan ikut digabung (ekspansi grup utuh).
+   * Penerima grup-grup asal digabung berurutan mengikuti
+   * urutan grup sumber; meta digabung: status 'selesai'
+   * hanya bila semua asal selesai, nomor VA dipertahankan
+   * hanya bila unik, kategori non_barang manual hanya
+   * bila semua asal sama.
+   */
+  public function grupManualGabung(Request $request)
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Konteks sekolah tidak ditemukan.'], 404);
+    }
+
+    $validated = $request->validate([
+      'nama' => 'required|string|max:120',
+      'baris_ids' => 'required|array|min:1',
+      'baris_ids.*' => 'integer',
+    ]);
+
+    $idsUnik = collect($validated['baris_ids'])->map(fn($i) => (int) $i)->unique()->values();
+    $terpilih = BosKasUmum::where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->whereIn('id', $idsUnik)
+      ->get();
+    if ($terpilih->count() !== $idsUnik->count()) {
+      return response()->json(['message' => 'Sebagian baris tidak ditemukan / bukan baris belanja.'], 422);
+    }
+
+    // Ekspansi grup utuh: tiap baris terpilih mewakili
+    // SELURUH grup efektifnya (nota / bukti / baris /
+    // grup manual).
+    $petaTerpilih = $this->petaGrupManual($sekolahId, $terpilih->pluck('id')->all());
+    $wakilSumber = [];
+    foreach ($terpilih as $b) {
+      $wakilSumber[$this->kunciGrupKwitansi($b, $petaTerpilih)] = $b;
+    }
+    if (count($wakilSumber) < 2) {
+      return response()->json(['message' => 'Pilih baris dari minimal dua nota/grup berbeda untuk digabung.'], 422);
+    }
+    $grupSumber = []; // kunci => baris-baris grup itu
+    $semua = [];      // id => baris (unik)
+    foreach ($wakilSumber as $kunci => $wakil) {
+      $rows = $this->barisGrupKwitansi($sekolahId, $wakil, $kunci);
+      $grupSumber[$kunci] = $rows;
+      foreach ($rows as $r) {
+        $semua[$r->id] = $r;
+      }
+    }
+    $semua = array_values($semua);
+
+    // Baris SIPLah tidak ikut digabung/dipecah:
+    // pengelompokannya mengikuti nota marketplace (status
+    // & VA diisi inline per nota). Dicek pada seluruh
+    // baris hasil ekspansi, bukan hanya yang terpilih.
+    $notaIds = collect($semua)->pluck('id_kas_nota')->filter()->unique()->values();
+    if ($notaIds->isNotEmpty()
+      && BosKasNota::where('sekolah_id', $sekolahId)
+        ->whereIn('id_arkas', $notaIds)
+        ->where('is_beli_di_siplah', true)
+        ->exists()) {
+      return response()->json(['message' => 'Baris SIPLah tidak bisa digabung/dipecah — pengelompokannya mengikuti nota marketplace.'], 422);
+    }
+
+    // Satu tahun anggaran + satu sumber dana: tanda tangan
+    // dari pemetaan anggaran tiap baris; baris tanpa
+    // pemetaan memakai tahun tanggal transaksinya dengan
+    // sumber kosong.
+    $anggaranIds = collect($semua)->pluck('id_anggaran_arkas')->filter()->unique()->values();
+    $petaAnggaran = $anggaranIds->isEmpty()
+      ? collect()
+      : BosAnggaran::where('sekolah_id', $sekolahId)
+        ->whereIn('id_arkas', $anggaranIds)
+        ->get()
+        ->keyBy('id_arkas');
+    $tandaTangan = [];
+    foreach ($semua as $r) {
+      $ag = !empty($r->id_anggaran_arkas) ? $petaAnggaran->get($r->id_anggaran_arkas) : null;
+      $tandaTangan[] = $ag
+        ? $ag->tahun_anggaran . '|' . $ag->id_ref_sumber_dana
+        : ($r->tanggal_transaksi?->format('Y') ?? '') . '|';
+    }
+    if (count(array_unique($tandaTangan)) > 1) {
+      return response()->json(['message' => 'Hanya transaksi satu tahun anggaran dan satu sumber dana yang bisa digabung.'], 422);
+    }
+
+    $nama = trim($validated['nama']);
+
+    $hasil = \Illuminate\Support\Facades\DB::transaction(function () use ($sekolahId, $nama, $grupSumber, $semua) {
+      $gm = BosSpjGrupManual::create(['sekolah_id' => $sekolahId, 'nama' => $nama]);
+      $kunciBaru = $gm->kunci();
+
+      // Penerima digabung: urutan mengikuti urutan grup
+      // sumber (tanggal awal grup), di dalam grup urutan
+      // aslinya; nomor urut ditulis ulang 1..n.
+      $urutan = 0;
+      foreach (array_keys($this->urutkanGrupKwitansi($grupSumber)) as $kunciSumber) {
+        $penerimaSumber = BosSpjPenerima::where('sekolah_id', $sekolahId)
+          ->where('grup_kunci', $kunciSumber)
+          ->orderBy('urutan')
+          ->orderBy('id')
+          ->get();
+        foreach ($penerimaSumber as $p) {
+          $p->grup_kunci = $kunciBaru;
+          $p->urutan = ++$urutan;
+          $p->save();
+        }
+      }
+
+      // Meta digabung menurut aturan di docblock method.
+      $metas = BosSpjGrup::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', array_keys($grupSumber))
+        ->get()
+        ->keyBy('grup_kunci');
+      $semuaSelesai = true;
+      foreach (array_keys($grupSumber) as $kunciSumber) {
+        if (($metas->get($kunciSumber)?->status ?? 'belum') !== 'selesai') {
+          $semuaSelesai = false;
+          break;
+        }
+      }
+      $statusBaru = $semuaSelesai ? 'selesai' : 'belum';
+      $vaUnik = $metas->map(fn($m) => $m->nomor_va)
+        ->filter(fn($v) => $v !== null && trim((string) $v) !== '')
+        ->unique()
+        ->values();
+      $vaBaru = $vaUnik->count() === 1 ? $vaUnik->first() : null;
+      $nbNilai = [];
+      foreach (array_keys($grupSumber) as $kunciSumber) {
+        $m = $metas->get($kunciSumber);
+        $nbNilai[] = $m && !is_null($m->non_barang) ? (bool) $m->non_barang : null;
+      }
+      $nonBarangBaru = count(array_unique($nbNilai, SORT_REGULAR)) === 1 ? $nbNilai[0] : null;
+      if ($statusBaru !== 'belum' || $vaBaru !== null || $nonBarangBaru !== null) {
+        BosSpjGrup::updateOrCreate(
+          ['sekolah_id' => $sekolahId, 'grup_kunci' => $kunciBaru],
+          ['status' => $statusBaru, 'nomor_va' => $vaBaru, 'non_barang' => $nonBarangBaru]
+        );
+      }
+      BosSpjGrup::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', array_keys($grupSumber))
+        ->delete();
+
+      // Keanggotaan: lepas semua baris gabungan dari grup
+      // manual lamanya, lalu daftarkan ke grup baru. Grup
+      // manual lama yang menjadi kosong dihapus.
+      $grupManualLama = collect(array_keys($grupSumber))
+        ->filter(fn($k) => str_starts_with($k, 'manual:'))
+        ->map(fn($k) => (int) substr($k, 7))
+        ->values();
+      BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+        ->whereIn('bos_kas_umum_id', array_map(fn($r) => $r->id, $semua))
+        ->delete();
+      $sekarang = now();
+      $anggotaBaru = [];
+      foreach ($semua as $r) {
+        $anggotaBaru[] = [
+          'grup_manual_id' => $gm->id,
+          'sekolah_id' => $sekolahId,
+          'bos_kas_umum_id' => $r->id,
+          'created_at' => $sekarang,
+          'updated_at' => $sekarang,
+        ];
+      }
+      BosSpjGrupAnggota::insert($anggotaBaru);
+      foreach ($grupManualLama as $gidLama) {
+        $masihAda = BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+          ->where('grup_manual_id', $gidLama)
+          ->exists();
+        if (!$masihAda) {
+          BosSpjGrupManual::where('sekolah_id', $sekolahId)
+            ->where('id', $gidLama)
+            ->delete();
+        }
+      }
+
+      return [
+        'grup_manual_id' => $gm->id,
+        'jumlah_baris' => count($semua),
+        'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $semua)),
+      ];
+    });
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Grup manual "' . $nama . '" dibuat dari ' . $hasil['jumlah_baris'] . ' baris.',
+      'grup_manual_id' => $hasil['grup_manual_id'],
+      'jumlah_baris' => $hasil['jumlah_baris'],
+      'total' => $hasil['total'],
+    ]);
+  }
+
+  /**
+   * Pecah satu grup transaksi BKU menjadi beberapa grup
+   * manual, tiap bagian bernama alias sendiri. Pembagian
+   * harus mencakup seluruh baris grup tepat satu kali.
+   * Penerima & meta grup sumber diwariskan ke bagian
+   * yang memuat baris pertama grup sumber (urut tanggal,
+   * id).
+   */
+  public function grupManualPecah(Request $request)
+  {
+    $validated = $request->validate([
+      'baris_id' => 'required|integer',
+      'bagian' => 'required|array|min:2',
+      'bagian.*.nama' => 'required|string|max:120',
+      'bagian.*.baris_ids' => 'required|array|min:1',
+      'bagian.*.baris_ids.*' => 'integer',
+    ]);
+
+    $konteks = $this->konteksGrupPenerima($request, (int) $validated['baris_id']);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunciSumber, 'grup' => $sumber] = $konteks;
+
+    if (count($sumber) < 2) {
+      return response()->json(['message' => 'Grup ini hanya berisi satu baris — tidak bisa dipecah.'], 422);
+    }
+
+    $idSumber = collect($sumber)->map(fn($r) => (int) $r->id)->sort()->values()->all();
+    $idBagian = collect($validated['bagian'])
+      ->flatMap(fn($bg) => collect($bg['baris_ids'])->map(fn($i) => (int) $i))
+      ->sort()
+      ->values()
+      ->all();
+    if ($idBagian !== $idSumber) {
+      return response()->json(['message' => 'Pembagian harus mencakup seluruh baris grup tepat satu kali.'], 422);
+    }
+
+    $idPertama = (int) $sumber[0]->id;
+    $bagian = $validated['bagian'];
+
+    $jumlahBagian = \Illuminate\Support\Facades\DB::transaction(function () use ($sekolahId, $kunciSumber, $sumber, $bagian, $idPertama) {
+      // Lepas keanggotaan lama dulu (bila sumbernya grup
+      // manual) agar insert bagian tidak melanggar unik
+      // bos_kas_umum_id.
+      BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+        ->whereIn('bos_kas_umum_id', array_map(fn($r) => $r->id, $sumber))
+        ->delete();
+
+      $kunciPewaris = null;
+      $sekarang = now();
+      foreach ($bagian as $bg) {
+        $gm = BosSpjGrupManual::create([
+          'sekolah_id' => $sekolahId,
+          'nama' => trim($bg['nama']),
+        ]);
+        $idsBagian = collect($bg['baris_ids'])->map(fn($i) => (int) $i)->all();
+        $anggotaBaru = [];
+        foreach ($idsBagian as $bid) {
+          $anggotaBaru[] = [
+            'grup_manual_id' => $gm->id,
+            'sekolah_id' => $sekolahId,
+            'bos_kas_umum_id' => $bid,
+            'created_at' => $sekarang,
+            'updated_at' => $sekarang,
+          ];
+        }
+        BosSpjGrupAnggota::insert($anggotaBaru);
+        if (in_array($idPertama, $idsBagian, true)) {
+          $kunciPewaris = $gm->kunci();
+        }
+      }
+
+      // Warisan penerima & meta sumber → bagian pewaris
+      // (kunci pewaris selalu kunci manual baru, tidak
+      // pernah sama dengan kunci sumber).
+      if ($kunciPewaris && $kunciPewaris !== $kunciSumber) {
+        BosSpjPenerima::where('sekolah_id', $sekolahId)
+          ->where('grup_kunci', $kunciSumber)
+          ->update(['grup_kunci' => $kunciPewaris]);
+        BosSpjGrup::where('sekolah_id', $sekolahId)
+          ->where('grup_kunci', $kunciSumber)
+          ->update(['grup_kunci' => $kunciPewaris]);
+      }
+
+      // Grup manual sumber dibubarkan — keanggotaannya
+      // sudah digantikan bagian-bagian baru.
+      if (str_starts_with($kunciSumber, 'manual:')) {
+        BosSpjGrupManual::where('sekolah_id', $sekolahId)
+          ->where('id', (int) substr($kunciSumber, 7))
+          ->delete();
+      }
+
+      return count($bagian);
+    });
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Grup dipecah menjadi ' . $jumlahBagian . ' grup manual.',
+      'jumlah_bagian' => $jumlahBagian,
+    ]);
+  }
+
+  /**
+   * Bubarkan satu grup manual: baris-barisnya kembali ke
+   * pengelompokan bawaan ARKAS. Penerima & meta grup
+   * manual dipindahkan ke grup bawaan baris pertamanya
+   * (urut tanggal, id) agar pekerjaan SPJ tidak hilang.
+   */
+  public function grupManualBatal(Request $request)
+  {
+    $validated = $request->validate([
+      'baris_id' => 'required|integer',
+    ]);
+
+    $konteks = $this->konteksGrupPenerima($request, (int) $validated['baris_id']);
+    if (!$konteks) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+    ['sekolahId' => $sekolahId, 'kunci' => $kunci, 'grup' => $anggota] = $konteks;
+
+    if (!str_starts_with($kunci, 'manual:')) {
+      return response()->json(['message' => 'Grup ini bukan grup manual.'], 422);
+    }
+    $grupManualId = (int) substr($kunci, 7);
+    $target = $this->kunciGrupKwitansi($anggota[0]);
+
+    \Illuminate\Support\Facades\DB::transaction(function () use ($sekolahId, $kunci, $target, $grupManualId) {
+      // Penerima pindah ke grup target; urutannya
+      // melanjutkan urutan yang sudah ada di target.
+      $urutan = (int) BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->where('grup_kunci', $target)
+        ->max('urutan');
+      $penerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->where('grup_kunci', $kunci)
+        ->orderBy('urutan')
+        ->orderBy('id')
+        ->get();
+      foreach ($penerima as $p) {
+        $p->grup_kunci = $target;
+        $p->urutan = ++$urutan;
+        $p->save();
+      }
+
+      // Meta dipertahankan hanya bila grup target belum
+      // punya meta sendiri.
+      $metaManual = BosSpjGrup::where('sekolah_id', $sekolahId)
+        ->where('grup_kunci', $kunci)
+        ->first();
+      if ($metaManual) {
+        $metaTargetAda = BosSpjGrup::where('sekolah_id', $sekolahId)
+          ->where('grup_kunci', $target)
+          ->exists();
+        if ($metaTargetAda) {
+          $metaManual->delete();
+        } else {
+          $metaManual->grup_kunci = $target;
+          $metaManual->save();
+        }
+      }
+
+      BosSpjGrupAnggota::where('sekolah_id', $sekolahId)
+        ->where('grup_manual_id', $grupManualId)
+        ->delete();
+      BosSpjGrupManual::where('sekolah_id', $sekolahId)
+        ->where('id', $grupManualId)
+        ->delete();
+    });
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Grup manual dibubarkan — baris-barisnya kembali ke pengelompokan ARKAS.',
+    ]);
+  }
+
+  /** Ganti nama alias satu grup manual. */
+  public function grupManualUbahNama(Request $request, int $grupId)
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    if (!$sekolahId) {
+      return response()->json(['message' => 'Konteks sekolah tidak ditemukan.'], 404);
+    }
+
+    $gm = BosSpjGrupManual::where('sekolah_id', $sekolahId)->find($grupId);
+    if (!$gm) {
+      return response()->json(['message' => 'Grup manual tidak ditemukan di sekolah aktif.'], 404);
+    }
+
+    $validated = $request->validate([
+      'nama' => 'required|string|max:120',
+    ]);
+
+    $gm->nama = trim($validated['nama']);
+    $gm->save();
+
+    return response()->json([
+      'success' => true,
+      'message' => 'Nama grup manual diperbarui.',
+      'nama' => $gm->nama,
     ]);
   }
 

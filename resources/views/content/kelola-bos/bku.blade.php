@@ -245,6 +245,23 @@
       </div>
     </div>
 
+    {{-- Bilah aksi pengelompokan SPJ (gabung / pecah nota) --}}
+    @if ($bisaTulisPenerima)
+      <div class="card mb-4" id="bilah-grup-manual">
+        <div class="card-body py-2 d-flex align-items-center gap-2 flex-wrap">
+          <span class="fw-semibold"><i class="icon-base ri ri-layout-grid-line me-1"></i>Pengelompokan SPJ</span>
+          <span class="text-muted small" id="info-pilihan-grup">Centang baris belanja untuk menggabung atau memecah
+            nota.</span>
+          <span class="ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btn-gabung-nota" disabled><i
+                class="icon-base ri ri-link me-1"></i>Gabung Nota</button>
+            <button type="button" class="btn btn-sm btn-outline-warning" id="btn-pecah-nota" disabled><i
+                class="icon-base ri ri-scissors-line me-1"></i>Pecah Nota</button>
+          </span>
+        </div>
+      </div>
+    @endif
+
     {{-- Tabel --}}
     <div class="card">
       <div class="table-responsive">
@@ -259,6 +276,12 @@
                   return '<a href="' . e($url) . '" class="text-reset text-decoration-none">' . e($label) . $panah . '</a>';
                 };
               @endphp
+              <th style="width: 1%;">
+                @if ($bisaTulisPenerima)
+                  <input class="form-check-input" type="checkbox" id="centang-semua-baris"
+                    title="Pilih semua baris belanja di halaman ini">
+                @endif
+              </th>
               <th>{!! $kepala('tanggal', 'Tanggal') !!}</th>
               <th>{!! $kepala('bukti', 'No Bukti') !!}</th>
               <th>{!! $kepala('rekening', 'Rekening') !!}</th>
@@ -269,8 +292,124 @@
             </tr>
           </thead>
           <tbody>
-            @forelse ($baris as $b)
+            @forelse ($barisTampil as $item)
+              @php
+                $b = $item['b'];
+                $gm = $item['gm'] ?? null;
+              @endphp
+              @if ($gm)
+                {{-- Baris ringkas grup manual (gabung/pecah nota):
+                     satu baris tampilan untuk seluruh grup —
+                     alias sebagai uraian, nominal = total
+                     seluruh anggota grup. --}}
+                <tr class="table-primary">
+                  <td>
+                    @if ($bisaTulisPenerima)
+                      <input class="form-check-input centang-baris" type="checkbox" value="{{ $b->id }}"
+                        data-kunci="manual:{{ $gm['id'] }}"
+                        data-anggota="{{ collect($gm['anggota'])->pluck('id')->implode(',') }}"
+                        data-grup-manual="{{ $gm['id'] }}">
+                    @endif
+                  </td>
+                  <td class="text-nowrap">
+                    {{ $gm['anggota'][0]->tanggal_transaksi->format('d-m-Y') }}
+                    @if ($gm['anggota'][count($gm['anggota']) - 1]->tanggal_transaksi->format('Y-m-d') !== $gm['anggota'][0]->tanggal_transaksi->format('Y-m-d'))
+                      <div class="small text-muted">s.d.
+                        {{ $gm['anggota'][count($gm['anggota']) - 1]->tanggal_transaksi->format('d-m-Y') }}</div>
+                    @endif
+                  </td>
+                  <td>
+                    @php
+                      $buktiUnikGrup = collect($gm['anggota'])->pluck('no_bukti')->filter()->unique()->values();
+                    @endphp
+                    @if ($buktiUnikGrup->count() === 1)
+                      {{ $buktiUnikGrup->first() }}
+                    @elseif ($buktiUnikGrup->count() > 1)
+                      <span class="text-muted">{{ $buktiUnikGrup->count() }} nota/bukti</span>
+                    @else
+                      -
+                    @endif
+                  </td>
+                  <td>
+                    @php
+                      $rekUnikGrup = collect($gm['anggota'])->pluck('kode_rekening')->filter()->unique()->values();
+                    @endphp
+                    @if ($rekUnikGrup->count() === 1)
+                      {{ $rekUnikGrup->first() }}
+                    @elseif ($rekUnikGrup->count() > 1)
+                      <span class="text-muted">Beragam</span>
+                    @else
+                      -
+                    @endif
+                  </td>
+                  <td>
+                    <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none"
+                      data-grup-anggota data-id="{{ $b->id }}" title="Lihat isi grup">{{ $gm['nama'] }}</button>
+                    <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
+                      class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                      title="Cetak kwitansi grup ini"><i class="icon-base ri ri-receipt-line"></i></a>
+                    <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+                      <span class="badge bg-primary">Grup Manual</span>
+                      <span class="badge bg-label-secondary">{{ $gm['jenis'] === 'gabungan' ? 'Gabungan' : 'Pecahan' }}</span>
+                      <span class="small text-muted">{{ count($gm['anggota']) }} baris</span>
+                    </div>
+                  </td>
+                  <td>
+                    @php
+                      $namaGrupBaris = $namaPenerima[$b->id] ?? [];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null, 'non_barang' => false, 'non_barang_manual' => null];
+                    @endphp
+                    <span class="nama-tampil-baris" data-nama-toko="{{ $b->nama_toko ?? '' }}">
+                      @if ($namaGrupBaris)
+                        {{ $namaGrupBaris[0] }}
+                        @if (count($namaGrupBaris) > 1)
+                          <span class="text-muted small">+{{ count($namaGrupBaris) - 1 }} lainnya</span>
+                        @endif
+                      @else
+                        {{ $b->nama_toko ?? '-' }}
+                      @endif
+                    </span>
+                    @if ($namaGrupBaris && $b->nama_toko && !in_array($b->nama_toko, $namaGrupBaris, true))
+                      <div class="small text-muted nama-toko-baris">Toko: {{ $b->nama_toko }}</div>
+                    @endif
+                    <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
+                      @if (!empty($metaBaris['non_barang']))
+                        <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
+                      @endif
+                      @if ($metaBaris['status'] === 'selesai')
+                        <span class="badge bg-success lencana-status-grup">Selesai</span>
+                      @endif
+                      @if (!empty($metaBaris['nomor_va']))
+                        <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
+                      @endif
+                    </div>
+                    <div class="mt-1">
+                      <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
+                        title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
+                        <i class="icon-base ri ri-team-line me-1"></i>Penerima
+                        @if (($jumlahPenerima[$b->id] ?? 0) > 0)
+                          <span class="badge rounded-pill bg-success lencana-penerima"
+                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
+                        @endif
+                      </button>
+                    </div>
+                  </td>
+                  <td class="small">
+                    @php
+                      $labelPajakGrup = collect($gm['anggota'])->map(fn($r) => $r->labelPajak())->filter()->unique()->values();
+                    @endphp
+                    {{ $labelPajakGrup->count() === 1 ? $labelPajakGrup->first() : '-' }}
+                  </td>
+                  <td class="text-end fw-semibold">{{ number_format($gm['total'], 0, ',', '.') }}</td>
+                </tr>
+              @else
               <tr>
+                <td>
+                  @if ($bisaTulisPenerima && in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true) && empty($b->is_beli_di_siplah))
+                    <input class="form-check-input centang-baris" type="checkbox" value="{{ $b->id }}"
+                      data-kunci="{{ $kunciPerBaris[$b->id] ?? '' }}" data-anggota="{{ $b->id }}">
+                  @endif
+                </td>
                 <td class="text-nowrap">{{ $b->tanggal_transaksi->format('d-m-Y') }}</td>
                 <td>{{ $b->no_bukti ?? '-' }}</td>
                 <td>
@@ -367,16 +506,17 @@
                 <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
                 <td class="text-end fw-semibold">{{ number_format($b->saldo, 0, ',', '.') }}</td>
               </tr>
+              @endif
             @empty
               <tr>
-                <td colspan="7" class="text-center text-muted py-4">Tidak ada transaksi yang cocok dengan saringan
+                <td colspan="8" class="text-center text-muted py-4">Tidak ada transaksi yang cocok dengan saringan
                   ini.</td>
               </tr>
             @endforelse
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="6" class="text-end fw-semibold">Total sesuai saringan</td>
+              <td colspan="7" class="text-end fw-semibold">Total sesuai saringan</td>
               <td class="text-end fw-bold">Rp {{ number_format($totalNominal, 0, ',', '.') }}</td>
             </tr>
           </tfoot>
@@ -393,6 +533,8 @@
     @endif
 
     @include('content.kelola-bos.partials.modal-penerima')
+
+    @include('content.kelola-bos.partials.modal-grup-manual')
   @endif
 
 @endsection
