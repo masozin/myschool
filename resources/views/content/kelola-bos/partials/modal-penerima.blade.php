@@ -347,7 +347,7 @@
       return r.isConfirmed;
     }
 
-    function segarkanLencana(jml) {
+    function segarkanLencana(jml, daftarNama) {
       var btn = document.querySelector('[data-penerima-baris][data-id="' + barisId + '"]');
       if (!btn) return;
       var lencana = btn.querySelector('.lencana-penerima');
@@ -361,6 +361,37 @@
         lencana.textContent = jml;
       } else if (lencana) {
         lencana.remove();
+      }
+
+      // Segarkan nama tampil pada sel yang sama (kolom
+      // Toko/Penerima): penerima pertama menggantikan
+      // nama toko; nama toko turun menjadi baris kecil
+      // di bawahnya bila berbeda dari semua penerima.
+      var sel = btn.closest('td');
+      var elNama = sel ? sel.querySelector('.nama-tampil-baris') : null;
+      if (!elNama) return;
+      var namaToko = elNama.getAttribute('data-nama-toko') || '';
+      var elToko = sel.querySelector('.nama-toko-baris');
+      if (daftarNama && daftarNama.length) {
+        elNama.innerHTML = lolosHtml(daftarNama[0]) +
+          (daftarNama.length > 1
+            ? ' <span class="text-muted small">+' + (daftarNama.length - 1) + ' lainnya</span>'
+            : '');
+        if (namaToko && daftarNama.indexOf(namaToko) === -1) {
+          if (!elToko) {
+            elToko = document.createElement('div');
+            elToko.className = 'small text-muted nama-toko-baris';
+            elNama.after(elToko);
+          }
+          elToko.textContent = 'Toko: ' + namaToko;
+        } else if (elToko) {
+          elToko.remove();
+        }
+      } else {
+        elNama.textContent = namaToko || '-';
+        if (elToko) {
+          elToko.remove();
+        }
       }
     }
 
@@ -550,7 +581,7 @@
         }
       }
 
-      segarkanLencana(daftar.length);
+      segarkanLencana(daftar.length, daftar.map(function(p) { return p.nama; }));
     }
 
     function gambarSumberPtk() {
@@ -775,6 +806,78 @@
       $('penerima-selisih').innerHTML = '';
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
       muat().catch(gagal);
+    });
+
+    // ── Meta inline untuk baris SIPLah di tabel BKU ──
+    // Baris SIPLah tidak membuka modal: status & nomor VA
+    // disimpan langsung dari sel Toko/Penerima.
+    function segarkanMetaInline(wadah, status, nomorVa) {
+      if (!wadah) return;
+      var lencanaStatus = wadah.querySelector('.lencana-status-grup');
+      if (status === 'lunas' || status === 'selesai') {
+        if (!lencanaStatus) {
+          lencanaStatus = document.createElement('span');
+          var vaEl = wadah.querySelector('.lencana-va-grup');
+          if (vaEl) {
+            wadah.insertBefore(lencanaStatus, vaEl);
+          } else {
+            wadah.appendChild(lencanaStatus);
+          }
+        }
+        lencanaStatus.className = 'badge lencana-status-grup ' +
+          (status === 'lunas' ? 'bg-success' : 'bg-primary');
+        lencanaStatus.textContent = status === 'lunas' ? 'Lunas' : 'Selesai';
+      } else if (lencanaStatus) {
+        lencanaStatus.remove();
+      }
+
+      var lencanaVa = wadah.querySelector('.lencana-va-grup');
+      if (nomorVa) {
+        if (!lencanaVa) {
+          lencanaVa = document.createElement('span');
+          lencanaVa.className = 'small text-muted lencana-va-grup';
+          wadah.appendChild(lencanaVa);
+        }
+        lencanaVa.textContent = 'VA: ' + nomorVa;
+      } else if (lencanaVa) {
+        lencanaVa.remove();
+      }
+    }
+
+    document.querySelectorAll('[data-meta-inline]').forEach(function(el) {
+      var id = el.getAttribute('data-id');
+      var selStatus = el.querySelector('.meta-inline-status');
+      var inpVa = el.querySelector('.meta-inline-va');
+      var btnSimpan = el.querySelector('.meta-inline-simpan');
+      if (!selStatus || !inpVa || !btnSimpan) return;
+      var statusTerakhir = selStatus.value;
+      var timerTersimpan = null;
+
+      async function simpanInline() {
+        try {
+          var res = await kirim(urlDasar + '/' + id + '/penerima-grup', 'PUT', {
+            status: selStatus.value,
+            nomor_va: inpVa.value.trim() || null
+          });
+          statusTerakhir = res.status;
+          selStatus.value = res.status;
+          inpVa.value = res.nomor_va || '';
+          var sel = el.closest('td');
+          segarkanMetaInline(sel ? sel.querySelector('.meta-grup-baris') : null,
+            res.status, res.nomor_va);
+          btnSimpan.textContent = 'Tersimpan';
+          clearTimeout(timerTersimpan);
+          timerTersimpan = setTimeout(function() {
+            btnSimpan.textContent = 'Simpan';
+          }, 1500);
+        } catch (e) {
+          selStatus.value = statusTerakhir;
+          gagal(e);
+        }
+      }
+
+      btnSimpan.addEventListener('click', simpanInline);
+      selStatus.addEventListener('change', simpanInline);
     });
 
     if (bisaTulis) {

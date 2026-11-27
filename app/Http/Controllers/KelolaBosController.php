@@ -1422,6 +1422,7 @@ class KelolaBosController extends Controller
         'bisaTulisAlias' => false,
         'bisaTulisPenerima' => false,
         'jumlahPenerima' => [],
+        'namaPenerima' => [],
         'metaGrup' => [],
         'tahunTerpilih' => null,
       ]);
@@ -1561,6 +1562,30 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Nama penerima SPJ per baris belanja — pola yang
+    // sama: satu query menurut kunci grup, nama
+    // dikelompokkan per grup lalu dipetakan ke id
+    // baris. Ditampilkan di kolom Toko/Penerima
+    // menggantikan nama toko bila grup sudah punya
+    // penerima. Baris tanpa penerima tidak masuk peta.
+    $namaPenerima = [];
+    if ($kunciPerBaris) {
+      $daftarNama = BosSpjPenerima::where('sekolah_id', $sekolahId)
+        ->whereIn('grup_kunci', array_unique(array_values($kunciPerBaris)))
+        ->orderBy('urutan')
+        ->orderBy('id')
+        ->get(['grup_kunci', 'nama']);
+      $namaPerGrup = [];
+      foreach ($daftarNama as $p) {
+        $namaPerGrup[$p->grup_kunci][] = $p->nama;
+      }
+      foreach ($kunciPerBaris as $barisId => $kunci) {
+        if (!empty($namaPerGrup[$kunci])) {
+          $namaPenerima[$barisId] = $namaPerGrup[$kunci];
+        }
+      }
+    }
+
     // Meta grup SPJ (status & nomor VA) untuk lencana di
     // kolom Toko/Penerima — pola yang sama: satu query
     // menurut kunci grup, dipetakan ke id baris. Baris
@@ -1598,6 +1623,7 @@ class KelolaBosController extends Controller
       'bisaTulisAlias' => $this->bisaTulisAlias(),
       'bisaTulisPenerima' => $this->bisaTulisAlias(),
       'jumlahPenerima' => $jumlahPenerima,
+      'namaPenerima' => $namaPenerima,
       'metaGrup' => $metaGrup,
     ]);
   }

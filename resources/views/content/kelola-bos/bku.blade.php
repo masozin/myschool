@@ -249,7 +249,6 @@
               @endphp
               <th>{!! $kepala('tanggal', 'Tanggal') !!}</th>
               <th>{!! $kepala('bukti', 'No Bukti') !!}</th>
-              <th>Jenis</th>
               <th>{!! $kepala('rekening', 'Rekening') !!}</th>
               <th>{!! $kepala('uraian', 'Uraian') !!}</th>
               <th>Toko / Penerima</th>
@@ -262,7 +261,6 @@
               <tr>
                 <td class="text-nowrap">{{ $b->tanggal_transaksi->format('d-m-Y') }}</td>
                 <td>{{ $b->no_bukti ?? '-' }}</td>
-                <td><span class="badge bg-label-secondary">{{ $b->nama_bku ?? 'BKU #' . $b->id_ref_bku }}</span></td>
                 <td>
                   @if ($b->kode_rekening)
                     <span title="{{ $b->nama_rekening ?? '' }}"
@@ -287,7 +285,22 @@
                   @endif
                 </td>
                 <td>
-                  {{ $b->nama_toko ?? '-' }}
+                  @php
+                    $namaGrupBaris = $namaPenerima[$b->id] ?? [];
+                  @endphp
+                  <span class="nama-tampil-baris" data-nama-toko="{{ $b->nama_toko ?? '' }}">
+                    @if ($namaGrupBaris)
+                      {{ $namaGrupBaris[0] }}
+                      @if (count($namaGrupBaris) > 1)
+                        <span class="text-muted small">+{{ count($namaGrupBaris) - 1 }} lainnya</span>
+                      @endif
+                    @else
+                      {{ $b->nama_toko ?? '-' }}
+                    @endif
+                  </span>
+                  @if ($namaGrupBaris && $b->nama_toko && !in_array($b->nama_toko, $namaGrupBaris, true))
+                    <div class="small text-muted nama-toko-baris">Toko: {{ $b->nama_toko }}</div>
+                  @endif
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
                       $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'nomor_va' => null];
@@ -309,16 +322,33 @@
                         <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
                       @endif
                     </div>
-                    <div class="mt-1">
-                      <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
-                        title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
-                        <i class="icon-base ri ri-team-line me-1"></i>Penerima
-                        @if (($jumlahPenerima[$b->id] ?? 0) > 0)
-                          <span class="badge rounded-pill bg-success lencana-penerima"
-                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
-                        @endif
-                      </button>
-                    </div>
+                    @if (!empty($b->is_beli_di_siplah))
+                      {{-- Baris SIPLah tidak memakai editor penerima:
+                           status & nomor VA diisi langsung (inline). --}}
+                      @if ($bisaTulisPenerima)
+                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
+                          <select class="form-select form-select-sm py-0 meta-inline-status" style="width: auto;" title="Status SPJ">
+                            <option value="belum" @selected($metaBaris['status'] === 'belum')>Belum</option>
+                            <option value="lunas" @selected($metaBaris['status'] === 'lunas')>Lunas</option>
+                            <option value="selesai" @selected($metaBaris['status'] === 'selesai')>Selesai</option>
+                          </select>
+                          <input type="text" class="form-control form-control-sm py-0 meta-inline-va" style="width: 140px;"
+                            placeholder="Nomor VA" value="{{ $metaBaris['nomor_va'] }}">
+                          <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 meta-inline-simpan">Simpan</button>
+                        </div>
+                      @endif
+                    @else
+                      <div class="mt-1">
+                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
+                          title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
+                          <i class="icon-base ri ri-team-line me-1"></i>Penerima
+                          @if (($jumlahPenerima[$b->id] ?? 0) > 0)
+                            <span class="badge rounded-pill bg-success lencana-penerima"
+                              style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
+                          @endif
+                        </button>
+                      </div>
+                    @endif
                   @endif
                 </td>
                 <td class="small">{{ $b->labelPajak() ?: '-' }}</td>
@@ -326,14 +356,14 @@
               </tr>
             @empty
               <tr>
-                <td colspan="8" class="text-center text-muted py-4">Tidak ada transaksi yang cocok dengan saringan
+                <td colspan="7" class="text-center text-muted py-4">Tidak ada transaksi yang cocok dengan saringan
                   ini.</td>
               </tr>
             @endforelse
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="7" class="text-end fw-semibold">Total sesuai saringan</td>
+              <td colspan="6" class="text-end fw-semibold">Total sesuai saringan</td>
               <td class="text-end fw-bold">Rp {{ number_format($totalNominal, 0, ',', '.') }}</td>
             </tr>
           </tfoot>
