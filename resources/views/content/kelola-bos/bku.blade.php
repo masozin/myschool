@@ -296,31 +296,33 @@
               @php
                 $b = $item['b'];
                 $gm = $item['gm'] ?? null;
+                $grupTampil = $item['grup'] ?? null;
               @endphp
-              @if ($gm)
-                {{-- Baris ringkas grup manual (gabung/pecah nota):
-                     satu baris tampilan untuk seluruh grup —
-                     alias sebagai uraian, nominal = total
-                     seluruh anggota grup. --}}
-                <tr class="table-primary">
+              @if ($grupTampil)
+                {{-- Baris ringkas grup SPJ (per nota / nomor bukti,
+                     atau grup manual gabung/pecah nota): satu baris
+                     tampilan untuk seluruh grup — nominal = total
+                     seluruh anggota; rincian dibuka lewat modal isi
+                     grup. Grup manual beralias dan berwarna khusus. --}}
+                <tr @if ($gm) class="table-primary" @endif>
                   <td>
-                    @if ($bisaTulisPenerima)
+                    @if ($bisaTulisPenerima && empty($b->is_beli_di_siplah))
                       <input class="form-check-input centang-baris" type="checkbox" value="{{ $b->id }}"
-                        data-kunci="manual:{{ $gm['id'] }}"
-                        data-anggota="{{ collect($gm['anggota'])->pluck('id')->implode(',') }}"
-                        data-grup-manual="{{ $gm['id'] }}">
+                        data-kunci="{{ $grupTampil['kunci'] }}"
+                        data-anggota="{{ collect($grupTampil['anggota'])->pluck('id')->implode(',') }}"
+                        @if ($gm) data-grup-manual="{{ $gm['id'] }}" @endif>
                     @endif
                   </td>
                   <td class="text-nowrap">
-                    {{ $gm['anggota'][0]->tanggal_transaksi->format('d-m-Y') }}
-                    @if ($gm['anggota'][count($gm['anggota']) - 1]->tanggal_transaksi->format('Y-m-d') !== $gm['anggota'][0]->tanggal_transaksi->format('Y-m-d'))
+                    {{ $grupTampil['anggota'][0]->tanggal_transaksi->format('d-m-Y') }}
+                    @if ($grupTampil['anggota'][count($grupTampil['anggota']) - 1]->tanggal_transaksi->format('Y-m-d') !== $grupTampil['anggota'][0]->tanggal_transaksi->format('Y-m-d'))
                       <div class="small text-muted">s.d.
-                        {{ $gm['anggota'][count($gm['anggota']) - 1]->tanggal_transaksi->format('d-m-Y') }}</div>
+                        {{ $grupTampil['anggota'][count($grupTampil['anggota']) - 1]->tanggal_transaksi->format('d-m-Y') }}</div>
                     @endif
                   </td>
                   <td>
                     @php
-                      $buktiUnikGrup = collect($gm['anggota'])->pluck('no_bukti')->filter()->unique()->values();
+                      $buktiUnikGrup = collect($grupTampil['anggota'])->pluck('no_bukti')->filter()->unique()->values();
                     @endphp
                     @if ($buktiUnikGrup->count() === 1)
                       {{ $buktiUnikGrup->first() }}
@@ -332,7 +334,7 @@
                   </td>
                   <td>
                     @php
-                      $rekUnikGrup = collect($gm['anggota'])->pluck('kode_rekening')->filter()->unique()->values();
+                      $rekUnikGrup = collect($grupTampil['anggota'])->pluck('kode_rekening')->filter()->unique()->values();
                     @endphp
                     @if ($rekUnikGrup->count() === 1)
                       {{ $rekUnikGrup->first() }}
@@ -343,16 +345,35 @@
                     @endif
                   </td>
                   <td>
-                    <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none"
-                      data-grup-anggota data-id="{{ $b->id }}" title="Lihat isi grup">{{ $gm['nama'] }}</button>
-                    <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
-                      class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
-                      title="Cetak kwitansi grup ini"><i class="icon-base ri ri-receipt-line"></i></a>
-                    <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
-                      <span class="badge bg-primary">Grup Manual</span>
-                      <span class="badge bg-label-secondary">{{ $gm['jenis'] === 'gabungan' ? 'Gabungan' : 'Pecahan' }}</span>
-                      <span class="small text-muted">{{ count($gm['anggota']) }} baris</span>
-                    </div>
+                    @if ($gm)
+                      <button type="button" class="btn btn-link p-0 text-start fw-semibold text-decoration-none"
+                        data-grup-anggota data-id="{{ $b->id }}" title="Lihat isi grup">{{ $gm['nama'] }}</button>
+                      <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
+                        class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                        title="Cetak kwitansi grup ini"><i class="icon-base ri ri-receipt-line"></i></a>
+                      <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+                        <span class="badge bg-primary">Grup Manual</span>
+                        <span class="badge bg-label-secondary">{{ $gm['jenis'] === 'gabungan' ? 'Gabungan' : 'Pecahan' }}</span>
+                        <span class="small text-muted">{{ count($grupTampil['anggota']) }} baris</span>
+                      </div>
+                    @else
+                      @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
+                      <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
+                        data-grup-anggota data-id="{{ $b->id }}"
+                        title="Lihat rincian grup ini">{{ $aliasUraian ?? $b->uraian }}</button>
+                      @if ($bisaTulisAlias)
+                        <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                          title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
+                          data-alias="{{ $aliasUraian ?? '' }}">
+                          <i class="icon-base ri ri-pencil-line"></i></button>
+                      @endif
+                      <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
+                        class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
+                        title="Cetak kwitansi (per nota)"><i class="icon-base ri ri-receipt-line"></i></a>
+                      <div class="mt-1">
+                        <span class="badge bg-label-secondary">{{ count($grupTampil['anggota']) }} baris</span>
+                      </div>
+                    @endif
                   </td>
                   <td>
                     @php
@@ -373,6 +394,9 @@
                       <div class="small text-muted nama-toko-baris">Toko: {{ $b->nama_toko }}</div>
                     @endif
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
+                      @if (!empty($b->is_beli_di_siplah))
+                        <span class="badge bg-info">SIPLah</span>
+                      @endif
                       @if (!empty($metaBaris['non_barang']))
                         <span class="badge bg-warning text-dark lencana-nonbarang-grup">Non-barang</span>
                       @endif
@@ -383,24 +407,42 @@
                         <span class="small text-muted lencana-va-grup">VA: {{ $metaBaris['nomor_va'] }}</span>
                       @endif
                     </div>
-                    <div class="mt-1">
-                      <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
-                        title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
-                        <i class="icon-base ri ri-team-line me-1"></i>Penerima
-                        @if (($jumlahPenerima[$b->id] ?? 0) > 0)
-                          <span class="badge rounded-pill bg-success lencana-penerima"
-                            style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
-                        @endif
-                      </button>
-                    </div>
+                    @if (!empty($b->is_beli_di_siplah))
+                      {{-- Grup SIPLah tidak memakai editor penerima:
+                           status & nomor VA diisi langsung (inline),
+                           sama seperti baris biasa. --}}
+                      @if ($bisaTulisPenerima)
+                        <div class="meta-inline mt-1 d-flex flex-wrap align-items-center gap-1" data-meta-inline data-id="{{ $b->id }}">
+                          <div class="form-check form-switch mb-0">
+                            <input class="form-check-input meta-inline-status" type="checkbox" role="switch"
+                              id="meta-inline-{{ $b->id }}" @checked($metaBaris['status'] === 'selesai')>
+                            <label class="form-check-label small" for="meta-inline-{{ $b->id }}">Selesai</label>
+                          </div>
+                          <input type="text" class="form-control form-control-sm py-0 meta-inline-va" style="width: 140px;"
+                            placeholder="Nomor VA" value="{{ $metaBaris['nomor_va'] }}">
+                          <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 meta-inline-simpan">Simpan</button>
+                        </div>
+                      @endif
+                    @else
+                      <div class="mt-1">
+                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
+                          title="Penerima SPJ (per nota)" data-penerima-baris data-id="{{ $b->id }}">
+                          <i class="icon-base ri ri-team-line me-1"></i>Penerima
+                          @if (($jumlahPenerima[$b->id] ?? 0) > 0)
+                            <span class="badge rounded-pill bg-success lencana-penerima"
+                              style="font-size: .6rem; vertical-align: super;">{{ $jumlahPenerima[$b->id] }}</span>
+                          @endif
+                        </button>
+                      </div>
+                    @endif
                   </td>
                   <td class="small">
                     @php
-                      $labelPajakGrup = collect($gm['anggota'])->map(fn($r) => $r->labelPajak())->filter()->unique()->values();
+                      $labelPajakGrup = collect($grupTampil['anggota'])->map(fn($r) => $r->labelPajak())->filter()->unique()->values();
                     @endphp
                     {{ $labelPajakGrup->count() === 1 ? $labelPajakGrup->first() : '-' }}
                   </td>
-                  <td class="text-end fw-semibold">{{ number_format($gm['total'], 0, ',', '.') }}</td>
+                  <td class="text-end fw-semibold">{{ number_format($grupTampil['total'], 0, ',', '.') }}</td>
                 </tr>
               @else
               <tr>

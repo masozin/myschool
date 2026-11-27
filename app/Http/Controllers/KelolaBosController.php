@@ -1666,65 +1666,66 @@ class KelolaBosController extends Controller
       }
     }
 
-    // Daftar tampil tabel: grup manual yang tersentuh
-    // halaman ini diringkas jadi SATU item pada posisi
-    // anggota pertamanya (menurut urutan halaman); anggota
-    // lain dari grup yang sama tidak di-render terpisah.
+    // Daftar tampil tabel: baris belanja yang satu grup SPJ
+    // (per nota / nomor bukti, atau grup manual) diringkas
+    // jadi SATU item pada posisi anggota pertamanya di
+    // halaman ini bila grupnya berisi lebih dari satu baris;
+    // rincian anggotanya dibuka lewat modal isi grup. Grup
+    // satu baris dan baris non-belanja tampil seperti biasa.
     // Item grup membawa data ringkas seluruh grup (semua
-    // anggota, bukan hanya yang tampil di halaman ini).
+    // anggota dari basis data, bukan hanya yang tampil di
+    // halaman ini).
     $barisTampil = [];
-    $grupManualDiHalaman = []; // grupId => data ringkas
-    if ($petaManual) {
-      $grupIds = collect($petaManual)->map(fn($k) => (int) substr($k, 7))->unique()->values();
-      $daftarGrupManual = BosSpjGrupManual::where('sekolah_id', $sekolahId)
-        ->whereIn('id', $grupIds)
-        ->get()
-        ->keyBy('id');
-      foreach ($grupIds as $gid) {
-        $gm = $daftarGrupManual->get($gid);
-        if (!$gm) {
-          continue;
-        }
-        $repSeed = null;
-        foreach ($baris as $b) {
-          if (($petaManual[$b->id] ?? null) === 'manual:' . $gid) {
-            $repSeed = $b;
-            break;
-          }
-        }
-        if (!$repSeed) {
-          continue;
-        }
-        $anggota = $this->barisGrupKwitansi($sekolahId, $repSeed, 'manual:' . $gid);
-        if (!$anggota) {
-          continue;
-        }
-        $kunciAsal = collect($anggota)->map(fn($r) => $this->kunciGrupKwitansi($r))->unique();
-        $grupManualDiHalaman[$gid] = [
-          'id' => $gid,
-          'nama' => $gm->nama,
-          'jenis' => $kunciAsal->count() > 1 ? 'gabungan' : 'pecahan',
-          'anggota' => $anggota,
-          'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $anggota)),
-          'perwakilan' => $repSeed,
-        ];
-      }
-    }
-    $tampilGrup = [];
+    $grupDiHalaman = []; // kunci => daftar anggota grup (null bila grup satu baris)
+    $kunciTampil = [];
     foreach ($baris as $b) {
       $kunciB = $kunciPerBaris[$b->id] ?? null;
-      if ($kunciB && str_starts_with($kunciB, 'manual:')) {
-        $gid = (int) substr($kunciB, 7);
-        if (isset($tampilGrup[$gid])) {
-          continue;
-        }
-        $tampilGrup[$gid] = true;
-        if (isset($grupManualDiHalaman[$gid])) {
-          $barisTampil[] = ['tipe' => 'grup', 'b' => $grupManualDiHalaman[$gid]['perwakilan'], 'gm' => $grupManualDiHalaman[$gid]];
-        }
+      if ($kunciB === null) {
+        $barisTampil[] = ['tipe' => 'baris', 'b' => $b, 'gm' => null, 'grup' => null];
         continue;
       }
-      $barisTampil[] = ['tipe' => 'baris', 'b' => $b, 'gm' => null];
+      if (isset($kunciTampil[$kunciB])) {
+        continue;
+      }
+      $kunciTampil[$kunciB] = true;
+      if (!array_key_exists($kunciB, $grupDiHalaman)) {
+        $anggotaGrup = $this->barisGrupKwitansi($sekolahId, $b, $kunciB);
+        // Grup manual selalu diringkas (aliasnya harus
+        // tampil walau anggotanya tinggal satu baris, mis.
+        // bagian pecahan berisi satu baris); grup bawaan
+        // ARKAS hanya diringkas bila anggotanya banyak.
+        $grupDiHalaman[$kunciB] = (count($anggotaGrup) > 1 || str_starts_with($kunciB, 'manual:'))
+          ? $anggotaGrup
+          : null;
+      }
+      $anggota = $grupDiHalaman[$kunciB];
+      if ($anggota === null) {
+        $barisTampil[] = ['tipe' => 'baris', 'b' => $b, 'gm' => null, 'grup' => null];
+        continue;
+      }
+      // Data ringkas grup multi-baris; khusus grup manual
+      // ditambah identitas aliasnya (nama & jenis).
+      $gm = null;
+      if (str_starts_with($kunciB, 'manual:')) {
+        $gid = (int) substr($kunciB, 7);
+        $record = BosSpjGrupManual::where('sekolah_id', $sekolahId)->find($gid);
+        $kunciAsal = collect($anggota)->map(fn($r) => $this->kunciGrupKwitansi($r))->unique();
+        $gm = [
+          'id' => $gid,
+          'nama' => $record?->nama,
+          'jenis' => $kunciAsal->count() > 1 ? 'gabungan' : 'pecahan',
+        ];
+      }
+      $barisTampil[] = [
+        'tipe' => 'grup',
+        'b' => $b,
+        'gm' => $gm,
+        'grup' => [
+          'kunci' => $kunciB,
+          'anggota' => $anggota,
+          'total' => array_sum(array_map(fn($r) => (float) $r->saldo, $anggota)),
+        ],
+      ];
     }
 
     return view('content.kelola-bos.bku', $konteks + [

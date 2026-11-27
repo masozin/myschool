@@ -223,8 +223,13 @@
       var jmlGrup = kunciUnikPilihan(pilihan).length;
       if (!pilihan.length) {
         info.textContent = 'Centang baris belanja untuk menggabung atau memecah nota.';
+      } else if (jmlGrup < 2) {
+        info.textContent = '1 grup dipilih (' + pilihan.length + ' baris tampilan) — baris-baris dalam satu ' +
+          'nota sudah menjadi satu grup, jadi Gabung Nota perlu centang dari minimal 2 nota/grup berbeda. ' +
+          'Untuk membagi grup ini, gunakan Pecah Nota.';
       } else {
-        info.textContent = jmlGrup + ' grup dipilih (' + pilihan.length + ' baris tampilan).';
+        info.textContent = jmlGrup + ' grup dipilih (' + pilihan.length +
+          ' baris tampilan) — siap digabung menjadi satu grup.';
       }
       btnGabung.disabled = jmlGrup < 2;
       btnPecah.disabled = jmlGrup !== 1;
@@ -433,13 +438,19 @@
         var res = await kirimGrup(urlDasarGrup + '/' + barisId + '/grup-anggota', 'GET');
         var g = res.grup || {};
         isiGrupManualId = g.grup_manual_id || null;
-        $('isi-grup-judul').textContent = g.nama_alias || 'Isi Grup';
+        $('isi-grup-judul').textContent = g.nama_alias ||
+          (res.baris && res.baris[0] ? res.baris[0].uraian : 'Isi Grup');
         var lencana = '';
         if (g.manual) {
           lencana = '<span class="badge bg-primary">Grup Manual</span> ' +
             '<span class="badge bg-label-secondary">' + (g.jenis === 'gabungan' ? 'Gabungan' : 'Pecahan') + '</span> ';
         }
-        $('isi-grup-info').innerHTML = lencana + (g.jumlah_baris || 0) + ' baris &bull; total ' + fmtRp(g.total || 0);
+        var infoTeks = (g.jumlah_baris || 0) + ' baris';
+        if (!g.manual && res.baris && res.baris[0] && res.baris[0].no_bukti) {
+          infoTeks += ' &bull; No Bukti ' + lolosHtml(res.baris[0].no_bukti);
+        }
+        infoTeks += ' &bull; total ' + fmtRp(g.total || 0);
+        $('isi-grup-info').innerHTML = lencana + infoTeks;
         var html = '';
         (res.baris || []).forEach(function(r) {
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
