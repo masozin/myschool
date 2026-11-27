@@ -2500,6 +2500,7 @@ class KelolaBosController extends Controller
       'id' => $p->id,
       'ptk_id' => $p->ptk_id,
       'penerima_id' => $p->penerima_id,
+      'jenis' => $p->jenis ?? 'orang',
       'nama' => $p->nama,
       'nip' => $p->nip,
       'pangkat_gol' => $p->pangkat_gol,
@@ -2543,7 +2544,32 @@ class KelolaBosController extends Controller
       'pph_rp' => 'nullable|numeric|min:0',
       'sspd_rp' => 'nullable|numeric|min:0',
       'admin_rp' => 'nullable|numeric|min:0',
+      'jenis' => 'nullable|in:orang,toko',
+      'ptk_id' => 'nullable|integer',
+      'penerima_id' => 'nullable|integer',
     ];
+  }
+
+  /**
+   * Verifikasi tautan sumber snapshot terhadap sekolah
+   * baris BKU: ptk_id harus PTK sekolah itu, penerima_id
+   * harus induk penerima sekolah itu; selain itu null.
+   * Jenis 'toko' tidak pernah tertaut.
+   *
+   * @return array{0: ?int, 1: ?int} [ptk_id, penerima_id]
+   */
+  private function tautanSumberPenerima(int $sekolahId, array $validated): array
+  {
+    if (($validated['jenis'] ?? 'orang') === 'toko') {
+      return [null, null];
+    }
+    $ptkId = !empty($validated['ptk_id'])
+      && Ptk::where('id', $validated['ptk_id'])->where('sekolah_id', $sekolahId)->exists()
+      ? (int) $validated['ptk_id'] : null;
+    $penerimaId = !empty($validated['penerima_id'])
+      && Penerima::where('id', $validated['penerima_id'])->where('sekolah_id', $sekolahId)->exists()
+      ? (int) $validated['penerima_id'] : null;
+    return [$ptkId, $penerimaId];
   }
 
   /** Aturan validasi induk penerima non-PTK. */
@@ -2677,6 +2703,17 @@ class KelolaBosController extends Controller
       'sspd' => (float) ($alokasiPajak->sspd ?? 0),
     ];
 
+    // Sumber nama toko untuk combobox editor: nama toko
+    // unik dari semua nota sekolah ini beserta NPWP-nya.
+    $sumberToko = BosKasNota::where('sekolah_id', $sekolahId)
+      ->whereNotNull('nama_toko')->where('nama_toko', '<>', '')
+      ->groupBy('nama_toko')
+      ->selectRaw('nama_toko, MAX(npwp) AS npwp')
+      ->orderBy('nama_toko')
+      ->get()
+      ->map(fn($t) => ['nama' => $t->nama_toko, 'npwp' => $t->npwp])
+      ->all();
+
     // Status tampil grup: diturunkan dari penanda
     // selesai penerima bila grup punya penerima.
     $statusGrup = $this->statusTampilGrup($sekolahId, $kunci);
@@ -2707,6 +2744,7 @@ class KelolaBosController extends Controller
       'penerima' => $penerima,
       'sumber_ptk' => $sumberPtk,
       'sumber_penerima' => $sumberPenerima,
+      'sumber_toko' => $sumberToko,
     ]);
   }
 
@@ -3428,11 +3466,19 @@ class KelolaBosController extends Controller
       $penerimaId = $master->id;
     }
 
+    // Tautan sumber dari editor inline (pilihan combobox
+    // PTK / tabel penerima): diverifikasi terhadap
+    // sekolah ini; penerima_id dari simpan_master di
+    // atas menang atas tautan.
+    [$ptkId, $penerimaIdTautan] = $this->tautanSumberPenerima($sekolahId, $validated);
+    $penerimaId = $penerimaId ?? $penerimaIdTautan;
+
     $snapshot = BosSpjPenerima::create([
       'sekolah_id' => $sekolahId,
       'grup_kunci' => $kunci,
-      'ptk_id' => null,
+      'ptk_id' => $ptkId,
       'penerima_id' => $penerimaId,
+      'jenis' => $validated['jenis'] ?? 'orang',
       'nama' => $validated['nama'],
       'nip' => $validated['nip'] ?? null,
       'pangkat_gol' => $validated['pangkat_gol'] ?? null,
@@ -3474,7 +3520,15 @@ class KelolaBosController extends Controller
 
     $validated = $request->validate($this->aturanSnapshot());
 
+    // Tautan sumber mengikuti isian editor inline saat
+    // ini (combobox): mengganti nama bebas melepaskan
+    // tautan, memilih sumber memasangnya kembali.
+    [$ptkId, $penerimaId] = $this->tautanSumberPenerima($sekolahId, $validated);
+
     $snapshot->update([
+      'jenis' => $validated['jenis'] ?? 'orang',
+      'ptk_id' => $ptkId,
+      'penerima_id' => $penerimaId,
       'nama' => $validated['nama'],
       'nip' => $validated['nip'] ?? null,
       'pangkat_gol' => $validated['pangkat_gol'] ?? null,

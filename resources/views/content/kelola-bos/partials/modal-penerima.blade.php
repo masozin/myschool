@@ -1,9 +1,16 @@
 {{--
   Modal editor penerima SPJ (Fase 2) — daftar penerima
   per grup transaksi BKU (grup yang sama dengan kwitansi:
-  per nota / nomor bukti). Penerima diambil dari PTK,
-  dari tabel penerima non-PTK, atau diketik manual;
-  semuanya tersimpan sebagai snapshot di bos_spj_penerima.
+  per nota / nomor bukti). Editor kini berupa TABEL
+  INLINE: semua isian penerima diisi langsung pada sel
+  tabel dan setiap baris tersimpan OTOMATIS per baris
+  lewat endpoint JSON yang sama. Nama penerima berupa
+  combobox pencarian dari tiga sumber: PTK, tabel
+  penerima non-PTK, dan TOKO (nama_toko dari nota-nota
+  sekolah ini). Kolom jenis membedakan penerima 'orang'
+  dari 'toko' — baris toko tidak memakai isian
+  perorangan (NIP, pangkat, NIK). Semuanya tersimpan
+  sebagai snapshot di bos_spj_penerima.
   Tombol pemicu: elemen dengan atribut data-penerima-baris
   dan data-id (id baris BKU). Semua data lewat endpoint
   JSON /kelola-bos/bku/{id}/penerima... — konteks sekolah
@@ -125,151 +132,14 @@
         <div class="small mb-3" id="penerima-selisih"></div>
 
         @if ($bisaTulisPenerima)
-          <ul class="nav nav-tabs" role="tablist">
-            <li class="nav-item">
-              <button class="nav-link active" id="tabbtn-ptk" data-bs-toggle="tab" data-bs-target="#tab-ptk"
-                type="button" role="tab">Dari PTK</button>
-            </li>
-            <li class="nav-item">
-              <button class="nav-link" id="tabbtn-master" data-bs-toggle="tab" data-bs-target="#tab-master"
-                type="button" role="tab">Dari Tabel Penerima</button>
-            </li>
-            <li class="nav-item">
-              <button class="nav-link" id="tabbtn-manual" data-bs-toggle="tab" data-bs-target="#tab-manual"
-                type="button" role="tab">Manual</button>
-            </li>
-          </ul>
-          <div class="tab-content pt-3">
-            <div class="tab-pane fade show active" id="tab-ptk" role="tabpanel">
-              <div id="daftar-sumber-ptk" style="max-height: 280px; overflow-y: auto;"></div>
-              <button type="button" class="btn btn-primary btn-sm mt-2" id="btn-tambah-ptk">
-                <i class="ri ri-add-line me-1"></i>Tambahkan yang Dicentang</button>
-              <div class="form-text">Data penerima disalin dari PTK saat ini (nama, NIP, pangkat/golongan
-                terakhir, NIK, rekening). Volume bawaan 1 dan satuan 0 — sesuaikan lewat tombol ubah pada
-                baris penerima.</div>
-            </div>
-            <div class="tab-pane fade" id="tab-master" role="tabpanel">
-              <div class="d-flex gap-2 mb-2">
-                <button type="button" class="btn btn-primary btn-sm" id="btn-tambah-master-pilihan">
-                  <i class="ri ri-add-line me-1"></i>Tambahkan yang Dicentang</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" id="btn-master-baru">
-                  <i class="ri ri-user-add-line me-1"></i>Penerima Baru</button>
-              </div>
-              <div id="daftar-sumber-master" style="max-height: 240px; overflow-y: auto;"></div>
-              <div id="form-master-wrap" class="border rounded p-3 mt-2 d-none">
-                <h6 class="mb-3" id="judul-form-master">Penerima Baru (Tabel Penerima)</h6>
-                <input type="hidden" id="m-id">
-                <div class="row g-2">
-                  <div class="col-12 col-md-6">
-                    <label class="form-label" for="m-nama">Nama *</label>
-                    <input type="text" class="form-control form-control-sm" id="m-nama" maxlength="255">
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label" for="m-nik">NIK</label>
-                    <input type="text" class="form-control form-control-sm" id="m-nik" maxlength="16">
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label" for="m-nip">NIP</label>
-                    <input type="text" class="form-control form-control-sm" id="m-nip" maxlength="18">
-                  </div>
-                  <div class="col-12 col-md-6">
-                    <label class="form-label" for="m-pangkat">Pangkat / Golongan</label>
-                    <input type="text" class="form-control form-control-sm" id="m-pangkat" maxlength="100"
-                      placeholder="mis. Penata / III/c">
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label" for="m-rekening">Nomor Rekening</label>
-                    <input type="text" class="form-control form-control-sm" id="m-rekening" maxlength="30">
-                  </div>
-                  <div class="col-6 col-md-3">
-                    <label class="form-label" for="m-bank">Nama Bank</label>
-                    <input type="text" class="form-control form-control-sm" id="m-bank" maxlength="100">
-                  </div>
-                  <div class="col-12">
-                    <label class="form-label" for="m-alamat">Alamat</label>
-                    <textarea class="form-control form-control-sm" id="m-alamat" rows="2" maxlength="1000"></textarea>
-                  </div>
-                </div>
-                <div class="mt-3 d-flex gap-2">
-                  <button type="button" class="btn btn-primary btn-sm" id="btn-simpan-master">Simpan</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-batal-master">Batal</button>
-                </div>
-              </div>
-            </div>
-            <div class="tab-pane fade" id="tab-manual" role="tabpanel">
-              <input type="hidden" id="f-id">
-              <div class="row g-2">
-                <div class="col-12 col-md-6">
-                  <label class="form-label" for="f-nama">Nama *</label>
-                  <input type="text" class="form-control form-control-sm" id="f-nama" maxlength="255">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label" for="f-nip">NIP</label>
-                  <input type="text" class="form-control form-control-sm" id="f-nip" maxlength="18">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label" for="f-nik">NIK</label>
-                  <input type="text" class="form-control form-control-sm" id="f-nik" maxlength="16">
-                </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label" for="f-pangkat">Pangkat / Golongan</label>
-                  <input type="text" class="form-control form-control-sm" id="f-pangkat" maxlength="100"
-                    placeholder="mis. Penata / III/c">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label" for="f-rekening">Nomor Rekening</label>
-                  <input type="text" class="form-control form-control-sm" id="f-rekening" maxlength="30">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label" for="f-bank">Nama Bank</label>
-                  <input type="text" class="form-control form-control-sm" id="f-bank" maxlength="100">
-                </div>
-                <div class="col-4 col-md-2">
-                  <label class="form-label" for="f-volume">Volume *</label>
-                  <input type="number" class="form-control form-control-sm" id="f-volume" min="0" step="0.01"
-                    value="1">
-                </div>
-                <div class="col-8 col-md-4">
-                  <label class="form-label" for="f-satuan">Satuan (Rp) *</label>
-                  <input type="number" class="form-control form-control-sm" id="f-satuan" min="0" step="0.01"
-                    value="0">
-                </div>
-                <div class="col-6 col-md-3" data-kolom-pajak="ppn">
-                  <label class="form-label" for="f-ppn">PPN Rp</label>
-                  <input type="number" class="form-control form-control-sm" id="f-ppn" min="0" step="0.01"
-                    value="0">
-                </div>
-                <div class="col-6 col-md-3" data-kolom-pajak="pph">
-                  <label class="form-label" for="f-pph">PPh Rp</label>
-                  <input type="number" class="form-control form-control-sm" id="f-pph" min="0" step="0.01"
-                    value="0">
-                </div>
-                <div class="col-6 col-md-3" data-kolom-pajak="sspd">
-                  <label class="form-label" for="f-sspd">SSPD Rp</label>
-                  <input type="number" class="form-control form-control-sm" id="f-sspd" min="0" step="0.01"
-                    value="0">
-                </div>
-                <div class="col-6 col-md-3" data-kolom-pajak="admin">
-                  <label class="form-label" for="f-admin">Biaya Admin Rp</label>
-                  <input type="number" class="form-control form-control-sm" id="f-admin" min="0" step="0.01"
-                    value="0">
-                </div>
-                <div class="col-8 col-md-4 d-flex align-items-end" id="wrap-simpan-master">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="f-simpan-master">
-                    <label class="form-check-label" for="f-simpan-master">Simpan juga ke tabel penerima</label>
-                  </div>
-                </div>
-              </div>
-              <div class="mt-3 d-flex gap-2">
-                <button type="button" class="btn btn-primary btn-sm" id="btn-simpan-snapshot">
-                  <i class="ri ri-add-line me-1"></i><span id="label-simpan-snapshot">Tambah Penerima</span></button>
-                <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btn-batal-edit">Batal
-                  Edit</button>
-              </div>
-            </div>
+          <div class="mb-3">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btn-baris-penerima-baru">
+              <i class="ri ri-add-line me-1"></i>Tambah Penerima</button>
+            <span class="form-text ms-2">Baris tersimpan otomatis saat diisi. Nama bisa dipilih dari daftar
+              (PTK, tabel penerima, toko) atau diketik baru.</span>
           </div>
         @endif
+
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -287,7 +157,6 @@
     var urlDasar = @json(url('/kelola-bos/bku'));
     var barisId = null;
     var data = null;
-    var editId = null;
 
     function $(id) {
       return document.getElementById(id);
@@ -692,7 +561,202 @@
       }
     }
 
+    // ── Tabel penerima: baris inline (mode tulis) ──
+
+    // Markup satu baris penerima yang bisa diisi
+    // langsung di sel tabel. p adalah objek snapshot;
+    // id kosong berarti baris baru yang belum tersimpan.
+    function barisPenerimaHtml(p, i) {
+      var jumlah = Math.round((Number(p.volume || 0) * Number(p.satuan || 0)) * 100) / 100;
+      var diterima = jumlah - Number(p.ppn || 0) - Number(p.pph || 0) -
+        Number(p.sspd || 0) - Number(p.biaya_admin || 0);
+      var statusSel;
+      if (p.id) {
+        statusSel = '<td><div class="form-check form-switch mb-0">' +
+          '<input class="form-check-input saklar-selesai-penerima" type="checkbox" data-selesai-id="' +
+          p.id + '"' + (p.selesai ? ' checked' : '') + '>' +
+          '<label class="form-check-label small">Selesai</label></div></td>';
+      } else {
+        statusSel = '<td><div class="form-check form-switch mb-0">' +
+          '<input class="form-check-input saklar-selesai-penerima" type="checkbox" disabled>' +
+          '<label class="form-check-label small">Selesai</label></div></td>';
+      }
+      return '<tr data-baris-penerima data-id="' + (p.id || '') +
+        '" data-ptk-id="' + (p.ptk_id || '') +
+        '" data-penerima-id="' + (p.penerima_id || '') +
+        '" data-jenis="' + lolosHtml(p.jenis || 'orang') + '">' +
+        '<td class="baris-no">' + (i + 1) + '</td>' +
+        '<td>' +
+        '<div class="position-relative">' +
+        '<input type="text" class="form-control form-control-sm inp-nama" value="' +
+        lolosHtml(p.nama || '') +
+        '" placeholder="Ketik nama atau pilih dari daftar" autocomplete="off">' +
+        '<div class="list-group daftar-nama d-none shadow" style="position: fixed; z-index: 1080; max-height: 230px; overflow-y: auto;"></div>' +
+        '</div>' +
+        '<div class="sub-orang mt-1">' +
+        '<input type="text" class="form-control form-control-sm inp-nip mb-1" placeholder="NIP" value="' +
+        lolosHtml(p.nip || '') + '">' +
+        '<input type="text" class="form-control form-control-sm inp-pangkat mb-1" placeholder="Pangkat / Golongan" value="' +
+        lolosHtml(p.pangkat_gol || '') + '">' +
+        '<input type="text" class="form-control form-control-sm inp-nik" placeholder="NIK" value="' +
+        lolosHtml(p.nik || '') + '">' +
+        '</div>' +
+        '<div class="sub-toko mt-1 small text-muted d-none"></div>' +
+        '<div class="d-flex align-items-center gap-2 mt-1">' +
+        '<span class="lencana-asal"></span>' +
+        '<select class="form-select form-select-sm inp-jenis" style="width: auto;">' +
+        '<option value="orang">Orang</option>' +
+        '<option value="toko">Toko</option>' +
+        '</select>' +
+        '<label class="form-check small mb-0 wrap-simpan-induk">' +
+        '<input type="checkbox" class="form-check-input inp-simpan-induk"> simpan ke tabel penerima' +
+        '</label>' +
+        '</div>' +
+        '</td>' +
+        '<td><input type="number" class="form-control form-control-sm text-end inp-volume" min="0" step="0.01" value="' +
+        Number(p.volume || 0) + '"></td>' +
+        '<td><input type="number" class="form-control form-control-sm text-end inp-satuan" min="0" step="0.01" value="' +
+        Number(p.satuan || 0) + '"></td>' +
+        '<td class="text-end sel-jumlah">' + fmtRp(jumlah) + '</td>' +
+        '<td data-kolom-pajak="ppn"><input type="number" class="form-control form-control-sm text-end inp-ppn" min="0" step="0.01" value="' +
+        Number(p.ppn || 0) + '"></td>' +
+        '<td data-kolom-pajak="pph"><input type="number" class="form-control form-control-sm text-end inp-pph" min="0" step="0.01" value="' +
+        Number(p.pph || 0) + '"></td>' +
+        '<td data-kolom-pajak="sspd"><input type="number" class="form-control form-control-sm text-end inp-sspd" min="0" step="0.01" value="' +
+        Number(p.sspd || 0) + '"></td>' +
+        '<td data-kolom-pajak="admin"><input type="number" class="form-control form-control-sm text-end inp-admin" min="0" step="0.01" value="' +
+        Number(p.biaya_admin || 0) + '"></td>' +
+        '<td class="text-end fw-semibold sel-diterima">' + fmtRp(diterima) + '</td>' +
+        '<td><input type="text" class="form-control form-control-sm inp-rekening mb-1" placeholder="No. Rekening" value="' +
+        lolosHtml(p.no_rekening || '') + '">' +
+        '<input type="text" class="form-control form-control-sm inp-bank" placeholder="Nama Bank" value="' +
+        lolosHtml(p.nama_bank || '') + '"></td>' +
+        statusSel +
+        '<td class="text-nowrap"><button type="button" class="btn btn-sm btn-icon btn-text-danger" data-aksi-hapus-baris title="Hapus baris"><i class="ri ri-delete-bin-line"></i></button></td>' +
+        '</tr>';
+    }
+
+    // Segarkan tampilan sub-bidang nama menurut jenis
+    // baris & tautan sumbernya: penerima tertaut PTK /
+    // induk ber-lencana asal dan pemilih jenisnya
+    // disembunyikan; toko menyembunyikan isian
+    // perorangan dan menampilkan NPWP dari daftar toko
+    // bila namanya cocok persis.
+    function segarkanSubJenis(tr) {
+      var jenis = tr.dataset.jenis || 'orang';
+      var inpNama = tr.querySelector('.inp-nama');
+      var subOrang = tr.querySelector('.sub-orang');
+      var subToko = tr.querySelector('.sub-toko');
+      if (subOrang) subOrang.classList.toggle('d-none', jenis === 'toko');
+      if (subToko) {
+        subToko.classList.toggle('d-none', jenis !== 'toko');
+        if (jenis === 'toko') {
+          var namaKini = (inpNama.value || '').trim().toLowerCase();
+          var cocok = sumberGabungan.find(function(s) {
+            return s.sumber === 'Toko' && s.nama.toLowerCase() === namaKini;
+          });
+          subToko.innerHTML = 'Toko' +
+            (cocok && cocok.npwp ? ' &bull; NPWP ' + lolosHtml(cocok.npwp) : '');
+        }
+      }
+      var pilihJenis = tr.querySelector('.inp-jenis');
+      if (pilihJenis) pilihJenis.value = jenis;
+      var tertautPtk = !!tr.dataset.ptkId;
+      var tertautInduk = !!tr.dataset.penerimaId;
+      var lencana = tr.querySelector('.lencana-asal');
+      if (lencana) {
+        if (tertautPtk) {
+          lencana.innerHTML = '<span class="badge bg-label-primary">PTK</span>';
+        } else if (tertautInduk) {
+          lencana.innerHTML = '<span class="badge bg-label-info">Induk</span>';
+        } else {
+          lencana.innerHTML = '';
+        }
+      }
+      if (pilihJenis) {
+        pilihJenis.classList.toggle('d-none', tertautPtk || tertautInduk);
+      }
+      var bungkusInduk = tr.querySelector('.wrap-simpan-induk');
+      if (bungkusInduk) {
+        bungkusInduk.classList.toggle('d-none',
+          (tertautPtk || tertautInduk) || jenis !== 'orang');
+      }
+    }
+
+    // Hitung jumlah & diterima satu baris dari inputnya
+    // (jumlah = volume × satuan, dibulatkan 2 desimal
+    // seperti model) lalu tulis ke sel tampilannya.
+    function hitungBaris(tr) {
+      function nilai(sel) {
+        var el = tr.querySelector(sel);
+        return el ? (parseFloat(el.value) || 0) : 0;
+      }
+      var jumlah = Math.round((nilai('.inp-volume') * nilai('.inp-satuan')) * 100) / 100;
+      var hasil = {
+        jumlah: jumlah,
+        ppn: nilai('.inp-ppn'),
+        pph: nilai('.inp-pph'),
+        sspd: nilai('.inp-sspd'),
+        admin: nilai('.inp-admin')
+      };
+      hasil.diterima = jumlah - hasil.ppn - hasil.pph - hasil.sspd - hasil.admin;
+      tr.querySelector('.sel-jumlah').textContent = fmtRp(jumlah);
+      tr.querySelector('.sel-diterima').textContent = fmtRp(hasil.diterima);
+      return hasil;
+    }
+
+    // Total kaki tabel & selisih dihitung dari baris
+    // yang sedang tampil di DOM (termasuk baris baru
+    // yang belum tersimpan), bukan dari model.
+    function segarkanTotalDariDom() {
+      var tbody = $('penerima-tbody');
+      var baris = tbody.querySelectorAll('tr[data-baris-penerima]');
+      var tot = {
+        jumlah: 0,
+        ppn: 0,
+        pph: 0,
+        sspd: 0,
+        admin: 0,
+        diterima: 0
+      };
+      var daftarNama = [];
+      baris.forEach(function(tr) {
+        var h = hitungBaris(tr);
+        tot.jumlah += h.jumlah;
+        tot.ppn += h.ppn;
+        tot.pph += h.pph;
+        tot.sspd += h.sspd;
+        tot.admin += h.admin;
+        tot.diterima += h.diterima;
+        daftarNama.push(tr.querySelector('.inp-nama').value.trim());
+      });
+      $('tot-jumlah').textContent = fmtRp(tot.jumlah);
+      $('tot-ppn').textContent = fmtRp(tot.ppn);
+      $('tot-pph').textContent = fmtRp(tot.pph);
+      $('tot-sspd').textContent = fmtRp(tot.sspd);
+      $('tot-admin').textContent = fmtRp(tot.admin);
+      $('tot-diterima').textContent = fmtRp(tot.diterima);
+
+      var el = $('penerima-selisih');
+      if (!baris.length) {
+        el.innerHTML = '';
+      } else {
+        var selisih = Math.round((tot.jumlah - Number(data.grup.total || 0)) * 100) / 100;
+        if (Math.abs(selisih) < 0.005) {
+          el.innerHTML = '<span class="text-success"><i class="ri ri-check-line me-1"></i>' +
+            'Total jumlah penerima sesuai dengan total grup.</span>';
+        } else {
+          el.innerHTML = '<span class="text-danger"><i class="ri ri-error-warning-line me-1"></i>' +
+            'Selisih ' + fmtRp(Math.abs(selisih)) + (selisih > 0 ? ' di atas' : ' di bawah') +
+            ' total grup.</span>';
+        }
+      }
+
+      segarkanLencana(baris.length, daftarNama);
+    }
+
     function gambarTabel() {
+      if (!bisaTulis) {
       var tbody = $('penerima-tbody');
       var daftar = data.penerima || [];
       if (!daftar.length) {
@@ -789,238 +853,385 @@
       // Baris-baris baru saja dirender: terapkan lagi
       // visibilitas kolom potongan menurut kategori.
       terapkanKolomPajak();
-    }
-
-    function gambarSumberPtk() {
-      var wadah = $('daftar-sumber-ptk');
-      if (!wadah) return;
-      var sudah = {};
-      (data.penerima || []).forEach(function(p) {
-        if (p.ptk_id) sudah[Number(p.ptk_id)] = true;
-      });
-      var daftar = data.sumber_ptk || [];
-      if (!daftar.length) {
-        wadah.innerHTML = '<div class="text-muted small">Tidak ada PTK aktif di sekolah ini.</div>';
         return;
       }
-      wadah.innerHTML = daftar.map(function(p) {
-        var sub = subInfo([
-          p.nip ? 'NIP ' + p.nip : null,
-          p.pangkat_golongan,
-          p.nama_bank ? p.nama_bank + ' ' + (p.no_rekening || '') : null
-        ]);
-        var ada = !!sudah[Number(p.id)];
-        return '<label class="d-flex gap-2 align-items-start border rounded px-2 py-2 mb-2' +
-          (ada ? ' opacity-50' : '') + '">' +
-          '<input type="checkbox" class="form-check-input mt-1 pilih-ptk" value="' + p.id + '"' +
-          (ada ? ' disabled' : '') + '>' +
-          '<span><span class="fw-semibold">' + lolosHtml(p.nama) + '</span>' +
-          (ada ? ' <span class="badge bg-label-success">sudah ditambahkan</span>' : '') +
-          (sub ? '<br><span class="small text-muted">' + sub + '</span>' : '') + '</span></label>';
-      }).join('');
-    }
 
-    function gambarSumberMaster() {
-      var wadah = $('daftar-sumber-master');
-      if (!wadah) return;
-      var sudah = {};
-      (data.penerima || []).forEach(function(p) {
-        if (p.penerima_id) sudah[Number(p.penerima_id)] = true;
-      });
-      var daftar = data.sumber_penerima || [];
+      var tbody = $('penerima-tbody');
+      var daftar = data.penerima || [];
       if (!daftar.length) {
-        wadah.innerHTML =
-          '<div class="text-muted small">Tabel penerima masih kosong — buat lewat tombol "Penerima Baru".</div>';
+        tbody.innerHTML = '<tr><td colspan="' + jumlahKolomTampil() +
+          '" class="text-center text-muted">Belum ada penerima untuk grup ini.</td></tr>';
+        $('tot-jumlah').textContent = fmtRp(0);
+        $('tot-ppn').textContent = fmtRp(0);
+        $('tot-pph').textContent = fmtRp(0);
+        $('tot-sspd').textContent = fmtRp(0);
+        $('tot-admin').textContent = fmtRp(0);
+        $('tot-diterima').textContent = fmtRp(0);
+        $('penerima-selisih').innerHTML = '';
+        segarkanLencana(0, []);
+        terapkanKolomPajak();
         return;
       }
-      wadah.innerHTML = daftar.map(function(p) {
-        var sub = subInfo([
-          p.nip ? 'NIP ' + p.nip : null,
-          p.pangkat_gol,
-          p.nik ? 'NIK ' + p.nik : null,
-          p.nama_bank ? p.nama_bank + ' ' + (p.no_rekening || '') : null
-        ]);
-        var ada = !!sudah[Number(p.id)];
-        return '<div class="d-flex gap-2 align-items-start border rounded px-2 py-2 mb-2' +
-          (ada ? ' opacity-50' : '') + '">' +
-          '<label class="d-flex gap-2 align-items-start flex-grow-1 mb-0">' +
-          '<input type="checkbox" class="form-check-input mt-1 pilih-master" value="' + p.id + '"' +
-          (ada ? ' disabled' : '') + '>' +
-          '<span><span class="fw-semibold">' + lolosHtml(p.nama) + '</span>' +
-          (ada ? ' <span class="badge bg-label-success">sudah ditambahkan</span>' : '') +
-          (sub ? '<br><span class="small text-muted">' + sub + '</span>' : '') + '</span></label>' +
-          '<span class="text-nowrap">' +
-          '<button type="button" class="btn btn-sm btn-icon btn-text-primary" data-master-edit="' + p.id +
-          '" title="Ubah data induk"><i class="ri ri-pencil-line"></i></button>' +
-          '<button type="button" class="btn btn-sm btn-icon btn-text-danger" data-master-hapus="' + p.id +
-          '" title="Hapus dari tabel penerima"><i class="ri ri-delete-bin-line"></i></button>' +
-          '</span></div>';
+      tbody.innerHTML = daftar.map(function(p, i) {
+        return barisPenerimaHtml(p, i);
       }).join('');
+      var baris = tbody.querySelectorAll('tr[data-baris-penerima]');
+      baris.forEach(function(tr, i) {
+        tr.dataset.namaTertaut = daftar[i].nama || '';
+        segarkanSubJenis(tr);
+        hitungBaris(tr);
+      });
+      segarkanTotalDariDom();
+      terapkanKolomPajak();
+    }
+
+    // ── Combobox nama penerima ──
+    var panelAktif = null;
+
+    function sembunyikanPanelNama() {
+      if (panelAktif) panelAktif.classList.add('d-none');
+      panelAktif = null;
+    }
+
+    // Tampilkan panel pilihan nama untuk satu baris:
+    // sumber gabungan (PTK, tabel penerima, toko)
+    // disaring menurut ketikan, dikelompokkan per
+    // sumber, maksimal 40 pilihan. Panel diposisikan
+    // fixed mengikuti kotak nama.
+    function tampilkanPanelNama(tr) {
+      var inp = tr.querySelector('.inp-nama');
+      var panel = tr.querySelector('.daftar-nama');
+      if (!inp || !panel) return;
+      var query = inp.value.trim().toLowerCase();
+      var cocok = sumberGabungan.filter(function(s) {
+        return !query || s.nama.toLowerCase().indexOf(query) !== -1;
+      }).slice(0, 40);
+      if (!cocok.length) {
+        panel.innerHTML = '<div class="list-group-item py-1 px-2 small text-muted">' +
+          'Tidak ada yang cocok — nama baru bisa diketik bebas.</div>';
+      } else {
+        var html = '';
+        var sumberKini = null;
+        cocok.forEach(function(s) {
+          if (s.sumber !== sumberKini) {
+            sumberKini = s.sumber;
+            html += '<div class="list-group-item py-1 px-2 small fw-semibold bg-light">' +
+              lolosHtml(s.sumber) + '</div>';
+          }
+          var sub = s.jenis === 'toko' ?
+            subInfo(['Toko', s.npwp ? 'NPWP ' + s.npwp : null]) :
+            subInfo([
+              s.nip ? 'NIP ' + s.nip : null,
+              s.nama_bank ? s.nama_bank + ' ' + (s.no_rekening || '') : null
+            ]);
+          html += '<button type="button" class="list-group-item list-group-item-action py-1 px-2" ' +
+            'data-pilih-sumber="' + sumberGabungan.indexOf(s) + '">' +
+            '<span class="fw-semibold">' + lolosHtml(s.nama) + '</span>' +
+            (sub ? '<br><span class="small text-muted">' + sub + '</span>' : '') + '</button>';
+        });
+        panel.innerHTML = html;
+      }
+      var rect = inp.getBoundingClientRect();
+      panel.style.left = rect.left + 'px';
+      panel.style.top = (rect.bottom + 2) + 'px';
+      panel.style.width = Math.max(rect.width, 260) + 'px';
+      if (panelAktif && panelAktif !== panel) panelAktif.classList.add('d-none');
+      panel.classList.remove('d-none');
+      panelAktif = panel;
+    }
+
+    // Terapkan satu sumber dari panel ke baris: isian
+    // snapshot disalin dari sumbernya (toko mengosongkan
+    // isian perorangan), tautan & jenis dipasang, lalu
+    // baris langsung disimpan.
+    function pilihSumber(tr, s) {
+      if (!s) return;
+      tr.querySelector('.inp-nama').value = s.nama || '';
+      tr.querySelector('.inp-nip').value = s.nip || '';
+      tr.querySelector('.inp-pangkat').value = s.pangkat_gol || '';
+      tr.querySelector('.inp-nik').value = s.nik || '';
+      tr.querySelector('.inp-rekening').value = s.no_rekening || '';
+      tr.querySelector('.inp-bank').value = s.nama_bank || '';
+      tr.dataset.ptkId = s.sumber === 'PTK' ? s.id : '';
+      tr.dataset.penerimaId = s.sumber === 'Penerima' ? s.id : '';
+      tr.dataset.jenis = s.jenis;
+      tr.dataset.namaTertaut = s.nama || '';
+      segarkanSubJenis(tr);
+      sembunyikanPanelNama();
+      simpanBaris(tr);
+    }
+
+    // ── Simpan otomatis per baris ──
+
+    // Kumpulkan payload snapshot dari input satu baris.
+    function kumpulkanPayload(tr) {
+      function teks(sel) {
+        var el = tr.querySelector(sel);
+        return el ? el.value.trim() : '';
+      }
+
+      function angka(sel) {
+        var el = tr.querySelector(sel);
+        return el ? (parseFloat(el.value) || 0) : 0;
+      }
+      return {
+        nama: teks('.inp-nama'),
+        nip: teks('.inp-nip') || null,
+        pangkat_gol: teks('.inp-pangkat') || null,
+        nik: teks('.inp-nik') || null,
+        no_rekening: teks('.inp-rekening') || null,
+        nama_bank: teks('.inp-bank') || null,
+        volume: angka('.inp-volume'),
+        satuan: angka('.inp-satuan'),
+        ppn_rp: angka('.inp-ppn'),
+        pph_rp: angka('.inp-pph'),
+        sspd_rp: angka('.inp-sspd'),
+        admin_rp: angka('.inp-admin'),
+        jenis: tr.dataset.jenis || 'orang',
+        ptk_id: tr.dataset.ptkId ? Number(tr.dataset.ptkId) : null,
+        penerima_id: tr.dataset.penerimaId ? Number(tr.dataset.penerimaId) : null
+      };
+    }
+
+    // Status tampil grup diturunkan ulang dari model
+    // penerima lokal — dipakai sesudah baris ditambah /
+    // dihapus agar blok Keterangan & lencana baris BKU
+    // segar tanpa memuat ulang data dari server.
+    function segarkanStatusTurunan() {
+      var daftar = data.penerima || [];
+      var jml = daftar.length;
+      var selesai = daftar.filter(function(p) {
+        return !!p.selesai;
+      }).length;
+      data.grup.jumlah_penerima = jml;
+      data.grup.jumlah_selesai = selesai;
+      data.grup.status_tampil = jml === 0 ?
+        (data.grup.status || 'belum') :
+        (selesai >= jml ? 'selesai' : (selesai > 0 ? 'sebagian' : 'belum'));
+      gambarMeta();
+      segarkanMetaBaris();
+    }
+
+    // Simpan satu baris penerima: baris baru lewat POST,
+    // baris tersimpan lewat PUT. Panggilan saat
+    // penyimpanan sedang berjalan diantrekan satu kali
+    // agar isian terakhir tetap terkirim.
+    async function simpanBaris(tr) {
+      if (!data) return;
+      var inpNama = tr.querySelector('.inp-nama');
+      if (!inpNama.value.trim()) {
+        inpNama.classList.add('is-invalid');
+        return;
+      }
+      inpNama.classList.remove('is-invalid');
+      if (tr.dataset.menyimpan === '1') {
+        tr.dataset.antre = '1';
+        return;
+      }
+      tr.dataset.menyimpan = '1';
+      tr.classList.add('opacity-50');
+      var payload = kumpulkanPayload(tr);
+      var idBaris = tr.dataset.id || '';
+      try {
+        var res;
+        if (idBaris) {
+          res = await kirim(urlDasar + '/' + barisId + '/penerima/' + idBaris, 'PUT', payload);
+        } else {
+          var centangInduk = tr.querySelector('.inp-simpan-induk');
+          if (centangInduk && centangInduk.checked && (tr.dataset.jenis || 'orang') === 'orang') {
+            payload.simpan_master = 1;
+          }
+          res = await kirim(urlDasar + '/' + barisId + '/penerima', 'POST', payload);
+        }
+        var d = res.data;
+        if (d) {
+          if (!idBaris) {
+            tr.dataset.id = d.id;
+            var saklarBaru = tr.querySelector('.saklar-selesai-penerima');
+            if (saklarBaru) {
+              saklarBaru.setAttribute('data-selesai-id', d.id);
+              saklarBaru.disabled = false;
+              saklarBaru.checked = !!d.selesai;
+            }
+            data.penerima.push(d);
+            segarkanStatusTurunan();
+          } else {
+            var idxModel = (data.penerima || []).findIndex(function(p) {
+              return Number(p.id) === Number(d.id);
+            });
+            if (idxModel >= 0) data.penerima[idxModel] = d;
+          }
+          tr.dataset.ptkId = d.ptk_id || '';
+          tr.dataset.penerimaId = d.penerima_id || '';
+          tr.dataset.jenis = d.jenis || 'orang';
+          tr.dataset.namaTertaut = d.nama || '';
+        }
+        segarkanSubJenis(tr);
+        segarkanTotalDariDom();
+      } catch (e) {
+        gagal(e);
+      } finally {
+        delete tr.dataset.menyimpan;
+        tr.classList.remove('opacity-50');
+        if (tr.dataset.antre) {
+          delete tr.dataset.antre;
+          simpanBaris(tr);
+        }
+      }
+    }
+
+    // Tambah satu baris penerima baru di bawah tabel.
+    // Isian bawaan dari sisa BKU: satuan = sisa total
+    // grup, potongan = sisa pajak nota — dihitung dari
+    // baris yang sudah TERSIMPAN di DOM.
+    function tambahBarisBaru() {
+      if (!data || !data.grup) return;
+      var tbody = $('penerima-tbody');
+      if (!tbody.querySelector('tr[data-baris-penerima]')) {
+        tbody.innerHTML = '';
+      }
+      var jumlahTerpakai = 0;
+      var alokasi = {
+        ppn: 0,
+        pph: 0,
+        sspd: 0
+      };
+      tbody.querySelectorAll('tr[data-baris-penerima]').forEach(function(tr) {
+        if (!tr.dataset.id) return;
+        var h = hitungBaris(tr);
+        jumlahTerpakai += h.jumlah;
+        alokasi.ppn += h.ppn;
+        alokasi.pph += h.pph;
+        alokasi.sspd += h.sspd;
+      });
+      var pajakBku = data.grup.pajak_bku || {};
+      var p = {
+        id: null,
+        nama: '',
+        nip: null,
+        pangkat_gol: null,
+        nik: null,
+        no_rekening: null,
+        nama_bank: null,
+        volume: 1,
+        satuan: Math.max(0, Number(data.grup.total || 0) - jumlahTerpakai),
+        ppn: Math.max(0, Number(pajakBku.ppn || 0) - alokasi.ppn),
+        pph: Math.max(0, Number(pajakBku.pph || 0) - alokasi.pph),
+        sspd: Math.max(0, Number(pajakBku.sspd || 0) - alokasi.sspd),
+        biaya_admin: 0,
+        jenis: 'orang',
+        selesai: false,
+        ptk_id: null,
+        penerima_id: null
+      };
+      var idx = tbody.querySelectorAll('tr[data-baris-penerima]').length;
+      tbody.insertAdjacentHTML('beforeend', barisPenerimaHtml(p, idx));
+      var trBaru = tbody.querySelectorAll('tr[data-baris-penerima]')[idx];
+      trBaru.dataset.namaTertaut = '';
+      segarkanSubJenis(trBaru);
+      hitungBaris(trBaru);
+      terapkanKolomPajak();
+      nomorUlangBaris();
+      segarkanTotalDariDom();
+      var inpNamaBaru = trBaru.querySelector('.inp-nama');
+      if (inpNamaBaru) inpNamaBaru.focus();
+    }
+
+    function nomorUlangBaris() {
+      $('penerima-tbody').querySelectorAll('tr[data-baris-penerima]').forEach(function(tr, i) {
+        var selNo = tr.querySelector('.baris-no');
+        if (selNo) selNo.textContent = i + 1;
+      });
+    }
+
+    // Hapus satu baris: baris tersimpan lewat DELETE ke
+    // server (dengan konfirmasi), baris baru yang belum
+    // tersimpan cukup dibuang dari DOM tanpa request.
+    async function hapusBaris(tr) {
+      var idBaris = tr.dataset.id || '';
+      if (idBaris) {
+        if (!confirm('Hapus penerima ini dari grup?')) return;
+        try {
+          await kirim(urlDasar + '/' + barisId + '/penerima/' + idBaris, 'DELETE');
+        } catch (e) {
+          gagal(e);
+          return;
+        }
+        data.penerima = (data.penerima || []).filter(function(p) {
+          return Number(p.id) !== Number(idBaris);
+        });
+      }
+      tr.remove();
+      if (idBaris) segarkanStatusTurunan();
+      var tbody = $('penerima-tbody');
+      if (!tbody.querySelector('tr[data-baris-penerima]')) {
+        gambarTabel();
+      } else {
+        nomorUlangBaris();
+        segarkanTotalDariDom();
+      }
+    }
+
+    // Daftar gabungan sumber nama untuk combobox:
+    // dibangun ulang setiap muat() dari payload server.
+    var sumberGabungan = [];
+
+    function bangunSumberGabungan() {
+      sumberGabungan = [];
+      (data.sumber_ptk || []).forEach(function(p) {
+        sumberGabungan.push({
+          sumber: 'PTK',
+          jenis: 'orang',
+          id: p.id,
+          nama: p.nama,
+          nip: p.nip || null,
+          pangkat_gol: p.pangkat_golongan || null,
+          nik: p.nik || null,
+          no_rekening: p.no_rekening || null,
+          nama_bank: p.nama_bank || null,
+          npwp: null
+        });
+      });
+      (data.sumber_penerima || []).forEach(function(p) {
+        sumberGabungan.push({
+          sumber: 'Penerima',
+          jenis: 'orang',
+          id: p.id,
+          nama: p.nama,
+          nip: p.nip || null,
+          pangkat_gol: p.pangkat_gol || null,
+          nik: p.nik || null,
+          no_rekening: p.no_rekening || null,
+          nama_bank: p.nama_bank || null,
+          npwp: null
+        });
+      });
+      (data.sumber_toko || []).forEach(function(t) {
+        sumberGabungan.push({
+          sumber: 'Toko',
+          jenis: 'toko',
+          id: null,
+          nama: t.nama,
+          nip: null,
+          pangkat_gol: null,
+          nik: null,
+          no_rekening: null,
+          nama_bank: null,
+          npwp: t.npwp || null
+        });
+      });
     }
 
     function gambarSemua() {
       gambarInfo();
       gambarMeta();
       gambarTabel();
-      gambarSumberPtk();
-      gambarSumberMaster();
     }
 
     async function muat() {
       data = await kirim(urlDasar + '/' + barisId + '/penerima', 'GET');
+      bangunSumberGabungan();
       gambarSemua();
-    }
-
-    // ── Form snapshot (manual / edit) ──
-    function kosongkanFormSnapshot() {
-      if (!bisaTulis) return;
-      editId = null;
-      $('f-id').value = '';
-      $('f-nama').value = '';
-      $('f-nip').value = '';
-      $('f-nik').value = '';
-      $('f-pangkat').value = '';
-      $('f-rekening').value = '';
-      $('f-bank').value = '';
-      $('f-volume').value = 1;
-      $('f-satuan').value = 0;
-      $('f-ppn').value = 0;
-      $('f-pph').value = 0;
-      $('f-sspd').value = 0;
-      $('f-admin').value = 0;
-      $('f-simpan-master').checked = false;
-      $('wrap-simpan-master').style.display = '';
-      $('label-simpan-snapshot').textContent = 'Tambah Penerima';
-      $('btn-batal-edit').classList.add('d-none');
-
-      // Isian bawaan dari BKU untuk mode TAMBAH: nama
-      // toko nota (bila nama masih kosong), satuan =
-      // sisa nominal grup yang belum dialokasikan ke
-      // penerima tersimpan, dan potongan pajak = sisa
-      // pajak nota menurut BKU yang belum teralokasi.
-      // Semua bawaan ini dapat diubah manual.
-      var g = (data && data.grup) || {};
-      if (!$('f-nama').value && g.nama_toko) {
-        $('f-nama').value = g.nama_toko;
-      }
-      var jumlahTerpakai = ((data && data.penerima) || []).reduce(function(s, p) {
-        return s + Number(p.jumlah || 0);
-      }, 0);
-      $('f-satuan').value = Math.max(0, Number(g.total || 0) - jumlahTerpakai);
-      var pajakBku = g.pajak_bku || {};
-      var pajakAlo = g.pajak_teralokasi || {};
-      $('f-ppn').value = Math.max(0, Number(pajakBku.ppn || 0) - Number(pajakAlo.ppn || 0));
-      $('f-pph').value = Math.max(0, Number(pajakBku.pph || 0) - Number(pajakAlo.pph || 0));
-      $('f-sspd').value = Math.max(0, Number(pajakBku.sspd || 0) - Number(pajakAlo.sspd || 0));
-      $('f-admin').value = 0;
-    }
-
-    function isiFormSnapshot(p) {
-      editId = p.id;
-      $('f-id').value = p.id;
-      $('f-nama').value = p.nama || '';
-      $('f-nip').value = p.nip || '';
-      $('f-nik').value = p.nik || '';
-      $('f-pangkat').value = p.pangkat_gol || '';
-      $('f-rekening').value = p.no_rekening || '';
-      $('f-bank').value = p.nama_bank || '';
-      $('f-volume').value = p.volume;
-      $('f-satuan').value = p.satuan;
-      $('f-ppn').value = p.ppn || 0;
-      $('f-pph').value = p.pph || 0;
-      $('f-sspd').value = p.sspd || 0;
-      $('f-admin').value = p.biaya_admin || 0;
-      $('wrap-simpan-master').style.display = 'none';
-      $('label-simpan-snapshot').textContent = 'Simpan Perubahan';
-      $('btn-batal-edit').classList.remove('d-none');
-      var tabBtn = $('tabbtn-manual');
-      if (tabBtn) bootstrap.Tab.getOrCreateInstance(tabBtn).show();
-    }
-
-    async function simpanSnapshot() {
-      var payload = {
-        nama: $('f-nama').value.trim(),
-        nip: $('f-nip').value.trim() || null,
-        pangkat_gol: $('f-pangkat').value.trim() || null,
-        nik: $('f-nik').value.trim() || null,
-        no_rekening: $('f-rekening').value.trim() || null,
-        nama_bank: $('f-bank').value.trim() || null,
-        volume: parseFloat($('f-volume').value) || 0,
-        satuan: parseFloat($('f-satuan').value) || 0,
-        ppn_rp: parseFloat($('f-ppn').value) || 0,
-        pph_rp: parseFloat($('f-pph').value) || 0,
-        sspd_rp: parseFloat($('f-sspd').value) || 0,
-        admin_rp: parseFloat($('f-admin').value) || 0
-      };
-      try {
-        var res;
-        if (editId) {
-          res = await kirim(urlDasar + '/' + barisId + '/penerima/' + editId, 'PUT', payload);
-        } else {
-          payload.simpan_master = $('f-simpan-master').checked ? 1 : 0;
-          res = await kirim(urlDasar + '/' + barisId + '/penerima', 'POST', payload);
-        }
-        berhasil(res);
-        await muat();
-        kosongkanFormSnapshot();
-      } catch (e) {
-        gagal(e);
-      }
-    }
-
-    // ── Form induk penerima ──
-    function sembunyikanFormMaster() {
-      if (!bisaTulis) return;
-      $('form-master-wrap').classList.add('d-none');
-      $('m-id').value = '';
-    }
-
-    function bukaFormMaster(master) {
-      $('m-id').value = master ? master.id : '';
-      $('m-nama').value = master ? (master.nama || '') : '';
-      $('m-nik').value = master ? (master.nik || '') : '';
-      $('m-nip').value = master ? (master.nip || '') : '';
-      $('m-pangkat').value = master ? (master.pangkat_gol || '') : '';
-      $('m-rekening').value = master ? (master.no_rekening || '') : '';
-      $('m-bank').value = master ? (master.nama_bank || '') : '';
-      $('m-alamat').value = master ? (master.alamat || '') : '';
-      $('judul-form-master').textContent = master ?
-        'Ubah Penerima (Tabel Penerima)' :
-        'Penerima Baru (Tabel Penerima)';
-      $('form-master-wrap').classList.remove('d-none');
-      $('m-nama').focus();
-    }
-
-    async function simpanMaster() {
-      var payload = {
-        nama: $('m-nama').value.trim(),
-        nik: $('m-nik').value.trim() || null,
-        nip: $('m-nip').value.trim() || null,
-        pangkat_gol: $('m-pangkat').value.trim() || null,
-        alamat: $('m-alamat').value.trim() || null,
-        no_rekening: $('m-rekening').value.trim() || null,
-        nama_bank: $('m-bank').value.trim() || null
-      };
-      var mid = $('m-id').value;
-      try {
-        var res = mid ?
-          await kirim(urlDasar + '/' + barisId + '/penerima-master/' + mid, 'PUT', payload) :
-          await kirim(urlDasar + '/' + barisId + '/penerima-master', 'POST', payload);
-        berhasil(res);
-        sembunyikanFormMaster();
-        await muat();
-      } catch (e) {
-        gagal(e);
-      }
-    }
-
-    function idTercentang(kelas) {
-      return Array.prototype.map.call(
-        modalEl.querySelectorAll('.' + kelas + ':checked'),
-        function(el) {
-          return Number(el.value);
-        }
-      );
     }
 
     // ── Buka modal dari tombol di tabel BKU ──
@@ -1029,11 +1240,7 @@
       if (!btn) return;
       barisId = btn.getAttribute('data-id');
       data = null;
-      editId = null;
-      if (bisaTulis) {
-        kosongkanFormSnapshot();
-        sembunyikanFormMaster();
-      }
+      sembunyikanPanelNama();
       $('penerima-info-grup').innerHTML = '<span class="text-muted">Memuat…</span>';
       $('meta-siplah-info').innerHTML = '';
       $('meta-status-baca').innerHTML = '';
@@ -1043,55 +1250,90 @@
         '" class="text-center text-muted">Memuat…</td></tr>';
       $('penerima-selisih').innerHTML = '';
       bootstrap.Modal.getOrCreateInstance(modalEl).show();
-      muat().then(function() {
-        // Data segar termuat: hitung ulang isian bawaan
-        // formulir tambah penerima dari BKU.
-        if (bisaTulis) kosongkanFormSnapshot();
-      }).catch(gagal);
+      muat().catch(gagal);
     });
 
     if (bisaTulis) {
-      $('btn-tambah-ptk').addEventListener('click', async function() {
-        var ids = idTercentang('pilih-ptk');
-        if (!ids.length) {
-          Swal.fire('Perhatian', 'Centang dulu PTK yang akan ditambahkan.', 'warning');
-          return;
-        }
-        try {
-          var res = await kirim(urlDasar + '/' + barisId + '/penerima/ptk', 'POST', {
-            ptk_ids: ids
-          });
-          berhasil(res);
-          await muat();
-        } catch (e) {
-          gagal(e);
+      // Tombol tambah baris penerima baru di bawah tabel.
+      $('btn-baris-penerima-baru').addEventListener('click', tambahBarisBaru);
+
+      // Delegasi peristiwa pada baris-baris penerima di
+      // tbody: combobox nama (fokus & ketik), hitung
+      // ulang saat angka berubah, dan simpan otomatis
+      // per baris saat isian berubah (change).
+      var tbodyPenerima = $('penerima-tbody');
+
+      tbodyPenerima.addEventListener('focusin', function(e) {
+        if (e.target.classList.contains('inp-nama')) {
+          var trFokus = e.target.closest('tr[data-baris-penerima]');
+          if (trFokus) tampilkanPanelNama(trFokus);
         }
       });
 
-      $('btn-tambah-master-pilihan').addEventListener('click', async function() {
-        var ids = idTercentang('pilih-master');
-        if (!ids.length) {
-          Swal.fire('Perhatian', 'Centang dulu penerima yang akan ditambahkan.', 'warning');
-          return;
+      tbodyPenerima.addEventListener('input', function(e) {
+        var tr = e.target.closest('tr[data-baris-penerima]');
+        if (!tr) return;
+        if (e.target.classList.contains('inp-nama')) {
+          tampilkanPanelNama(tr);
+          // Ketikan yang menyimpang dari nama sumber
+          // terpilih melepaskan tautan PTK / induknya.
+          if ((tr.dataset.ptkId || tr.dataset.penerimaId) &&
+            e.target.value.trim() !== (tr.dataset.namaTertaut || '')) {
+            tr.dataset.ptkId = '';
+            tr.dataset.penerimaId = '';
+            segarkanSubJenis(tr);
+          }
         }
-        try {
-          var res = await kirim(urlDasar + '/' + barisId + '/penerima/master', 'POST', {
-            penerima_ids: ids
-          });
-          berhasil(res);
-          await muat();
-        } catch (e) {
-          gagal(e);
+        if (e.target.matches('.inp-volume, .inp-satuan, .inp-ppn, .inp-pph, .inp-sspd, .inp-admin')) {
+          hitungBaris(tr);
+          segarkanTotalDariDom();
         }
       });
 
-      $('btn-master-baru').addEventListener('click', function() {
-        bukaFormMaster(null);
+      tbodyPenerima.addEventListener('change', function(e) {
+        if (e.target.closest('.saklar-selesai-penerima')) return;
+        var tr = e.target.closest('tr[data-baris-penerima]');
+        if (!tr || !data) return;
+        if (e.target.classList.contains('inp-jenis')) {
+          tr.dataset.jenis = e.target.value;
+          segarkanSubJenis(tr);
+        }
+        simpanBaris(tr);
       });
-      $('btn-batal-master').addEventListener('click', sembunyikanFormMaster);
-      $('btn-simpan-master').addEventListener('click', simpanMaster);
-      $('btn-simpan-snapshot').addEventListener('click', simpanSnapshot);
-      $('btn-batal-edit').addEventListener('click', kosongkanFormSnapshot);
+
+      tbodyPenerima.addEventListener('click', function(e) {
+        var btnPilih = e.target.closest('[data-pilih-sumber]');
+        if (btnPilih) {
+          var trPilih = btnPilih.closest('tr[data-baris-penerima]');
+          if (trPilih) {
+            pilihSumber(trPilih, sumberGabungan[Number(btnPilih.getAttribute('data-pilih-sumber'))]);
+          }
+          return;
+        }
+        var btnHapusBaris = e.target.closest('[data-aksi-hapus-baris]');
+        if (btnHapusBaris) {
+          var trHapus = btnHapusBaris.closest('tr[data-baris-penerima]');
+          if (trHapus) hapusBaris(trHapus);
+        }
+      });
+
+      tbodyPenerima.addEventListener('keydown', function(e) {
+        if (e.target.classList.contains('inp-nama') && e.key === 'Escape') {
+          sembunyikanPanelNama();
+        }
+      });
+
+      // Klik di luar baris pemilik panel menutup panel
+      // pilihan nama yang sedang terbuka.
+      document.addEventListener('click', function(e) {
+        if (panelAktif) {
+          var trPanel = panelAktif.closest('tr[data-baris-penerima]');
+          if (!trPanel || !trPanel.contains(e.target)) {
+            sembunyikanPanelNama();
+          }
+        }
+      });
+
 
       // Saklar status meta grup: tersimpan otomatis begitu
       // diganti (PUT penerima-grup, membawa VA saat ini).
@@ -1160,58 +1402,6 @@
         }
       });
 
-      // Aksi per baris di dalam modal (delegasi klik)
-      modalEl.addEventListener('click', async function(e) {
-        var btnEdit = e.target.closest('[data-aksi-edit]');
-        if (btnEdit) {
-          var target = (data.penerima || []).find(function(p) {
-            return Number(p.id) === Number(btnEdit.getAttribute('data-aksi-edit'));
-          });
-          if (target) isiFormSnapshot(target);
-          return;
-        }
-
-        var btnHapus = e.target.closest('[data-aksi-hapus]');
-        if (btnHapus) {
-          var pid = btnHapus.getAttribute('data-aksi-hapus');
-          if (await konfirmasiHapus('Hapus penerima ini?',
-              'Penerima akan dihapus dari daftar grup transaksi ini.')) {
-            try {
-              var res = await kirim(urlDasar + '/' + barisId + '/penerima/' + pid, 'DELETE');
-              berhasil(res);
-              if (editId && Number(editId) === Number(pid)) kosongkanFormSnapshot();
-              await muat();
-            } catch (err) {
-              gagal(err);
-            }
-          }
-          return;
-        }
-
-        var btnMasterEdit = e.target.closest('[data-master-edit]');
-        if (btnMasterEdit) {
-          var m = (data.sumber_penerima || []).find(function(p) {
-            return Number(p.id) === Number(btnMasterEdit.getAttribute('data-master-edit'));
-          });
-          if (m) bukaFormMaster(m);
-          return;
-        }
-
-        var btnMasterHapus = e.target.closest('[data-master-hapus]');
-        if (btnMasterHapus) {
-          var mid = btnMasterHapus.getAttribute('data-master-hapus');
-          if (await konfirmasiHapus('Hapus dari tabel penerima?',
-              'Data induk penerima dihapus. Penerima yang sudah masuk ke grup transaksi (snapshot) tidak ikut terhapus.')) {
-            try {
-              var res2 = await kirim(urlDasar + '/' + barisId + '/penerima-master/' + mid, 'DELETE');
-              berhasil(res2);
-              await muat();
-            } catch (err2) {
-              gagal(err2);
-            }
-          }
-        }
-      });
     }
   })();
 </script>

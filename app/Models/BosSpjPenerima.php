@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Baris ini adalah SNAPSHOT data penerima saat ditambahkan
  * — dari PTK (ptk_id terisi), dari induk penerima
  * (penerima_id terisi), atau ketikan manual (keduanya
- * kosong). Nilai pembayaran per orang: jumlah = volume ×
+ * kosong). Kolom jenis membedakan penerima: 'orang'
+ * (perorangan) atau 'toko' (toko/usaha, mis. nama toko
+ * pada nota — tanpa data perorangan seperti NIP,
+ * pangkat, dan NIK). Nilai pembayaran per penerima: jumlah = volume ×
  * satuan; potongannya kini nominal RUPIAH tersimpan per
  * komponen (ppn_rp, pph_rp, sspd_rp, admin_rp — isian
  * bawaan dari pajak nota di BKU, dapat diubah manual);
@@ -39,6 +42,7 @@ class BosSpjPenerima extends Model
     'grup_kunci',
     'ptk_id',
     'penerima_id',
+    'jenis',
     'nama',
     'nip',
     'pangkat_gol',
