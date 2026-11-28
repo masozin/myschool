@@ -334,6 +334,29 @@
           ]
         },
         {
+          "url": "/kelola-bos/token",
+          "name": "Token Sinkron",
+          "slug": "kelola-bos.token",
+          "roles": [
+            "Admin",
+            "Operator Sekolah"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Referensi",
+      "icon": "menu-icon icon-base ri ri-book-2-line",
+      "slug": "kelola-bos.referensi",
+      "roles": [
+        "Admin",
+        "Operator Sekolah",
+        "Kepala Sekolah",
+        "Bendahara"
+      ],
+      "fitur": "kelola-bos",
+      "submenu": [
+        {
           "url": "/kelola-bos/referensi/barang",
           "name": "Referensi Barang",
           "slug": "kelola-bos.referensi-barang",
@@ -364,15 +387,6 @@
             "Operator Sekolah",
             "Kepala Sekolah",
             "Bendahara"
-          ]
-        },
-        {
-          "url": "/kelola-bos/token",
-          "name": "Token Sinkron",
-          "slug": "kelola-bos.token",
-          "roles": [
-            "Admin",
-            "Operator Sekolah"
           ]
         }
       ]

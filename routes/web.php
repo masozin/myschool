@@ -877,7 +877,9 @@ Route::controller(KelolaBosController::class)
     // SPJ Penerima (Fase 2) — editor daftar penerima per
     // grup transaksi BKU (modal di halaman BKU, semua
     // JSON). Baca mengikuti akses BKU; tulis hanya Admin
-    // & Operator Sekolah. Semua URL membawa id baris BKU
+    // & Operator Sekolah — kecuali penanda status
+    // selesai (per penerima & per grup) yang juga boleh
+    // diubah Bendahara. Semua URL membawa id baris BKU
     // agar konteks sekolah selalu berasal dari baris itu.
     Route::get('/bku/{id}/penerima', 'penerimaData')->name('bku.penerima.data')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
@@ -890,7 +892,7 @@ Route::controller(KelolaBosController::class)
     Route::put('/bku/{id}/penerima/{penerimaId}', 'penerimaUbah')->name('bku.penerima.ubah')
       ->middleware('role:Admin|Operator Sekolah');
     Route::put('/bku/{id}/penerima/{penerimaId}/selesai', 'penerimaSelesaiUbah')->name('bku.penerima.selesai')
-      ->middleware('role:Admin|Operator Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Bendahara');
     Route::delete('/bku/{id}/penerima/{penerimaId}', 'penerimaHapus')->name('bku.penerima.hapus')
       ->middleware('role:Admin|Operator Sekolah');
     Route::post('/bku/{id}/penerima-master', 'penerimaMasterSimpan')->name('bku.penerima-master.simpan')
@@ -901,8 +903,12 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah');
     // Meta grup SPJ — saklar status (belum/selesai)
     // & nomor VA SIPLah (manual) per grup transaksi.
+    // Bendahara ikut boleh memanggil endpoint ini,
+    // tetapi di controller ia dibatasi hanya mengubah
+    // status (nomor VA, kategori & nama tampilan tidak
+    // diterapkan untuknya).
     Route::put('/bku/{id}/penerima-grup', 'penerimaGrupUbah')->name('bku.penerima.grup')
-      ->middleware('role:Admin|Operator Sekolah');
+      ->middleware('role:Admin|Operator Sekolah|Bendahara');
     // SPJ Grup Manual — gabung beberapa nota / pecah satu
     // nota menjadi grup SPJ bernama alias (lapisan SPJ,
     // data ARKAS tidak diubah). Isi grup dibaca mengikuti

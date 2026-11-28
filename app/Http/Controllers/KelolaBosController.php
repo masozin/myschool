@@ -163,6 +163,19 @@ class KelolaBosController extends Controller
   }
 
   /**
+   * Status SPJ (selesai / belum) boleh diubah Admin,
+   * Operator Sekolah & Bendahara — Bendahara adalah
+   * pengelola dana BOS yang menandai penyelesaian.
+   * Penulisan lain (penerima, kategori, nomor VA,
+   * nama tampilan) tetap hanya Admin & Operator
+   * Sekolah lewat bisaTulisAlias().
+   */
+  private function bisaUbahStatus(): bool
+  {
+    return Auth::user()->hasAnyRole(['Admin', 'Operator Sekolah', 'Bendahara']);
+  }
+
+  /**
    * Simpan / hapus alias. Alias terisi → updateOrCreate;
    * alias kosong → baris dihapus (tampilan kembali ke
    * nama asli dari ARKAS).
@@ -1457,6 +1470,7 @@ class KelolaBosController extends Controller
         'petaAlias' => [],
         'bisaTulisAlias' => false,
         'bisaTulisPenerima' => false,
+        'bisaUbahStatus' => false,
         'jumlahPenerima' => [],
         'namaPenerima' => [],
         'metaGrup' => [],
@@ -1943,6 +1957,7 @@ class KelolaBosController extends Controller
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
       'bisaTulisPenerima' => $this->bisaTulisAlias(),
+      'bisaUbahStatus' => $this->bisaUbahStatus(),
       'jumlahPenerima' => $jumlahPenerima,
       'namaPenerima' => $namaPenerima,
       'metaGrup' => $metaGrup,
@@ -2962,6 +2977,7 @@ class KelolaBosController extends Controller
         'pajak_teralokasi' => $pajakTeralokasi,
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
+      'bisa_status' => $this->bisaUbahStatus(),
       'penerima' => $penerima,
       'sumber_ptk' => $sumberPtk,
       'sumber_penerima' => $sumberPenerima,
@@ -3020,6 +3036,14 @@ class KelolaBosController extends Controller
     if ($request->exists('nama')) {
       $namaGrup = trim((string) ($request->input('nama') ?? ''));
       $atribut['nama'] = $namaGrup === '' ? null : $namaGrup;
+    }
+
+    // Bendahara hanya boleh mengubah status: kunci
+    // lain (nomor_va, kategori, nama) yang mungkin
+    // ikut terkirim tidak diterapkan untuk peran
+    // selain Admin & Operator Sekolah.
+    if (!$this->bisaTulisAlias()) {
+      $atribut = ['status' => $validated['status']];
     }
 
     $meta = BosSpjGrup::updateOrCreate(
@@ -3157,6 +3181,7 @@ class KelolaBosController extends Controller
         'jumlah_selesai' => $statusGrup['jumlah_selesai'],
       ],
       'bisa_tulis' => $this->bisaTulisAlias(),
+      'bisa_status' => $this->bisaUbahStatus(),
       'baris' => $baris,
     ]);
   }

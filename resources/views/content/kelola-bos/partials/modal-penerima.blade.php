@@ -41,12 +41,15 @@
   server dan data tersimpan tidak berubah: selesai
   per penerima tetap lewat endpoint khusus
   .../penerima/{pid}/selesai karena bukan bagian
-  aturan snapshot. Kepala Sekolah & Bendahara boleh
-  membuka (baca), tetapi panel tulis hanya dirender
-  untuk Admin & Operator Sekolah
-  ($bisaTulisPenerima).
+  aturan snapshot. Kepala Sekolah boleh membuka
+  (baca); Bendahara boleh membuka dan mengubah
+  penanda status selesai saja. Panel tulis penuh
+  hanya dirender untuk Admin & Operator Sekolah
+  ($bisaTulisPenerima); izin status terpisah di
+  $bisaUbahStatus.
 --}}
-<div class="modal fade" id="modal-penerima" tabindex="-1" data-bisa-tulis="{{ $bisaTulisPenerima ? '1' : '0' }}">
+<div class="modal fade" id="modal-penerima" tabindex="-1" data-bisa-tulis="{{ $bisaTulisPenerima ? '1' : '0' }}"
+  data-bisa-status="{{ $bisaUbahStatus ? '1' : '0' }}">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
@@ -488,6 +491,10 @@
     var daftarEl = document.getElementById('modal-daftar-penerima');
 
     var bisaTulis = modalEl.getAttribute('data-bisa-tulis') === '1';
+    // Bendahara: hanya saklar status selesai yang
+    // boleh digerakkan (tanpa tulis penuh).
+    var bisaStatus = modalEl.getAttribute('data-bisa-status') === '1';
+    var bolehSaklar = bisaTulis || bisaStatus;
     var urlDasar = @json(url('/kelola-bos/bku'));
     var urlPtkDasar = @json(url('/ptk'));
     var barisId = null;
@@ -715,7 +722,7 @@
       var sls = Number(g.jumlah_selesai || 0);
       $('meta-status-info').textContent = jml > 0 ?
         sls + ' dari ' + jml + ' penerima selesai' :
-        (bisaTulis ? 'Diatur lewat Isi Grup (klik uraian nota).' : 'Belum ada penerima.');
+        (bolehSaklar ? 'Diatur lewat Isi Grup (klik uraian nota).' : 'Belum ada penerima.');
 
       // Kategori grup: tiga saklar tombol (peran tulis)
       // — yang aktif mengikuti kategori efektif; tautan
@@ -954,9 +961,12 @@
     // selesai penerima lewat endpoint khusus (permintaan
     // user: status di tabel tetap saklar, bukan hanya
     // label); baris bawaan yang belum tersimpan
-    // saklarnya nonaktif; peran baca melihat lencana.
+    // saklarnya nonaktif; peran tanpa izin status
+    // (mis. Kepala Sekolah) melihat lencana. Bendahara
+    // termasuk bolehSaklar: saklar aktif, tanpa aksi
+    // ubah/hapus.
     function selStatusHtml(p, isBawaan) {
-      if (!bisaTulis) {
+      if (!bolehSaklar) {
         return p.selesai ?
           '<span class="badge bg-success">Selesai</span>' :
           '<span class="badge bg-secondary">Belum</span>';
@@ -1874,13 +1884,6 @@
         if (btnHapus) hapusInduk(btnHapus.getAttribute('data-induk-hapus'));
       });
 
-      // Saklar status pada baris tampilan: perubahan
-      // langsung disimpan lewat endpoint selesai.
-      $('penerima-tbody').addEventListener('change', function(e) {
-        var saklar = e.target.closest ? e.target.closest('[data-selesai-id]') : null;
-        if (saklar) ubahSelesaiBaris(saklar);
-      });
-
       // Formulir: hitung ulang jumlah & diterima saat
       // angka berubah; jenis mengatur sub-bidang.
       ['form-volume', 'form-satuan', 'form-ppn', 'form-pph', 'form-sspd', 'form-admin']
@@ -1981,6 +1984,18 @@
         }
       });
 
+    }
+
+    // Saklar status pada baris tampilan: perubahan
+    // langsung disimpan lewat endpoint selesai. Penyetel
+    // ini di luar blok tulis penuh karena Bendahara
+    // (bisaStatus) juga boleh menggerakkan saklar,
+    // walau tidak boleh mengubah isi penerima.
+    if (bolehSaklar) {
+      $('penerima-tbody').addEventListener('change', function(e) {
+        var saklar = e.target.closest ? e.target.closest('[data-selesai-id]') : null;
+        if (saklar) ubahSelesaiBaris(saklar);
+      });
     }
 
     // Modal Daftar Penerima bisa dibuka semua peran

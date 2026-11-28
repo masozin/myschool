@@ -538,6 +538,7 @@
     var isiGrupSpjSiplah = false; // grup terakhir SIPLah atau bukan
     var isiGrupNamaBawaan = ''; // nama bawaan grup (alias / uraian baris pertama)
     var isiGrupManualAktif = false; // grup yang sedang dibuka manual atau bukan
+    var isiGrupStatusSaja = false; // Bendahara: keterangan SPJ hanya saklar status
 
     async function bukaIsiGrup(barisId) {
       isiGrupId = barisId;
@@ -602,9 +603,11 @@
         });
         $('isi-grup-tbody').innerHTML = html;
         $('isi-grup-total').textContent = fmtRp(g.total || 0);
-        // Keterangan SPJ (status & VA) hanya untuk peran
-        // yang boleh menulis; peran baca-saja melihat
-        // status dari lencana di tabel BKU. Status grup
+        // Keterangan SPJ (status & VA) untuk peran yang
+        // boleh menulis; Bendahara melihatnya dalam mode
+        // status saja (tanpa VA & nama); peran baca murni
+        // (Kepala Sekolah) melihat status dari lencana di
+        // tabel BKU. Status grup
         // berpenerima diturunkan dari penanda selesai
         // penerima — saklar diganti teks turunan; grup
         // tanpa penerima memakai saklar meta seperti
@@ -612,7 +615,11 @@
         isiGrupSpjStatus = g.status || 'belum';
         isiGrupSpjJumlahPenerima = Number(g.jumlah_penerima || 0);
         isiGrupSpjSiplah = !!g.siplah;
-        var tampilSpj = !!res.bisa_tulis;
+        // Bendahara (bisa_status tanpa bisa_tulis)
+        // melihat bagian yang sama dalam mode status
+        // saja: tanpa isian VA & nama tampilan.
+        isiGrupStatusSaja = !res.bisa_tulis && !!res.bisa_status;
+        var tampilSpj = !!res.bisa_tulis || !!res.bisa_status;
         $('isi-grup-spj').classList.toggle('d-none', !tampilSpj);
         if (tampilSpj) {
           isiGrupSpjBarisId = g.baris_id;
@@ -638,7 +645,7 @@
             bungkusStatusSpj.classList.remove('d-none');
             $('isi-grup-status').checked = (isiGrupSpjStatus === 'selesai');
           }
-          $('isi-grup-va').classList.toggle('d-none', !isiGrupSpjSiplah);
+          $('isi-grup-va').classList.toggle('d-none', !isiGrupSpjSiplah || isiGrupStatusSaja);
           if (isiGrupSpjSiplah) {
             $('isi-grup-va-input').value = g.nomor_va || '';
           }
@@ -646,7 +653,7 @@
           // ARKAS — grup manual sudah punya nama alias
           // grupnya sendiri di bagian bawah modal.
           isiGrupManualAktif = !!g.manual;
-          $('isi-grup-nama-tampil-wrap').classList.toggle('d-none', isiGrupManualAktif);
+          $('isi-grup-nama-tampil-wrap').classList.toggle('d-none', isiGrupManualAktif || isiGrupStatusSaja);
           if (!isiGrupManualAktif) {
             $('isi-grup-nama-tampil').value = g.nama || '';
           }
@@ -734,10 +741,12 @@
             isiGrupSpjStatus :
             ($('isi-grup-status').checked ? 'selesai' : 'belum')
         };
-        if (isiGrupSpjSiplah) {
+        // Mode status saja (Bendahara): hanya status
+        // yang dikirim — VA & nama tidak ikut.
+        if (isiGrupSpjSiplah && !isiGrupStatusSaja) {
           payloadSpj.nomor_va = $('isi-grup-va-input').value.trim() || null;
         }
-        if (!isiGrupManualAktif) {
+        if (!isiGrupManualAktif && !isiGrupStatusSaja) {
           payloadSpj.nama = $('isi-grup-nama-tampil').value.trim() || null;
         }
         var res = await kirimGrup(urlDasarGrup + '/' + isiGrupSpjBarisId + '/penerima-grup', 'PUT', payloadSpj);
