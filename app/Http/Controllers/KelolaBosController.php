@@ -1857,9 +1857,16 @@ class KelolaBosController extends Controller
     // Kode & nama kegiatan per baris untuk kolom
     // Rekening: baris BKU -> periode RAPBS (id_rapbs_
     // periode) -> baris RAPBS (id_rapbs_arkas) -> ref
-    // kode (id_ref_kode + tahun), pola yang sama dengan
-    // realisasi Kertas Kerja. Baris tanpa hubungan
-    // periode (mis. saldo awal) tidak punya kegiatan.
+    // kode (id_ref_kode), pola realisasi Kertas Kerja.
+    // Join ref kode SENGAJA tanpa syarat tahun: varian
+    // ref_kode per id_ref_kode berbagi id_kode &
+    // uraian_kode yang sama, tetapi tahun variannya
+    // tidak mencakup semua tahun anggaran baris RAPBS
+    // (terverifikasi dari data asli 2026-11-28: dengan
+    // syarat tahun, sebagian baris anggaran — honor
+    // 0013, ATK 0024 — kegiatannya tidak ketemu).
+    // Baris tanpa hubungan periode (mis. saldo awal)
+    // tidak punya kegiatan.
     $kegiatanPerBaris = [];
     $idsKegiatan = collect($baris)->pluck('id')->all();
     foreach ($barisTampil as $itemTampil) {
@@ -1872,9 +1879,9 @@ class KelolaBosController extends Controller
     $idsKegiatan = array_values(array_unique($idsKegiatan));
     if ($idsKegiatan) {
       $refKodeKegiatan = BosRefKode::query()
-        ->select('id_ref_kode', 'tahun')
+        ->select('id_ref_kode')
         ->selectRaw('MIN(id_kode) as id_kode, MIN(uraian_kode) as uraian_kode')
-        ->groupBy('id_ref_kode', 'tahun');
+        ->groupBy('id_ref_kode');
       $barisKegiatan = BosKasUmum::query()
         ->from('bos_kas_umum')
         ->join('bos_rapbs_periode', function ($j) {
@@ -1886,8 +1893,7 @@ class KelolaBosController extends Controller
             ->on('bos_rapbs.sekolah_id', '=', 'bos_rapbs_periode.sekolah_id');
         })
         ->leftJoinSub($refKodeKegiatan, 'ref_kode_kegiatan', function ($j) {
-          $j->on('ref_kode_kegiatan.id_ref_kode', '=', 'bos_rapbs.id_ref_kode')
-            ->on('ref_kode_kegiatan.tahun', '=', 'bos_rapbs.id_ref_tahun_anggaran');
+          $j->on('ref_kode_kegiatan.id_ref_kode', '=', 'bos_rapbs.id_ref_kode');
         })
         ->where('bos_kas_umum.sekolah_id', $sekolahId)
         ->whereIn('bos_kas_umum.id', $idsKegiatan)
