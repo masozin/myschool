@@ -258,19 +258,24 @@
       btnPecah.disabled = jmlGrup !== 1;
     }
 
-    document.querySelectorAll('.centang-baris').forEach(function(cb) {
-      cb.addEventListener('change', segarkanBilah);
-    });
-
-    var centangSemua = $('centang-semua-baris');
-    if (centangSemua) {
-      centangSemua.addEventListener('change', function() {
-        document.querySelectorAll('.centang-baris').forEach(function(cb) {
-          cb.checked = centangSemua.checked;
-        });
-        segarkanBilah();
+    function ikatCentangBku() {
+      document.querySelectorAll('.centang-baris').forEach(function(cb) {
+        cb.addEventListener('change', segarkanBilah);
       });
+
+      var centangSemua = $('centang-semua-baris');
+      if (centangSemua && !centangSemua.dataset.terikat) {
+        centangSemua.dataset.terikat = '1';
+        centangSemua.addEventListener('change', function() {
+          document.querySelectorAll('.centang-baris').forEach(function(cb) {
+            cb.checked = centangSemua.checked;
+          });
+          segarkanBilah();
+        });
+      }
     }
+    ikatCentangBku();
+    document.addEventListener('bku:tabel-dimuat', ikatCentangBku);
 
     // ── Gabung nota ───────────────────────────────────
     var btnGabung = $('btn-gabung-nota');

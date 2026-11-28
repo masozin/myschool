@@ -45,6 +45,7 @@
     <div class="alert alert-warning">Pilih sekolah dulu lewat pemilih di atas — data BOS mengikuti sekolah yang
       dipilih.</div>
   @else
+    <div id="bku-ringkasan">
     {{-- Kepala halaman --}}
     <div class="card mb-4">
       <div class="card-body py-4 d-flex align-items-center gap-4 flex-wrap">
@@ -85,102 +86,159 @@
               : ($kartuDana['tahun'] < (int) now()->format('Y') ? 'akhir tahun ' : 'posisi terakhir tahun ') . $kartuDana['tahun']);
       $bulanAng = $kartuAnggaran['bulan'];
       $labelAng = $bulanAng >= 1 ? 's.d. ' . $namaBulanKartu[$bulanAng] . ' ' . $kartuAnggaran['tahun'] : $kartuAnggaran['tahun'];
+      $ketBulanIni = $bulanAng >= 1 && $kartuAnggaran['ada']
+          ? 'Anggaran terjadwal s.d. bulan ini: ' . $rp($kartuAnggaran['terjadwal']) . ' (versi RKAS disetujui terakhir, semua sumber dana).'
+          : ($bulanAng < 1
+              ? 'Belum ada bulan berjalan pada tahun ' . $kartuAnggaran['tahun'] . '.'
+              : 'Belum ada RKAS untuk tahun ' . $kartuAnggaran['tahun'] . '.');
     @endphp
 
     <h6 class="mb-2">Posisi Dana <span class="text-muted fw-normal">&middot; {{ $labelDana }}</span></h6>
     <div class="row g-3 mb-2">
       <div class="col-6 col-md-3">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Total Dana Tersedia</div>
-            <div class="fw-bold {{ $merah($kartuDana['tersedia']) ?: 'text-primary' }}">{{ $rp($kartuDana['tersedia']) }}</div>
+        <div class="card h-100 bg-label-primary">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-primary position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Total Dana Tersedia" data-bs-content="Dana tersedia = tunai + non tunai. Dihitung per anggaran dari saldo awal bulan terakhir (saldo penutup bulan sebelumnya) ditambah transaksi sesudahnya. Tidak ikut saringan jenis, rekening, dan pencarian.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-primary text-white"><i class="icon-base ri ri-wallet-3-line"></i></span></span>
+              <div>
+                <div class="small">Total Dana Tersedia</div>
+                <div class="fw-bold {{ $merah($kartuDana['tersedia']) }}">{{ $rp($kartuDana['tersedia']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Dana Tunai</div>
-            <div class="fw-semibold {{ $merah($kartuDana['tunai']) }}">{{ $rp($kartuDana['tunai']) }}</div>
+        <div class="card h-100 bg-label-success">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-success position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Dana Tunai" data-bs-content="Tunai dihitung dari saldo awal tunai + pergeseran tunai − kas keluar tunai, sampai posisi ini.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-success text-white"><i class="icon-base ri ri-cash-line"></i></span></span>
+              <div>
+                <div class="small">Dana Tunai</div>
+                <div class="fw-semibold {{ $merah($kartuDana['tunai']) }}">{{ $rp($kartuDana['tunai']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Dana Non Tunai (Bank)</div>
-            <div class="fw-semibold {{ $merah($kartuDana['bank']) }}">{{ $rp($kartuDana['bank']) }}</div>
+        <div class="card h-100 bg-label-info">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-info position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Dana Non Tunai (Bank)" data-bs-content="Non tunai dihitung dari saldo awal bank + terima dana + bunga bank − pajak bunga − tarik tunai − kas keluar non tunai, sampai posisi ini.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-info text-white"><i class="icon-base ri ri-bank-line"></i></span></span>
+              <div>
+                <div class="small">Dana Non Tunai (Bank)</div>
+                <div class="fw-semibold {{ $merah($kartuDana['bank']) }}">{{ $rp($kartuDana['bank']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Jumlah Pajak Belanja</div>
-            <div class="fw-semibold {{ $merah($kartuDana['pajak']) }}">{{ $rp($kartuDana['pajak']) }}</div>
+        <div class="card h-100 bg-label-warning">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-warning position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Jumlah Pajak Belanja" data-bs-content="Pajak belanja yang tercatat sejak Januari s.d. posisi ini, dikurangi pajak belanja SIPLah (diselesaikan marketplace). Pajak tidak memengaruhi dana.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-warning text-white"><i class="icon-base ri ri-percent-line"></i></span></span>
+              <div>
+                <div class="small">Jumlah Pajak Belanja</div>
+                <div class="fw-semibold {{ $merah($kartuDana['pajak']) }}">{{ $rp($kartuDana['pajak']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-12">
-        <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Dana tersedia = tunai + non
-          tunai. Dihitung per anggaran dari saldo awal bulan terakhir (saldo penutup bulan sebelumnya) ditambah
-          transaksi sesudahnya: tunai + pergeseran tunai − kas keluar; non tunai + terima dana + bunga bank − pajak
-          bunga − tarik tunai − kas keluar non tunai. Jumlah pajak = pajak belanja yang tercatat sejak Januari s.d.
-          posisi ini, dikurangi pajak belanja SIPLah (diselesaikan marketplace), tidak memengaruhi dana. Tidak ikut saringan jenis, rekening, dan pencarian.</div>
-        @if (!empty($kartuDana['takDikenal']['jml']))
-          <div class="small text-warning mt-1"><i class="icon-base ri ri-error-warning-line me-1"></i>{{ $kartuDana['takDikenal']['jml'] }}
+      @if (!empty($kartuDana['takDikenal']['jml']))
+        <div class="col-12">
+          <div class="small text-warning"><i class="icon-base ri ri-error-warning-line me-1"></i>{{ $kartuDana['takDikenal']['jml'] }}
             transaksi dengan jenis BKU #{{ implode(', #', $kartuDana['takDikenal']['ids']) }} belum dipetakan dan tidak
             ikut dihitung pada kartu dana.</div>
-        @endif
-      </div>
+        </div>
+      @endif
     </div>
 
     <h6 class="mb-2 mt-4">Anggaran <span class="text-muted fw-normal">&middot; {{ $labelAng }}</span></h6>
     <div class="row g-3 mb-4">
       <div class="col-12 col-sm-4">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Bisa Dibelanjakan</div>
-            <div class="fw-semibold">{{ $rp($kartuAnggaran['bisa']) }}</div>
+        <div class="card h-100 bg-label-dark">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-dark position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Bisa Dibelanjakan" data-bs-content="Bisa dibelanjakan = sisa jadwal baris RKAS yang belum terpenuhi realisasinya. Memakai versi RKAS disetujui terakhir, semua sumber dana — sama dengan Kertas Kerja.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-dark text-white"><i class="icon-base ri ri-shopping-basket-line"></i></span></span>
+              <div>
+                <div class="small">Bisa Dibelanjakan</div>
+                <div class="fw-semibold">{{ $rp($kartuAnggaran['bisa']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-12 col-sm-4">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Sudah Dibelanjakan</div>
-            <div class="fw-semibold">{{ $rp($kartuAnggaran['sudah']) }}</div>
+        <div class="card h-100 bg-label-danger">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-danger position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Sudah Dibelanjakan" data-bs-content="Sudah dibelanjakan = realisasi BKU belanja sampai posisi ini.">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-danger text-white"><i class="icon-base ri ri-shopping-cart-line"></i></span></span>
+              <div>
+                <div class="small">Sudah Dibelanjakan</div>
+                <div class="fw-semibold">{{ $rp($kartuAnggaran['sudah']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <div class="col-12 col-sm-4">
-        <div class="card h-100">
-          <div class="card-body py-3">
-            <div class="text-muted small">Anggaran Bulan Ini{{ $bulanAng >= 1 ? ' (' . $namaBulanKartu[$bulanAng] . ')' : '' }}</div>
-            <div class="fw-semibold">{{ $rp($kartuAnggaran['bulanIni']) }}</div>
+        <div class="card h-100 bg-label-secondary">
+          <div class="card-body py-3 position-relative">
+            <button type="button" class="btn btn-icon btn-sm text-secondary position-absolute top-0 end-0 mt-1 me-1"
+              data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
+              title="Anggaran Bulan Ini" data-bs-content="{{ $ketBulanIni }}">
+              <i class="icon-base ri ri-information-line"></i>
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-secondary text-white"><i class="icon-base ri ri-calendar-line"></i></span></span>
+              <div>
+                <div class="small">Anggaran Bulan Ini{{ $bulanAng >= 1 ? ' (' . $namaBulanKartu[$bulanAng] . ')' : '' }}</div>
+                <div class="fw-semibold">{{ $rp($kartuAnggaran['bulanIni']) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-12">
-        @if ($bulanAng < 1)
-          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Belum ada bulan berjalan
-            pada tahun {{ $kartuAnggaran['tahun'] }}.</div>
-        @elseif (!$kartuAnggaran['ada'])
-          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Belum ada RKAS untuk tahun
-            {{ $kartuAnggaran['tahun'] }}.</div>
-        @else
-          <div class="text-muted small"><i class="icon-base ri ri-information-line me-1"></i>Terjadwal s.d. bulan ini
-            {{ $rp($kartuAnggaran['terjadwal']) }}. Bisa dibelanjakan = sisa jadwal baris yang belum terpenuhi; sudah
-            dibelanjakan = realisasi BKU belanja. Memakai versi RKAS disetujui terakhir, semua sumber dana — sama dengan
-            Kertas Kerja.</div>
-        @endif
-      </div>
+    </div>
     </div>
 
     {{-- Saringan --}}
     <div class="card mb-4">
       <div class="card-body py-3">
-        <form method="GET" action="{{ url('/kelola-bos/bku') }}" class="row g-3 align-items-end">
+        <form method="GET" action="{{ url('/kelola-bos/bku') }}" class="row g-3 align-items-end" id="form-saring-bku">
           <div class="col-6 col-md-2">
             <label class="form-label">Tahun</label>
             <select name="tahun" class="form-select">
@@ -236,9 +294,9 @@
               placeholder="Uraian, no bukti, nama toko…">
           </div>
           <div class="col-12 d-flex gap-2">
-            <button type="submit" class="btn btn-primary"><i class="icon-base ri ri-filter-3-line me-1"></i>Saring</button>
-            <a href="{{ url('/kelola-bos/bku') }}" class="btn btn-outline-secondary">Atur Ulang</a>
-            <a href="{{ route('kelola-bos.bku.kwitansi-massal', request()->query()) }}" target="_blank"
+            <a href="{{ url('/kelola-bos/bku') }}" class="btn btn-outline-secondary" id="btn-atur-ulang">Atur Ulang</a>
+            <a href="{{ route('kelola-bos.bku.kwitansi-massal', request()->query()) }}" target="_blank" id="btn-kwitansi-massal"
+              data-url-dasar="{{ route('kelola-bos.bku.kwitansi-massal') }}"
               class="btn btn-outline-primary"><i class="icon-base ri ri-receipt-line me-1"></i>Cetak Kwitansi</a>
           </div>
         </form>
@@ -263,6 +321,7 @@
     @endif
 
     {{-- Tabel --}}
+    <div id="bku-tabel">
     <div class="card">
       <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -591,6 +650,7 @@
         {{ $baris->links('pagination::bootstrap-5') }}
       </div>
     </div>
+    </div>
 
     @if ($bisaTulisAlias)
       @include('content.kelola-bos.partials.modal-alias')
@@ -599,6 +659,148 @@
     @include('content.kelola-bos.partials.modal-penerima')
 
     @include('content.kelola-bos.partials.modal-grup-manual')
+
+  <script>
+    (function() {
+      'use strict';
+
+      var form = document.getElementById('form-saring-bku');
+      var wadahRingkasan = document.getElementById('bku-ringkasan');
+      var wadahTabel = document.getElementById('bku-tabel');
+      if (!form || !wadahRingkasan || !wadahTabel) return;
+
+      function mulaiPopover() {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Popover) return;
+        document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function(el) {
+          if (el.dataset.popoverAktif) return;
+          el.dataset.popoverAktif = '1';
+          new bootstrap.Popover(el);
+        });
+      }
+      mulaiPopover();
+
+      function sekolahIdAktif() {
+        var pemilih = document.querySelector('select[name="sekolah_id"]');
+        return pemilih && pemilih.value ? pemilih.value : null;
+      }
+
+      function urlDariForm() {
+        var data = new FormData(form);
+        var params = new URLSearchParams();
+        data.forEach(function(nilai, kunci) {
+          if (nilai !== null && String(nilai).trim() !== '') params.set(kunci, nilai);
+        });
+        if (!params.has('sekolah_id')) {
+          var sid = sekolahIdAktif();
+          if (sid) params.set('sekolah_id', sid);
+        }
+        var qs = params.toString();
+        return form.action + (qs ? '?' + qs : '');
+      }
+
+      var sedangMuat = false;
+      var antreanUrl = null;
+
+      function muat(url, dorong) {
+        if (dorong === undefined) dorong = true;
+        if (sedangMuat) {
+          antreanUrl = { url: url, dorong: dorong };
+          return;
+        }
+        sedangMuat = true;
+        wadahRingkasan.style.opacity = '0.5';
+        wadahTabel.style.opacity = '0.5';
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function(res) { return res.text(); })
+          .then(function(html) {
+            var dok = new DOMParser().parseFromString(html, 'text/html');
+            var ringkasanBaru = dok.getElementById('bku-ringkasan');
+            var tabelBaru = dok.getElementById('bku-tabel');
+            if (!ringkasanBaru || !tabelBaru) {
+              location.href = url;
+              return;
+            }
+            wadahRingkasan.innerHTML = ringkasanBaru.innerHTML;
+            wadahTabel.innerHTML = tabelBaru.innerHTML;
+            var btnMassal = document.getElementById('btn-kwitansi-massal');
+            if (btnMassal) {
+              var dasar = btnMassal.getAttribute('data-url-dasar');
+              var cari = new URL(url, location.href).search;
+              if (dasar) btnMassal.href = dasar + cari;
+            }
+            if (dorong) history.pushState(null, '', url);
+            mulaiPopover();
+            document.dispatchEvent(new CustomEvent('bku:tabel-dimuat'));
+          })
+          .catch(function() {
+            location.href = url;
+          })
+          .finally(function() {
+            wadahRingkasan.style.opacity = '';
+            wadahTabel.style.opacity = '';
+            sedangMuat = false;
+            if (antreanUrl) {
+              var berikut = antreanUrl;
+              antreanUrl = null;
+              muat(berikut.url, berikut.dorong);
+            }
+          });
+      }
+
+      form.querySelectorAll('select').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+          muat(urlDariForm());
+        });
+      });
+
+      var inputCari = form.querySelector('input[name="cari"]');
+      var jedaCari = null;
+      if (inputCari) {
+        inputCari.addEventListener('input', function() {
+          clearTimeout(jedaCari);
+          jedaCari = setTimeout(function() {
+            muat(urlDariForm());
+          }, 400);
+        });
+      }
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        muat(urlDariForm());
+      });
+
+      wadahTabel.addEventListener('click', function(e) {
+        var tautan = e.target.closest ? e.target.closest('.pagination a') : null;
+        if (!tautan) return;
+        e.preventDefault();
+        var halaman = new URL(tautan.href, location.href).searchParams.get('page');
+        var u = new URL(urlDariForm(), location.href);
+        var kini = new URLSearchParams(location.search);
+        ['urut', 'dir'].forEach(function(k) {
+          if (kini.get(k)) u.searchParams.set(k, kini.get(k));
+        });
+        if (halaman) u.searchParams.set('page', halaman);
+        muat(u.toString());
+      });
+
+      var btnAturUlang = document.getElementById('btn-atur-ulang');
+      if (btnAturUlang) {
+        btnAturUlang.addEventListener('click', function(e) {
+          e.preventDefault();
+          form.querySelectorAll('select').forEach(function(sel) {
+            sel.selectedIndex = 0;
+          });
+          if (inputCari) inputCari.value = '';
+          var sid = sekolahIdAktif();
+          muat(form.action + (sid ? '?sekolah_id=' + encodeURIComponent(sid) : ''));
+        });
+      }
+
+      window.addEventListener('popstate', function() {
+        location.reload();
+      });
+    })();
+  </script>
   @endif
 
 @endsection
