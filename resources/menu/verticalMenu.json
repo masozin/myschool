@@ -332,15 +332,6 @@
             "Kepala Sekolah",
             "Bendahara"
           ]
-        },
-        {
-          "url": "/kelola-bos/token",
-          "name": "Token Sinkron",
-          "slug": "kelola-bos.token",
-          "roles": [
-            "Admin",
-            "Operator Sekolah"
-          ]
         }
       ]
     },
@@ -390,6 +381,17 @@
           ]
         }
       ]
+    },
+    {
+      "url": "/kelola-bos/token",
+      "icon": "menu-icon icon-base ri ri-key-2-line",
+      "name": "Token Sinkron",
+      "slug": "kelola-bos.token",
+      "roles": [
+        "Admin",
+        "Operator Sekolah"
+      ],
+      "fitur": "kelola-bos"
     },
     {
       "menuHeader": "Web Sekolah"

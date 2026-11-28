@@ -208,10 +208,10 @@
                 <input type="text" class="form-control" id="form-nama"
                   placeholder="Ketik nama atau pilih dari daftar (PTK, tabel penerima, toko)" autocomplete="off">
                 <button type="button" class="btn btn-outline-success d-none" id="form-tambah-induk"
-                  title="Tambah penerima ini ke database (tabel penerima)"><i class="ri ri-user-add-line"></i></button>
+                  title="Tambah penerima baru ke daftar penerima"><i class="ri ri-user-add-line"></i></button>
               </div>
               <div class="list-group shadow d-none" id="form-daftar-nama"
-                style="position: fixed; z-index: 1095; max-height: 230px; overflow-y: auto;"></div>
+                style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px; z-index: 1056; max-height: 230px; overflow-y: auto;"></div>
             </div>
             <div class="small text-danger d-none" id="form-nama-galat">Nama penerima wajib diisi.</div>
           </div>
@@ -394,20 +394,6 @@
                 <tbody id="daftar-toko-tbody"></tbody>
               </table>
             </div>
-            <h6 class="mt-4 mb-1">Toko dari Nota ARKAS</h6>
-            <p class="small text-muted">Nama toko yang terbawa dari nota hasil sinkronisasi ARKAS —
-              hanya tampil, dan tetap bisa dipilih pada formulir penerimaan.</p>
-            <div class="table-responsive">
-              <table class="table table-sm align-middle">
-                <thead>
-                  <tr>
-                    <th>Nama Toko</th>
-                    <th>NPWP</th>
-                  </tr>
-                </thead>
-                <tbody id="daftar-toko-arkas-tbody"></tbody>
-              </table>
-            </div>
           </div>
         </div>
         @if ($bisaTulisPenerima)
@@ -512,6 +498,12 @@
     // POST seperti tambah baru).
     var formEditId = null;
     var formBawaan = false;
+
+    // Penanda modal Daftar Penerima dibuka dari ikon
+    // tambah di formulir penerimaan: setelah induk
+    // baru tersimpan di sana, formulir langsung
+    // tertaut ke induk tersebut.
+    var indukDariForm = false;
     // Keadaan formulir induk pada modal Daftar
     // Penerima: id induk yang sedang diubah (null =
     // tambah baru) dan jenis tab aktifnya.
@@ -1184,15 +1176,24 @@
       });
     }
 
-    // Ikon tambah ke database (tabel penerima) di
-    // samping nama: hanya tampil untuk penerima orang
-    // yang belum tertaut ke PTK / induk mana pun.
+    // Ikon tambah di samping nama: tampil selama nama
+    // belum tertaut ke PTK / induk mana pun. Kliknya
+    // membuka modal tambah induk (orang / toko
+    // mengikuti jenis formulir), bukan menyimpan
+    // langsung.
     function segarkanTombolInduk() {
       var btn = $('form-tambah-induk');
       if (!btn) return;
-      var tampil = jenisFormAktif() === 'orang' &&
-        !formTautan.ptkId && !formTautan.penerimaId;
+      var tampil = !formTautan.ptkId && !formTautan.penerimaId;
       btn.classList.toggle('d-none', !tampil);
+      if (tampil) {
+        var toko = jenisFormAktif() === 'toko';
+        btn.innerHTML = '<i class="ri ' +
+          (toko ? 'ri-store-2-line' : 'ri-user-add-line') + '"></i>';
+        btn.title = toko ?
+          'Tambah toko baru ke daftar penerima' :
+          'Tambah penerima baru (non-PTK) ke daftar penerima';
+      }
     }
 
     function segarkanSubJenisForm() {
@@ -1397,66 +1398,32 @@
       }
     }
 
-    // Ikon tambah ke database di samping nama:
-    // identitas yang sedang diisi formulir disimpan
-    // sebagai induk penerima baru (tabel penerima),
-    // lalu formulir tertaut kepadanya — lencana
-    // berubah menjadi Induk dan baris yang disimpan
-    // ikut menunjuk induk tersebut.
-    async function tambahKeInduk() {
-      var nama = $('form-nama').value.trim();
-      if (!nama) {
-        $('form-nama').classList.add('is-invalid');
-        $('form-nama-galat').classList.remove('d-none');
-        $('form-nama').focus();
-        return;
+    // Ikon tambah di samping nama: membuka modal
+    // Daftar Penerima dengan formulir induk baru
+    // terbuka — jenis mengikuti formulir (orang =
+    // penerima non-PTK, toko = toko) dan isian yang
+    // sudah diketik ikut terbawa. Setelah induk baru
+    // tersimpan di sana, formulir penerimaan langsung
+    // tertaut kepadanya (lihat simpanFormInduk).
+    function bukaTambahIndukDariForm() {
+      if (!daftarEl) return;
+      var jenis = jenisFormAktif();
+      indukDariForm = true;
+      gambarDaftarPenerima();
+      new bootstrap.Modal(daftarEl).show();
+      var tombolTab = daftarEl.querySelector('[data-bs-target="' +
+        (jenis === 'toko' ? '#tab-daftar-toko' : '#tab-daftar-orang') + '"]');
+      if (tombolTab) bootstrap.Tab.getOrCreateInstance(tombolTab).show();
+      bukaFormInduk(jenis, null);
+      $('induk-nama').value = $('form-nama').value.trim();
+      if (jenis === 'orang') {
+        $('induk-nik').value = $('form-nik').value.trim();
+        $('induk-nip').value = $('form-nip').value.trim();
+        $('induk-pangkat').value = $('form-pangkat').value.trim();
       }
-      var btn = $('form-tambah-induk');
-      btn.disabled = true;
-      try {
-        function teks(id) {
-          var el = $(id);
-          return el && el.value.trim() ? el.value.trim() : null;
-        }
-        var res = await kirim(urlDasar + '/' + barisId + '/penerima-master', 'POST', {
-          nama: nama,
-          nip: teks('form-nip'),
-          pangkat_gol: teks('form-pangkat'),
-          nik: teks('form-nik'),
-          no_rekening: teks('form-rekening'),
-          nama_bank: teks('form-bank')
-        });
-        var m = res.data || {};
-        (data.sumber_penerima = data.sumber_penerima || []).push({
-          id: m.id,
-          nama: m.nama,
-          jenis: 'orang',
-          nik: m.nik || null,
-          nip: m.nip || null,
-          pangkat_gol: m.pangkat_gol || null,
-          pemilik: null,
-          npwp: null,
-          no_hp: null,
-          alamat: m.alamat || null,
-          no_rekening: m.no_rekening || null,
-          nama_bank: m.nama_bank || null
-        });
-        bangunSumberGabungan();
-        formTautan.penerimaId = m.id ? String(m.id) : '';
-        formTautan.namaTertaut = m.nama || nama;
-        segarkanSubJenisForm();
-        Swal.fire({
-          icon: 'success',
-          title: 'Tersimpan ke tabel penerima',
-          text: res.message || '',
-          timer: 1600,
-          showConfirmButton: false
-        });
-      } catch (e) {
-        gagal(e);
-      } finally {
-        btn.disabled = false;
-      }
+      $('induk-rekening').value = $('form-rekening').value.trim();
+      $('induk-bank').value = $('form-bank').value.trim();
+      $('induk-nama').focus();
     }
 
     // ── Modal Daftar Penerima ──
@@ -1519,12 +1486,6 @@
           subInfo([p.no_rekening, p.nama_bank]) + '</td>' + selAksiInduk(p) + '</tr>';
       }).join('') : barisKosongDaftar(6 + kolomAksi,
         'Belum ada toko induk. Tambahkan lewat tombol Tambah Toko.');
-
-      var tokoArkas = data.sumber_toko || [];
-      $('daftar-toko-arkas-tbody').innerHTML = tokoArkas.length ? tokoArkas.map(function(t) {
-        return '<tr><td>' + lolosHtml(t.nama) + '</td><td>' +
-          lolosHtml(t.npwp || '-') + '</td></tr>';
-      }).join('') : barisKosongDaftar(2, 'Tidak ada nama toko dari nota ARKAS.');
     }
 
     function bukaFormInduk(jenis, master) {
@@ -1596,6 +1557,7 @@
         var m = res.data || Object.assign({}, payload, {
           id: indukEditId
         });
+        var dariForm = indukDariForm && !indukEditId;
         if (indukEditId) {
           data.sumber_penerima = (data.sumber_penerima || []).map(function(p) {
             return String(p.id) === String(indukEditId) ? m : p;
@@ -1606,6 +1568,26 @@
         bangunSumberGabungan();
         tutupFormInduk();
         gambarDaftarPenerima();
+        if (dariForm) {
+          // Dibuka dari ikon tambah formulir
+          // penerimaan: terapkan induk baru ke
+          // formulir itu dan tutup modal daftar,
+          // kembali ke formulir.
+          indukDariForm = false;
+          $('form-nama').value = m.nama || '';
+          $('form-nip').value = m.nip || '';
+          $('form-pangkat').value = m.pangkat_gol || '';
+          $('form-nik').value = m.nik || '';
+          $('form-rekening').value = m.no_rekening || '';
+          $('form-bank').value = m.nama_bank || '';
+          formTautan.ptkId = '';
+          formTautan.penerimaId = m.id ? String(m.id) : '';
+          formTautan.namaTertaut = m.nama || '';
+          pasangJenisForm(m.jenis || indukJenis);
+          segarkanSubJenisForm();
+          var modalDaftar = bootstrap.Modal.getInstance(daftarEl);
+          if (modalDaftar) modalDaftar.hide();
+        }
         Swal.fire({
           icon: 'success',
           title: 'Tersimpan',
@@ -1651,8 +1633,10 @@
     // Tampilkan panel pilihan nama untuk formulir:
     // sumber gabungan (PTK, tabel penerima, toko)
     // disaring menurut ketikan, dikelompokkan per
-    // sumber, maksimal 40 pilihan. Panel diposisikan
-    // fixed mengikuti kotak nama.
+    // sumber, maksimal 40 pilihan. Panel melekat
+    // (absolute) tepat di bawah kotak nama selebar
+    // kotaknya, jadi selalu pas dan ikut bergulir
+    // bersama isi modal.
     function tampilkanPanelNamaForm() {
       var inp = $('form-nama');
       var panel = $('form-daftar-nama');
@@ -1686,10 +1670,6 @@
         });
         panel.innerHTML = html;
       }
-      var rect = inp.getBoundingClientRect();
-      panel.style.left = rect.left + 'px';
-      panel.style.top = (rect.bottom + 2) + 'px';
-      panel.style.width = Math.max(rect.width, 260) + 'px';
       if (panelAktif && panelAktif !== panel) panelAktif.classList.add('d-none');
       panel.classList.remove('d-none');
       panelAktif = panel;
@@ -1905,8 +1885,9 @@
         segarkanSubJenisForm();
       });
 
-      // Ikon tambah ke database di samping nama.
-      $('form-tambah-induk').addEventListener('click', tambahKeInduk);
+      // Ikon tambah di samping nama: membuka modal
+      // tambah induk di Daftar Penerima.
+      $('form-tambah-induk').addEventListener('click', bukaTambahIndukDariForm);
 
       // Combobox nama di formulir: tampilkan panel
       // saat fokus / mengetik; ketikan yang menyimpang
@@ -2004,7 +1985,9 @@
     // bawahnya harus tetap bisa digulir.
     if (daftarEl) {
       daftarEl.addEventListener('hidden.bs.modal', function() {
-        if (modalEl.classList.contains('show')) {
+        indukDariForm = false;
+        if (modalEl.classList.contains('show') ||
+          (formEl && formEl.classList.contains('show'))) {
           document.body.classList.add('modal-open');
         }
       });
