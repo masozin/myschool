@@ -216,6 +216,14 @@
   </div>
 </div>
 
+<style>
+  /* Editor nama alias harus tampil di atas modal isi
+     grup saat dibuka dari daftar anggota grup. */
+  #modal-alias {
+    z-index: 1095;
+  }
+</style>
+
 <script>
   (function() {
     var urlDasarGrup = @json(url('/kelola-bos/bku'));
@@ -568,12 +576,20 @@
           // Nama anggota mengikuti cadangan tampilan yang
           // sama dengan tabel BKU: alias teks bila ada,
           // selain itu uraian asli ARKAS (nama asli tampil
-          // kecil di bawahnya bila berbeda). Mengedit
-          // alias tetap hanya dari Kertas Kerja — di sini
-          // tidak ada pensil alias.
+          // kecil di bawahnya bila berbeda). Peran tulis
+          // mendapat tombol pensil per item untuk mengedit
+          // nama alias item itu (rancangan awal user) —
+          // berbeda dari pensil di tabel BKU yang mengedit
+          // Nama Tampilan Grup.
+          var tombolAlias = res.bisa_tulis ?
+            ' <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 align-baseline" ' +
+            'title="Beri nama alias" data-alias-edit data-nama-asli="' +
+            lolosHtml(r.uraian || '') + '" data-alias="' + lolosHtml(r.alias || '') +
+            '"><i class="icon-base ri ri-pencil-line"></i></button>' :
+            '';
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
             '<td>' + lolosHtml(r.no_bukti || '-') + '</td>' +
-            '<td>' + lolosHtml(r.alias || r.uraian || '-') +
+            '<td>' + lolosHtml(r.alias || r.uraian || '-') + tombolAlias +
             (r.alias && r.alias !== r.uraian ?
               '<div class="small text-muted">Asli: ' + lolosHtml(r.uraian || '') + '</div>' :
               '') +

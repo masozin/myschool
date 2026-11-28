@@ -690,6 +690,10 @@
     </div>
     </div>
 
+    @if ($bisaTulisAlias)
+      @include('content.kelola-bos.partials.modal-alias')
+    @endif
+
     @include('content.kelola-bos.partials.modal-penerima')
 
     @include('content.kelola-bos.partials.modal-grup-manual')

@@ -1595,9 +1595,15 @@ class KelolaBosController extends Controller
         // sini: ia menyaring sekolah dari $this model).
         'bos_kas_nota.is_beli_di_siplah',
       ])
+      // Nama rekening: varian tahun transaksi diutamakan
+      // lewat ORDER BY, BUKAN disaring kaku — sebagian
+      // kode tidak punya varian ref_rekening untuk tahun
+      // transaksinya (pola yang sama dengan celah tahun
+      // ref_kode pada kode kegiatan), dan saringan kaku
+      // membuat title nama rekening kosong saat disorot.
       ->selectRaw("(SELECT nama_rekening FROM bos_ref_rekening r
         WHERE r.kode_rekening = bos_kas_umum.kode_rekening
-          AND r.tahun = {$tahunTransaksi}
+        ORDER BY (r.tahun = {$tahunTransaksi}) DESC
         LIMIT 1) as nama_rekening")
       ->orderBy($urut ?? 'bos_kas_umum.tanggal_transaksi', $urut ? $arah : 'desc')
       ->orderByDesc('bos_kas_umum.id')
@@ -3073,14 +3079,20 @@ class KelolaBosController extends Controller
     // Nama rekening per baris: ref rekening dipilih
     // menurut kode + tahun transaksi baris (satu kode
     // punya nama per tahun di ref ARKAS) — pola yang sama
-    // dengan subquery nama_rekening di bku().
+    // dengan subquery nama_rekening di bku(). Bila kode
+    // tidak punya varian untuk tahun transaksinya, nama
+    // dari tahun lain dipakai sebagai cadangan (nama
+    // satu kode sama antar tahun) agar nama rekening
+    // anggota grup tidak kosong.
     $kodeUnik = collect($grup)->pluck('kode_rekening')->filter()->unique()->values();
     $namaPerKodeTahun = [];
+    $namaPerKode = [];
     if ($kodeUnik->isNotEmpty()) {
       $refRekening = BosRefRekening::whereIn('kode_rekening', $kodeUnik)
         ->get(['kode_rekening', 'nama_rekening', 'tahun']);
       foreach ($refRekening as $r) {
         $namaPerKodeTahun[$r->kode_rekening . '|' . $r->tahun] = $r->nama_rekening;
+        $namaPerKode[$r->kode_rekening] ??= $r->nama_rekening;
       }
     }
 
@@ -3100,7 +3112,9 @@ class KelolaBosController extends Controller
         'alias' => $petaAliasGrup[$r->uraian] ?? null,
         'kode_rekening' => $r->kode_rekening,
         'nama_rekening' => $r->kode_rekening
-          ? ($namaPerKodeTahun[$r->kode_rekening . '|' . $r->tanggal_transaksi?->format('Y')] ?? null)
+          ? ($namaPerKodeTahun[$r->kode_rekening . '|' . $r->tanggal_transaksi?->format('Y')]
+            ?? $namaPerKode[$r->kode_rekening]
+            ?? null)
           : null,
         'nominal' => (float) $r->saldo,
       ];
