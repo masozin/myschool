@@ -23,7 +23,13 @@
   tulis); formulir kehilangan saklar Selesai, jenis
   menjadi grup tombol radio di bagian atas, dan di
   samping nama ada ikon tambah penerima ke database
-  (tabel penerima). Baris bawaan (nama toko + nominal grup)
+  (tabel penerima). Ditambah modal Daftar Penerima
+  (tombol di modal ini): tab PTK hanya tampil, tab
+  Orang dan tab Toko adalah induk yang bisa ditambah
+  / diubah / dihapus — toko kini induk penuh seperti
+  non-PTK (kolom jenis + pemilik / NPWP / no HP di
+  tabel_penerima), dan induk toko masuk kelompok
+  Toko pada combobox formulir. Baris bawaan (nama toko + nominal grup)
   tampil sebagai penanda "Belum tersimpan" bila grup
   belum punya penerima; tombol Edit-nya membuka
   formulir berisi bawaan itu, Hapus hanya membuang
@@ -141,13 +147,15 @@
         </div>
         <div class="small mb-3" id="penerima-selisih"></div>
 
-        @if ($bisaTulisPenerima)
-          <div class="mb-3">
+        <div class="mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-daftar-penerima">
+            <i class="ri ri-book-2-line me-1"></i>Daftar Penerima</button>
+          @if ($bisaTulisPenerima)
             <button type="button" class="btn btn-outline-primary btn-sm" id="btn-baris-penerima-baru">
               <i class="ri ri-add-line me-1"></i>Tambah Penerimaan</button>
             <span class="form-text ms-2">Isian lewat formulir sendiri — klik Tambah atau ikon Edit pada baris.</span>
-          </div>
-        @endif
+          @endif
+        </div>
 
       </div>
       <div class="modal-footer">
@@ -276,11 +284,198 @@
   </div>
 </div>
 
+{{--
+  Modal Daftar Penerima: satu tempat melihat semua
+  sumber penerima. Tiga tab — PTK (hanya tampil,
+  dikelola di menu PTK; peran tulis mendapat tautan
+  ubah), Orang non-PTK (induk orang; tambah / ubah /
+  hapus penuh), dan Toko (induk jenis toko; tambah /
+  ubah / hapus penuh dengan rincian pemilik, NPWP,
+  alamat, no HP) — plus daftar nama toko dari nota
+  ARKAS yang hanya tampil. Perubahan induk
+  menyegarkan sumber combobox formulir penerimaan;
+  snapshot yang sudah tersimpan di grup tidak ikut
+  berubah.
+--}}
+<div class="modal fade" id="modal-daftar-penerima" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ri ri-book-2-line me-2"></i>Daftar Penerima</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-daftar-ptk"
+              type="button" role="tab">PTK</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-daftar-orang"
+              type="button" role="tab">Orang (Non-PTK)</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-daftar-toko"
+              type="button" role="tab">Toko</button>
+          </li>
+        </ul>
+        <div class="tab-content pt-3">
+          <div class="tab-pane fade show active" id="tab-daftar-ptk" role="tabpanel">
+            <p class="small text-muted">Data guru / pegawai dikelola di menu PTK — di sini hanya tampil
+              sebagai sumber penerima.</p>
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>NIP</th>
+                    <th>Pangkat/Gol</th>
+                    <th>NIK</th>
+                    <th>Rekening</th>
+                    @if ($bisaTulisPenerima)
+                      <th class="text-end">Aksi</th>
+                    @endif
+                  </tr>
+                </thead>
+                <tbody id="daftar-ptk-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tab-daftar-orang" role="tabpanel">
+            @if ($bisaTulisPenerima)
+              <div class="d-flex justify-content-end mb-2">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-tambah-induk-orang">
+                  <i class="ri ri-add-line me-1"></i>Tambah Penerima</button>
+              </div>
+            @endif
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>NIK</th>
+                    <th>NIP</th>
+                    <th>Pangkat/Gol</th>
+                    <th>Rekening</th>
+                    @if ($bisaTulisPenerima)
+                      <th class="text-end">Aksi</th>
+                    @endif
+                  </tr>
+                </thead>
+                <tbody id="daftar-orang-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="tab-daftar-toko" role="tabpanel">
+            @if ($bisaTulisPenerima)
+              <div class="d-flex justify-content-end mb-2">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-tambah-induk-toko">
+                  <i class="ri ri-add-line me-1"></i>Tambah Toko</button>
+              </div>
+            @endif
+            <div class="table-responsive">
+              <table class="table table-sm table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Nama Toko</th>
+                    <th>Pemilik</th>
+                    <th>NPWP</th>
+                    <th>Alamat</th>
+                    <th>No HP</th>
+                    <th>Rekening</th>
+                    @if ($bisaTulisPenerima)
+                      <th class="text-end">Aksi</th>
+                    @endif
+                  </tr>
+                </thead>
+                <tbody id="daftar-toko-tbody"></tbody>
+              </table>
+            </div>
+            <h6 class="mt-4 mb-1">Toko dari Nota ARKAS</h6>
+            <p class="small text-muted">Nama toko yang terbawa dari nota hasil sinkronisasi ARKAS —
+              hanya tampil, dan tetap bisa dipilih pada formulir penerimaan.</p>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Nama Toko</th>
+                    <th>NPWP</th>
+                  </tr>
+                </thead>
+                <tbody id="daftar-toko-arkas-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        @if ($bisaTulisPenerima)
+          <div class="card border mt-3 d-none" id="induk-form-wrap">
+            <div class="card-body">
+              <h6 id="induk-form-judul" class="mb-3">Tambah Penerima</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="induk-nama" id="induk-nama-label">Nama</label>
+                  <input type="text" class="form-control" id="induk-nama" autocomplete="off">
+                  <div class="small text-danger d-none" id="induk-nama-galat">Nama wajib diisi.</div>
+                </div>
+                <div class="col-md-6 induk-khusus-toko">
+                  <label class="form-label" for="induk-pemilik">Pemilik</label>
+                  <input type="text" class="form-control" id="induk-pemilik" autocomplete="off">
+                </div>
+                <div class="col-md-4 induk-khusus-orang">
+                  <label class="form-label" for="induk-nik">NIK</label>
+                  <input type="text" class="form-control" id="induk-nik" maxlength="16"
+                    inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="col-md-4 induk-khusus-orang">
+                  <label class="form-label" for="induk-nip">NIP</label>
+                  <input type="text" class="form-control" id="induk-nip" autocomplete="off">
+                </div>
+                <div class="col-md-4 induk-khusus-orang">
+                  <label class="form-label" for="induk-pangkat">Pangkat / Gol</label>
+                  <input type="text" class="form-control" id="induk-pangkat" autocomplete="off">
+                </div>
+                <div class="col-md-4 induk-khusus-toko">
+                  <label class="form-label" for="induk-npwp">NPWP</label>
+                  <input type="text" class="form-control" id="induk-npwp" autocomplete="off">
+                </div>
+                <div class="col-md-4 induk-khusus-toko">
+                  <label class="form-label" for="induk-nohp">No HP</label>
+                  <input type="text" class="form-control" id="induk-nohp" autocomplete="off">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="induk-alamat">Alamat</label>
+                  <input type="text" class="form-control" id="induk-alamat" autocomplete="off">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="induk-rekening">No Rekening</label>
+                  <input type="text" class="form-control" id="induk-rekening" autocomplete="off">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="induk-bank">Nama Bank</label>
+                  <input type="text" class="form-control" id="induk-bank" autocomplete="off">
+                </div>
+              </div>
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="button" class="btn btn-outline-secondary" id="induk-btn-batal">Batal</button>
+                <button type="button" class="btn btn-primary" id="induk-btn-simpan">Simpan</button>
+              </div>
+            </div>
+          </div>
+        @endif
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
-  /* Formulir penerima bertumpuk di atas modal penerima:
-     naikkan lapisannya agar tidak tertutup backdrop
-     modal di bawahnya. */
-  #modal-penerima-form {
+  /* Formulir penerima & daftar penerima bertumpuk di
+     atas modal penerima: naikkan lapisannya agar tidak
+     tertutup backdrop modal di bawahnya. */
+  #modal-penerima-form,
+  #modal-daftar-penerima {
     z-index: 1090;
   }
 </style>
@@ -290,9 +485,11 @@
     var modalEl = document.getElementById('modal-penerima');
     if (!modalEl) return;
     var formEl = document.getElementById('modal-penerima-form');
+    var daftarEl = document.getElementById('modal-daftar-penerima');
 
     var bisaTulis = modalEl.getAttribute('data-bisa-tulis') === '1';
     var urlDasar = @json(url('/kelola-bos/bku'));
+    var urlPtkDasar = @json(url('/ptk'));
     var barisId = null;
     var data = null;
 
@@ -308,6 +505,11 @@
     // POST seperti tambah baru).
     var formEditId = null;
     var formBawaan = false;
+    // Keadaan formulir induk pada modal Daftar
+    // Penerima: id induk yang sedang diubah (null =
+    // tambah baru) dan jenis tab aktifnya.
+    var indukEditId = null;
+    var indukJenis = 'orang';
     var formTautan = {
       ptkId: '',
       penerimaId: '',
@@ -1218,9 +1420,14 @@
         (data.sumber_penerima = data.sumber_penerima || []).push({
           id: m.id,
           nama: m.nama,
+          jenis: 'orang',
           nik: m.nik || null,
           nip: m.nip || null,
           pangkat_gol: m.pangkat_gol || null,
+          pemilik: null,
+          npwp: null,
+          no_hp: null,
+          alamat: m.alamat || null,
           no_rekening: m.no_rekening || null,
           nama_bank: m.nama_bank || null
         });
@@ -1239,6 +1446,187 @@
         gagal(e);
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    // ── Modal Daftar Penerima ──
+    // Tiga tab dari payload yang sama dengan combobox
+    // formulir: PTK (hanya tampil + tautan ubah),
+    // induk orang dan induk toko (tambah / ubah /
+    // hapus lewat endpoint penerima-master). Setiap
+    // perubahan induk membangun ulang sumber combobox
+    // agar formulir penerimaan langsung memakainya.
+
+    function selAksiInduk(p) {
+      if (!bisaTulis) return '';
+      return '<td class="text-end text-nowrap">' +
+        '<button type="button" class="btn btn-sm btn-icon btn-outline-primary me-1" data-induk-edit="' +
+        p.id + '" title="Ubah"><i class="ri ri-pencil-line"></i></button>' +
+        '<button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-induk-hapus="' +
+        p.id + '" title="Hapus"><i class="ri ri-delete-bin-line"></i></button></td>';
+    }
+
+    function barisKosongDaftar(jumlahKolom, pesan) {
+      return '<tr><td colspan="' + jumlahKolom +
+        '" class="text-center text-muted">' + pesan + '</td></tr>';
+    }
+
+    function gambarDaftarPenerima() {
+      var kolomAksi = bisaTulis ? 1 : 0;
+
+      var ptk = data.sumber_ptk || [];
+      $('daftar-ptk-tbody').innerHTML = ptk.length ? ptk.map(function(p) {
+        var aksi = bisaTulis ?
+          '<td class="text-end"><a class="btn btn-sm btn-outline-primary" target="_blank" href="' +
+          urlPtkDasar + '/' + p.id + '/ubah"><i class="ri ri-external-link-line me-1"></i>Ubah di PTK</a></td>' :
+          '';
+        return '<tr><td class="fw-semibold">' + lolosHtml(p.nama) + '</td><td>' +
+          lolosHtml(p.nip || '-') + '</td><td>' + lolosHtml(p.pangkat_golongan || '-') +
+          '</td><td>' + lolosHtml(p.nik || '-') + '</td><td>' +
+          subInfo([p.no_rekening, p.nama_bank]) + '</td>' + aksi + '</tr>';
+      }).join('') : barisKosongDaftar(5 + kolomAksi, 'Tidak ada data PTK.');
+
+      var induk = data.sumber_penerima || [];
+      var orang = induk.filter(function(p) {
+        return (p.jenis || 'orang') !== 'toko';
+      });
+      $('daftar-orang-tbody').innerHTML = orang.length ? orang.map(function(p) {
+        return '<tr><td class="fw-semibold">' + lolosHtml(p.nama) + '</td><td>' +
+          lolosHtml(p.nik || '-') + '</td><td>' + lolosHtml(p.nip || '-') +
+          '</td><td>' + lolosHtml(p.pangkat_gol || '-') + '</td><td>' +
+          subInfo([p.no_rekening, p.nama_bank]) + '</td>' + selAksiInduk(p) + '</tr>';
+      }).join('') : barisKosongDaftar(5 + kolomAksi,
+        'Belum ada penerima non-PTK.');
+
+      var toko = induk.filter(function(p) {
+        return (p.jenis || 'orang') === 'toko';
+      });
+      $('daftar-toko-tbody').innerHTML = toko.length ? toko.map(function(p) {
+        return '<tr><td class="fw-semibold">' + lolosHtml(p.nama) + '</td><td>' +
+          lolosHtml(p.pemilik || '-') + '</td><td>' + lolosHtml(p.npwp || '-') +
+          '</td><td>' + lolosHtml(p.alamat || '-') + '</td><td>' +
+          lolosHtml(p.no_hp || '-') + '</td><td>' +
+          subInfo([p.no_rekening, p.nama_bank]) + '</td>' + selAksiInduk(p) + '</tr>';
+      }).join('') : barisKosongDaftar(6 + kolomAksi,
+        'Belum ada toko induk. Tambahkan lewat tombol Tambah Toko.');
+
+      var tokoArkas = data.sumber_toko || [];
+      $('daftar-toko-arkas-tbody').innerHTML = tokoArkas.length ? tokoArkas.map(function(t) {
+        return '<tr><td>' + lolosHtml(t.nama) + '</td><td>' +
+          lolosHtml(t.npwp || '-') + '</td></tr>';
+      }).join('') : barisKosongDaftar(2, 'Tidak ada nama toko dari nota ARKAS.');
+    }
+
+    function bukaFormInduk(jenis, master) {
+      indukJenis = jenis;
+      indukEditId = master ? master.id : null;
+      $('induk-form-judul').textContent =
+        (master ? 'Ubah ' : 'Tambah ') + (jenis === 'toko' ? 'Toko' : 'Penerima');
+      $('induk-nama-label').textContent = jenis === 'toko' ? 'Nama Toko' : 'Nama';
+      document.querySelectorAll('.induk-khusus-orang').forEach(function(el) {
+        el.classList.toggle('d-none', jenis !== 'orang');
+      });
+      document.querySelectorAll('.induk-khusus-toko').forEach(function(el) {
+        el.classList.toggle('d-none', jenis !== 'toko');
+      });
+      var d = master || {};
+      $('induk-nama').value = d.nama || '';
+      $('induk-nik').value = d.nik || '';
+      $('induk-nip').value = d.nip || '';
+      $('induk-pangkat').value = d.pangkat_gol || '';
+      $('induk-pemilik').value = d.pemilik || '';
+      $('induk-npwp').value = d.npwp || '';
+      $('induk-nohp').value = d.no_hp || '';
+      $('induk-alamat').value = d.alamat || '';
+      $('induk-rekening').value = d.no_rekening || '';
+      $('induk-bank').value = d.nama_bank || '';
+      $('induk-nama').classList.remove('is-invalid');
+      $('induk-nama-galat').classList.add('d-none');
+      $('induk-form-wrap').classList.remove('d-none');
+      $('induk-nama').focus();
+    }
+
+    function tutupFormInduk() {
+      indukEditId = null;
+      $('induk-form-wrap').classList.add('d-none');
+    }
+
+    async function simpanFormInduk() {
+      var nama = $('induk-nama').value.trim();
+      if (!nama) {
+        $('induk-nama').classList.add('is-invalid');
+        $('induk-nama-galat').classList.remove('d-none');
+        $('induk-nama').focus();
+        return;
+      }
+
+      function teks(id) {
+        var el = $(id);
+        return el && el.value.trim() ? el.value.trim() : null;
+      }
+      var payload = {
+        nama: nama,
+        jenis: indukJenis,
+        nik: indukJenis === 'orang' ? teks('induk-nik') : null,
+        nip: indukJenis === 'orang' ? teks('induk-nip') : null,
+        pangkat_gol: indukJenis === 'orang' ? teks('induk-pangkat') : null,
+        pemilik: indukJenis === 'toko' ? teks('induk-pemilik') : null,
+        npwp: indukJenis === 'toko' ? teks('induk-npwp') : null,
+        no_hp: indukJenis === 'toko' ? teks('induk-nohp') : null,
+        alamat: teks('induk-alamat'),
+        no_rekening: teks('induk-rekening'),
+        nama_bank: teks('induk-bank')
+      };
+      var btn = $('induk-btn-simpan');
+      btn.disabled = true;
+      try {
+        var res = indukEditId ?
+          await kirim(urlDasar + '/' + barisId + '/penerima-master/' + indukEditId, 'PUT', payload) :
+          await kirim(urlDasar + '/' + barisId + '/penerima-master', 'POST', payload);
+        var m = res.data || Object.assign({}, payload, {
+          id: indukEditId
+        });
+        if (indukEditId) {
+          data.sumber_penerima = (data.sumber_penerima || []).map(function(p) {
+            return String(p.id) === String(indukEditId) ? m : p;
+          });
+        } else {
+          (data.sumber_penerima = data.sumber_penerima || []).push(m);
+        }
+        bangunSumberGabungan();
+        tutupFormInduk();
+        gambarDaftarPenerima();
+        Swal.fire({
+          icon: 'success',
+          title: 'Tersimpan',
+          text: res.message || '',
+          timer: 1500,
+          showConfirmButton: false
+        });
+      } catch (e) {
+        gagal(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function hapusInduk(id) {
+      var m = (data.sumber_penerima || []).find(function(p) {
+        return String(p.id) === String(id);
+      });
+      if (!await konfirmasiHapus('Hapus dari daftar penerima?',
+          '"' + (m ? m.nama : '') + '" dihapus dari tabel penerima. ' +
+          'Penerima yang sudah tersimpan di grup tidak ikut terhapus.')) return;
+      try {
+        await kirim(urlDasar + '/' + barisId + '/penerima-master/' + id, 'DELETE');
+        data.sumber_penerima = (data.sumber_penerima || []).filter(function(p) {
+          return String(p.id) !== String(id);
+        });
+        if (indukEditId && String(indukEditId) === String(id)) tutupFormInduk();
+        bangunSumberGabungan();
+        gambarDaftarPenerima();
+      } catch (e) {
+        gagal(e);
       }
     }
 
@@ -1311,7 +1699,7 @@
       $('form-rekening').value = s.no_rekening || '';
       $('form-bank').value = s.nama_bank || '';
       formTautan.ptkId = s.sumber === 'PTK' ? String(s.id) : '';
-      formTautan.penerimaId = s.sumber === 'Penerima' ? String(s.id) : '';
+      formTautan.penerimaId = s.penerimaId ? String(s.penerimaId) : '';
       formTautan.namaTertaut = s.nama || '';
       pasangJenisForm(s.jenis);
       segarkanSubJenisForm();
@@ -1339,17 +1727,23 @@
         });
       });
       (data.sumber_penerima || []).forEach(function(p) {
+        var jenisInduk = (p.jenis || 'orang') === 'toko' ? 'toko' : 'orang';
         sumberGabungan.push({
-          sumber: 'Penerima',
-          jenis: 'orang',
+          // Induk toko masuk kelompok Toko pada daftar
+          // pilihan nama; induk orang tetap Penerima.
+          // Keduanya membawa penerimaId agar formulir
+          // tertaut ke induknya saat dipilih.
+          sumber: jenisInduk === 'toko' ? 'Toko' : 'Penerima',
+          jenis: jenisInduk,
           id: p.id,
+          penerimaId: p.id,
           nama: p.nama,
           nip: p.nip || null,
           pangkat_gol: p.pangkat_gol || null,
           nik: p.nik || null,
           no_rekening: p.no_rekening || null,
           nama_bank: p.nama_bank || null,
-          npwp: null
+          npwp: p.npwp || null
         });
       });
       (data.sumber_toko || []).forEach(function(t) {
@@ -1452,6 +1846,32 @@
             hapusPenerima(kunciHapus);
           }
         }
+      });
+
+      // Modal Daftar Penerima: tambah induk orang /
+      // toko, simpan & batal formulir induk, serta
+      // aksi ubah / hapus pada baris-baris induk.
+      $('btn-tambah-induk-orang').addEventListener('click', function() {
+        bukaFormInduk('orang', null);
+      });
+      $('btn-tambah-induk-toko').addEventListener('click', function() {
+        bukaFormInduk('toko', null);
+      });
+      $('induk-btn-batal').addEventListener('click', tutupFormInduk);
+      $('induk-btn-simpan').addEventListener('click', simpanFormInduk);
+      daftarEl.addEventListener('click', function(e) {
+        var btnEdit = e.target.closest ? e.target.closest('[data-induk-edit]') : null;
+        if (btnEdit) {
+          var mEdit = (data.sumber_penerima || []).find(function(p) {
+            return String(p.id) === btnEdit.getAttribute('data-induk-edit');
+          });
+          if (mEdit) {
+            bukaFormInduk((mEdit.jenis || 'orang') === 'toko' ? 'toko' : 'orang', mEdit);
+          }
+          return;
+        }
+        var btnHapus = e.target.closest ? e.target.closest('[data-induk-hapus]') : null;
+        if (btnHapus) hapusInduk(btnHapus.getAttribute('data-induk-hapus'));
       });
 
       // Saklar status pada baris tampilan: perubahan
@@ -1559,6 +1979,23 @@
         if (modalEl.classList.contains('show')) {
           document.body.classList.add('modal-open');
         }
+      });
+
+    }
+
+    // Modal Daftar Penerima bisa dibuka semua peran
+    // (peran baca hanya melihat): bertumpuk di atas
+    // modal penerima, dan saat ditutup modal di
+    // bawahnya harus tetap bisa digulir.
+    if (daftarEl) {
+      daftarEl.addEventListener('hidden.bs.modal', function() {
+        if (modalEl.classList.contains('show')) {
+          document.body.classList.add('modal-open');
+        }
+      });
+      $('btn-daftar-penerima').addEventListener('click', function() {
+        gambarDaftarPenerima();
+        new bootstrap.Modal(daftarEl).show();
       });
     }
   })();

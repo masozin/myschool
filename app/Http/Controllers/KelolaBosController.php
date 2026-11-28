@@ -2690,9 +2690,13 @@ class KelolaBosController extends Controller
   {
     return [
       'nama' => 'required|string|max:255',
+      'jenis' => 'nullable|in:orang,toko',
       'nik' => 'nullable|digits:16',
       'nip' => 'nullable|string|max:18',
       'pangkat_gol' => 'nullable|string|max:100',
+      'pemilik' => 'nullable|string|max:255',
+      'npwp' => 'nullable|string|max:30',
+      'no_hp' => 'nullable|string|max:30',
       'alamat' => 'nullable|string|max:1000',
       'no_rekening' => 'nullable|string|max:30',
       'nama_bank' => 'nullable|string|max:100',
@@ -2739,9 +2743,13 @@ class KelolaBosController extends Controller
       ->map(fn(Penerima $p) => [
         'id' => $p->id,
         'nama' => $p->nama,
+        'jenis' => $p->jenis ?: 'orang',
         'nik' => $p->nik,
         'nip' => $p->nip,
         'pangkat_gol' => $p->pangkat_gol,
+        'pemilik' => $p->pemilik,
+        'npwp' => $p->npwp,
+        'no_hp' => $p->no_hp,
         'alamat' => $p->alamat,
         'no_rekening' => $p->no_rekening,
         'nama_bank' => $p->nama_bank,
@@ -3742,9 +3750,13 @@ class KelolaBosController extends Controller
     $master = Penerima::create([
       'sekolah_id' => $sekolahId,
       'nama' => $validated['nama'],
+      'jenis' => $validated['jenis'] ?? 'orang',
       'nik' => $validated['nik'] ?? null,
       'nip' => $validated['nip'] ?? null,
       'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'pemilik' => $validated['pemilik'] ?? null,
+      'npwp' => $validated['npwp'] ?? null,
+      'no_hp' => $validated['no_hp'] ?? null,
       'alamat' => $validated['alamat'] ?? null,
       'no_rekening' => $validated['no_rekening'] ?? null,
       'nama_bank' => $validated['nama_bank'] ?? null,
@@ -3756,9 +3768,13 @@ class KelolaBosController extends Controller
       'data' => [
         'id' => $master->id,
         'nama' => $master->nama,
+        'jenis' => $master->jenis ?: 'orang',
         'nik' => $master->nik,
         'nip' => $master->nip,
         'pangkat_gol' => $master->pangkat_gol,
+        'pemilik' => $master->pemilik,
+        'npwp' => $master->npwp,
+        'no_hp' => $master->no_hp,
         'alamat' => $master->alamat,
         'no_rekening' => $master->no_rekening,
         'nama_bank' => $master->nama_bank,
@@ -3785,9 +3801,13 @@ class KelolaBosController extends Controller
 
     $master->update([
       'nama' => $validated['nama'],
+      'jenis' => $validated['jenis'] ?? ($master->jenis ?: 'orang'),
       'nik' => $validated['nik'] ?? null,
       'nip' => $validated['nip'] ?? null,
       'pangkat_gol' => $validated['pangkat_gol'] ?? null,
+      'pemilik' => $validated['pemilik'] ?? null,
+      'npwp' => $validated['npwp'] ?? null,
+      'no_hp' => $validated['no_hp'] ?? null,
       'alamat' => $validated['alamat'] ?? null,
       'no_rekening' => $validated['no_rekening'] ?? null,
       'nama_bank' => $validated['nama_bank'] ?? null,
@@ -3796,6 +3816,20 @@ class KelolaBosController extends Controller
     return response()->json([
       'success' => true,
       'message' => 'Data penerima di tabel penerima diperbarui.',
+      'data' => [
+        'id' => $master->id,
+        'nama' => $master->nama,
+        'jenis' => $master->jenis ?: 'orang',
+        'nik' => $master->nik,
+        'nip' => $master->nip,
+        'pangkat_gol' => $master->pangkat_gol,
+        'pemilik' => $master->pemilik,
+        'npwp' => $master->npwp,
+        'no_hp' => $master->no_hp,
+        'alamat' => $master->alamat,
+        'no_rekening' => $master->no_rekening,
+        'nama_bank' => $master->nama_bank,
+      ],
     ]);
   }
 
