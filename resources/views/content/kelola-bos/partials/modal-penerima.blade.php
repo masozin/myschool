@@ -1084,7 +1084,7 @@
     // Isian bawaan dari sisa BKU: satuan = sisa total
     // grup, potongan = sisa pajak nota — dihitung dari
     // baris yang sudah TERSIMPAN di DOM.
-    function tambahBarisBaru() {
+    function tambahBarisBaru(awal) {
       if (!data || !data.grup) return;
       var tbody = $('penerima-tbody');
       if (!tbody.querySelector('tr[data-baris-penerima]')) {
@@ -1107,7 +1107,7 @@
       var pajakBku = data.grup.pajak_bku || {};
       var p = {
         id: null,
-        nama: '',
+        nama: (awal && awal.nama) || '',
         nip: null,
         pangkat_gol: null,
         nik: null,
@@ -1119,7 +1119,7 @@
         pph: Math.max(0, Number(pajakBku.pph || 0) - alokasi.pph),
         sspd: Math.max(0, Number(pajakBku.sspd || 0) - alokasi.sspd),
         biaya_admin: 0,
-        jenis: 'orang',
+        jenis: (awal && awal.jenis) || 'orang',
         selesai: false,
         ptk_id: null,
         penerima_id: null
@@ -1232,6 +1232,16 @@
       data = await kirim(urlDasar + '/' + barisId + '/penerima', 'GET');
       bangunSumberGabungan();
       gambarSemua();
+      // Grup yang belum punya penerima tersimpan langsung diberi
+      // satu baris bawaan (belum tersimpan): nama toko dari nota
+      // BKU bila ada + nominal sisa grup, supaya penerima bawaan
+      // dan nominalnya langsung terlihat tanpa input manual.
+      // Baris tersimpan sendiri begitu pengguna mengubah isinya;
+      // menutup modal tanpa mengubah apa pun tidak menyimpan apa-apa.
+      if (bisaTulis && data && data.grup && (!data.penerima || !data.penerima.length)) {
+        var namaToko = (data.grup.nama_toko || '').trim();
+        tambahBarisBaru(namaToko ? { nama: namaToko, jenis: 'toko' } : null);
+      }
     }
 
     // ── Buka modal dari tombol di tabel BKU ──

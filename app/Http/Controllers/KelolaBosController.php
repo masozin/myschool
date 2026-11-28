@@ -1351,17 +1351,24 @@ class KelolaBosController extends Controller
    *  - bulanIni  : jadwal bulan titik potong saja
    *  - terjadwal : jadwal kumulatif Januari s.d. bulan titik potong
    */
-  private function hitungKartuAnggaran(int $sekolahId, ?int $tahun): array
+  private function hitungKartuAnggaran(int $sekolahId, ?int $tahun, ?int $bulanPilih = null): array
   {
     $tahunIni = (int) now()->format('Y');
     $tahunAcuan = $tahun ?? $tahunIni;
-    $bulanPotong = $tahunAcuan === $tahunIni
-      ? (int) now()->format('n')
-      : ($tahunAcuan < $tahunIni ? 12 : 0);
+    // Bulan terpilih di saringan menjadi titik potong (sama
+    // seperti kartu dana); tanpa pilihan, titik potong mengikuti
+    // kalender: bulan berjalan untuk tahun ini, Desember untuk
+    // tahun lampau, kosong untuk tahun depan.
+    $bulanPotong = $bulanPilih !== null
+      ? max(1, min(12, $bulanPilih))
+      : ($tahunAcuan === $tahunIni
+        ? (int) now()->format('n')
+        : ($tahunAcuan < $tahunIni ? 12 : 0));
 
     $hasil = [
       'tahun' => $tahunAcuan,
       'bulan' => $bulanPotong,
+      'bulanDipilih' => $bulanPilih !== null,
       'ada' => false,
       'terjadwal' => 0.0,
       'bisa' => 0.0,
@@ -1553,7 +1560,11 @@ class KelolaBosController extends Controller
       $tahunDana,
       $request->filled('bulan') ? $request->integer('bulan') : null
     );
-    $kartuAnggaran = $this->hitungKartuAnggaran($sekolahId, $tahunEfektif);
+    $kartuAnggaran = $this->hitungKartuAnggaran(
+      $sekolahId,
+      $tahunEfektif,
+      $request->filled('bulan') ? $request->integer('bulan') : null
+    );
 
     $kolomUrut = [
       'tanggal' => 'bos_kas_umum.tanggal_transaksi',

@@ -87,7 +87,7 @@
       $bulanAng = $kartuAnggaran['bulan'];
       $labelAng = $bulanAng >= 1 ? 's.d. ' . $namaBulanKartu[$bulanAng] . ' ' . $kartuAnggaran['tahun'] : $kartuAnggaran['tahun'];
       $ketBulanIni = $bulanAng >= 1 && $kartuAnggaran['ada']
-          ? 'Anggaran terjadwal s.d. bulan ini: ' . $rp($kartuAnggaran['terjadwal']) . ' (versi RKAS disetujui terakhir, semua sumber dana).'
+          ? 'Anggaran terjadwal s.d. ' . $namaBulanKartu[$bulanAng] . ' ' . $kartuAnggaran['tahun'] . ': ' . $rp($kartuAnggaran['terjadwal']) . ' (versi RKAS disetujui terakhir, semua sumber dana).'
           : ($bulanAng < 1
               ? 'Belum ada bulan berjalan pada tahun ' . $kartuAnggaran['tahun'] . '.'
               : 'Belum ada RKAS untuk tahun ' . $kartuAnggaran['tahun'] . '.');
@@ -219,13 +219,13 @@
           <div class="card-body py-3 position-relative">
             <button type="button" class="btn btn-icon btn-sm text-secondary position-absolute top-0 end-0 mt-1 me-1"
               data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="left"
-              title="Anggaran Bulan Ini" data-bs-content="{{ $ketBulanIni }}">
+              title="{{ !empty($kartuAnggaran['bulanDipilih']) && $bulanAng >= 1 ? 'Anggaran Bulan ' . $namaBulanKartu[$bulanAng] : 'Anggaran Bulan Ini' }}" data-bs-content="{{ $ketBulanIni }}">
               <i class="icon-base ri ri-information-line"></i>
             </button>
             <div class="d-flex align-items-center gap-2">
               <span class="avatar avatar-sm flex-shrink-0"><span class="avatar-initial rounded bg-secondary text-white"><i class="icon-base ri ri-calendar-line"></i></span></span>
               <div>
-                <div class="small">Anggaran Bulan Ini{{ $bulanAng >= 1 ? ' (' . $namaBulanKartu[$bulanAng] . ')' : '' }}</div>
+                <div class="small">{{ !empty($kartuAnggaran['bulanDipilih']) && $bulanAng >= 1 ? 'Anggaran Bulan ' . $namaBulanKartu[$bulanAng] : 'Anggaran Bulan Ini' . ($bulanAng >= 1 ? ' (' . $namaBulanKartu[$bulanAng] . ')' : '') }}</div>
                 <div class="fw-semibold">{{ $rp($kartuAnggaran['bulanIni']) }}</div>
               </div>
             </div>
