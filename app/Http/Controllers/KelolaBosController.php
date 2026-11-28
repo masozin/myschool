@@ -2168,6 +2168,18 @@ class KelolaBosController extends Controller
       $namaTampilGrup = $metaNama?->nama ?: null;
     }
 
+    // Alias teks sebagai cadangan nama dokumen —
+    // rantai nama yang sama dengan tampilan BKU
+    // (keputusan user 2026-11-28): nama grup manual /
+    // nama tampilan grup, lalu alias teks uraian baris
+    // pertama, terakhir uraian asli / teks generik.
+    // Peta yang sama dipakai untuk nama rincian per
+    // item (alias ?? uraian asli per teks).
+    $petaAliasKw = $this->petaAlias($sekolahId, collect($grup)->pluck('uraian'));
+    $aliasGrup = (!$grupManual && !$namaTampilGrup)
+      ? ($petaAliasKw[$pertama->uraian] ?? null)
+      : null;
+
     $nota = null;
     if (!empty($pertama->id_kas_nota)) {
       $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
@@ -2200,14 +2212,15 @@ class KelolaBosController extends Controller
       'kode_rekening' => $kodeRekening,
       'uraian' => $grupManual
         ? $grupManual->nama
-        : ($namaTampilGrup ?? (count($grup) === 1
+        : ($namaTampilGrup ?? $aliasGrup ?? (count($grup) === 1
           ? $pertama->uraian
           : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut')),
       'grup_manual' => (bool) $grupManual,
       'nama_alias' => $grupManual?->nama,
       'nama_grup' => $namaTampilGrup,
+      'alias' => $aliasGrup,
       'rincian' => array_map(fn($b) => [
-        'uraian' => $b->uraian,
+        'uraian' => $petaAliasKw[$b->uraian] ?? $b->uraian,
         'kode_rekening' => $b->kode_rekening,
         'volume' => $fmtVolume($b->volume),
         'saldo' => (float) $b->saldo,
@@ -2246,7 +2259,9 @@ class KelolaBosController extends Controller
 
     $uraian = (!empty($dasar['grup_manual']) || !empty($dasar['nama_grup']))
       ? $dasar['uraian']
-      : (count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian);
+      : (count($grup) === 1
+        ? $dasar['uraian']
+        : ($dasar['alias'] ?? $grup[0]->uraian));
 
     $daftar = [];
     foreach ($penerima as $i => $p) {
@@ -2295,9 +2310,10 @@ class KelolaBosController extends Controller
    * Susun data Tanda Terima satu grup non-barang: daftar
    * penerima jenis 'orang' saja (baris toko tidak ikut —
    * Tanda Terima untuk pembayaran ke orang). Judul
-   * kegiatan = alias grup manual bila ada, selain itu
-   * uraian BKU grup. Kolom identitas memakai NIK (data
-   * penerima/PTK menyimpan NIK, bukan NPWP).
+   * kegiatan mengikuti rantai nama dataKwitansi: nama
+   * grup manual / nama tampilan grup, lalu alias teks,
+   * terakhir uraian asli. Kolom identitas memakai NIK
+   * (data penerima/PTK menyimpan NIK, bukan NPWP).
    */
   private function dataTandaTerima(int $sekolahId, string $kunci, array $grup): array
   {
