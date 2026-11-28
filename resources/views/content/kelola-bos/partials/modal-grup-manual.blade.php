@@ -143,6 +143,46 @@
   </div>
 </div>
 
+{{--
+  Modal VA SIPLah cepat: dibuka dengan mengklik
+  lencana SIPLah di tabel BKU (peran tulis) untuk
+  mengisi nomor VA grup tanpa membuka modal isi
+  grup. Status meta grup dibaca segar dari endpoint
+  grup-anggota lalu dikirim apa adanya bersama VA
+  (endpoint meta grup mewajibkan status).
+--}}
+<div class="modal fade" id="modal-va-siplah" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ri ri-bank-card-line me-2"></i>Nomor VA SIPLah</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger py-2 px-3 d-none" id="va-siplah-gagal"></div>
+        <p class="small text-muted" id="va-siplah-info">Memuat…</p>
+        <label class="form-label" for="va-siplah-input">Nomor Virtual Account</label>
+        <input type="text" id="va-siplah-input" class="form-control"
+          placeholder="mis. 8808xxxxxxxxxx" autocomplete="off">
+        <div class="form-text">Nomor VA tidak tercatat di data ARKAS — isian manual ini tersimpan
+          sebagai keterangan SPJ grup. Kosongkan untuk menghapus nomor VA.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="va-siplah-simpan">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Editor nama alias harus tampil di atas modal isi
+     grup saat dibuka dari daftar anggota grup. */
+  #modal-alias {
+    z-index: 1095;
+  }
+</style>
+
 <script>
   (function() {
     var urlDasarGrup = @json(url('/kelola-bos/bku'));
@@ -473,7 +513,7 @@
         var g = res.grup || {};
         isiGrupManualId = g.grup_manual_id || null;
         $('isi-grup-judul').textContent = g.nama_alias ||
-          (res.baris && res.baris[0] ? res.baris[0].uraian : 'Isi Grup');
+          (res.baris && res.baris[0] ? (res.baris[0].alias || res.baris[0].uraian) : 'Isi Grup');
         var lencana = '';
         if (g.manual) {
           lencana = '<span class="badge bg-primary">Grup Manual</span> ' +
@@ -487,9 +527,23 @@
         $('isi-grup-info').innerHTML = lencana + infoTeks;
         var html = '';
         (res.baris || []).forEach(function(r) {
+          // Nama tampil mengikuti alias (sama seperti
+          // tabel BKU); nama asli ARKAS tampil kecil di
+          // bawahnya bila berbeda. Peran tulis mendapat
+          // tombol pensil per item untuk membuka editor
+          // nama alias bersama (data-alias-edit).
+          var tombolAlias = res.bisa_tulis ?
+            ' <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 align-baseline" ' +
+            'title="Beri nama alias" data-alias-edit data-nama-asli="' +
+            lolosHtml(r.uraian || '') + '" data-alias="' + lolosHtml(r.alias || '') +
+            '"><i class="icon-base ri ri-pencil-line"></i></button>' :
+            '';
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
             '<td>' + lolosHtml(r.no_bukti || '-') + '</td>' +
-            '<td>' + lolosHtml(r.uraian || '-') +
+            '<td>' + lolosHtml(r.alias || r.uraian || '-') + tombolAlias +
+            (r.alias && r.alias !== r.uraian ?
+              '<div class="small text-muted">Asli: ' + lolosHtml(r.uraian || '') + '</div>' :
+              '') +
             (r.nama_rekening ?
               '<div class="small text-muted">' + lolosHtml(r.kode_rekening || '') + ' — ' +
               lolosHtml(r.nama_rekening) + '</div>' :
@@ -634,6 +688,57 @@
         kotakGagal.classList.remove('d-none');
       } finally {
         btn.disabled = false;
+      }
+    });
+
+    // VA SIPLah cepat dari lencana SIPLah di tabel:
+    // klik lencana membuka modal VA; keadaan grup
+    // (status meta + VA tersimpan) dibaca segar dari
+    // grup-anggota agar status yang dikirim balik
+    // tidak pernah basi.
+    var vaEditBarisId = null;
+    var vaEditStatus = 'belum';
+
+    document.addEventListener('click', async function(e) {
+      var btnVa = e.target.closest('[data-va-siplah]');
+      if (!btnVa) return;
+      vaEditBarisId = parseInt(btnVa.getAttribute('data-id'), 10);
+      vaEditStatus = 'belum';
+      tampilGalat('va-siplah-gagal', '');
+      $('va-siplah-info').textContent = 'Memuat…';
+      $('va-siplah-input').value = '';
+      bootstrap.Modal.getOrCreateInstance($('modal-va-siplah')).show();
+      try {
+        var resVa = await kirimGrup(urlDasarGrup + '/' + vaEditBarisId + '/grup-anggota', 'GET');
+        var gVa = resVa.grup || {};
+        vaEditBarisId = gVa.baris_id || vaEditBarisId;
+        vaEditStatus = gVa.status || 'belum';
+        $('va-siplah-input').value = gVa.nomor_va || '';
+        $('va-siplah-info').textContent = (gVa.jumlah_baris || 1) + ' baris • total ' +
+          fmtRp(gVa.total || 0);
+      } catch (errVa) {
+        $('va-siplah-info').textContent = '';
+        tampilGalat('va-siplah-gagal', (errVa && errVa.message) || 'Gagal memuat data grup.');
+      }
+    });
+
+    $('va-siplah-simpan').addEventListener('click', async function() {
+      if (!vaEditBarisId) return;
+      var btnSimpanVa = $('va-siplah-simpan');
+      tampilGalat('va-siplah-gagal', '');
+      btnSimpanVa.disabled = true;
+      try {
+        var resSimpanVa = await kirimGrup(
+          urlDasarGrup + '/' + vaEditBarisId + '/penerima-grup', 'PUT', {
+            status: vaEditStatus,
+            nomor_va: $('va-siplah-input').value.trim() || null
+          });
+        segarkanMetaDiBaris(vaEditBarisId, resSimpanVa.status_tampil, resSimpanVa.nomor_va);
+        bootstrap.Modal.getOrCreateInstance($('modal-va-siplah')).hide();
+      } catch (errSimpanVa) {
+        tampilGalat('va-siplah-gagal', (errSimpanVa && errSimpanVa.message) || 'Gagal menyimpan nomor VA.');
+      } finally {
+        btnSimpanVa.disabled = false;
       }
     });
 

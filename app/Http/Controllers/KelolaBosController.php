@@ -2981,6 +2981,12 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Alias tampilan per uraian anggota (teks persis
+    // nama_sumber) agar modal isi grup menampilkan nama
+    // yang sama dengan tabel BKU dan bisa membuka
+    // editor alias per item.
+    $petaAliasGrup = $this->petaAlias($sekolahId, collect($grup)->pluck('uraian'));
+
     $baris = [];
     foreach ($grup as $r) {
       $baris[] = [
@@ -2988,6 +2994,7 @@ class KelolaBosController extends Controller
         'tanggal' => $r->tanggal_transaksi?->format('d-m-Y'),
         'no_bukti' => $r->no_bukti,
         'uraian' => $r->uraian,
+        'alias' => $petaAliasGrup[$r->uraian] ?? null,
         'kode_rekening' => $r->kode_rekening,
         'nama_rekening' => $r->kode_rekening
           ? ($namaPerKodeTahun[$r->kode_rekening . '|' . $r->tanggal_transaksi?->format('Y')] ?? null)

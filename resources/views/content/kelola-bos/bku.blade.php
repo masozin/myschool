@@ -461,7 +461,12 @@
                     </span>
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
                       @if (!empty($b->is_beli_di_siplah))
-                        <span class="badge bg-info">SIPLah</span>
+                        @if ($bisaTulisPenerima)
+                          <button type="button" class="badge bg-info border-0" data-va-siplah
+                            data-id="{{ $b->id }}" title="Klik untuk mengisi nomor VA">SIPLah</button>
+                        @else
+                          <span class="badge bg-info">SIPLah</span>
+                        @endif
                       @endif
                       @if (($metaBaris['kategori'] ?? 'barang') === 'non_barang')
                         <span class="badge bg-warning text-dark lencana-kategori-grup">Non-barang</span>
@@ -481,8 +486,9 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Grup SIPLah tidak memakai editor penerima:
-                           status & nomor VA diatur lewat modal isi
-                           grup (klik uraian); di tabel hanya lencana. --}}
+                           status diatur lewat modal isi grup (klik
+                           uraian), nomor VA lewat klik lencana
+                           SIPLah atau modal isi grup. --}}
                     @else
                       <div class="mt-1">
                         <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
@@ -530,13 +536,14 @@
                 </td>
                 <td>
                   @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
-                  @if (!empty($b->is_beli_di_siplah) && in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
-                    {{-- Baris SIPLah satu baris: uraian bisa diklik
-                         untuk membuka modal isi grup — di sanalah
-                         nomor VA sekarang diisi. --}}
+                  @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
+                    {{-- Semua baris belanja: uraian bisa diklik
+                         untuk membuka modal isi grup (rincian
+                         belanja grup ini, keterangan SPJ, dan
+                         nomor VA untuk grup SIPLah). --}}
                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                       data-grup-anggota data-id="{{ $b->id }}"
-                      title="Lihat rincian & isi nomor VA">{{ $aliasUraian ?? $b->uraian }}</button>
+                      title="Lihat rincian grup ini">{{ $aliasUraian ?? $b->uraian }}</button>
                   @else
                     <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
                   @endif
@@ -582,7 +589,12 @@
                          memperbaruinya tanpa muat ulang. --}}
                     <div class="meta-grup-baris mt-1 d-flex flex-wrap align-items-center gap-1">
                       @if (!empty($b->is_beli_di_siplah))
-                        <span class="badge bg-info">SIPLah</span>
+                        @if ($bisaTulisPenerima)
+                          <button type="button" class="badge bg-info border-0" data-va-siplah
+                            data-id="{{ $b->id }}" title="Klik untuk mengisi nomor VA">SIPLah</button>
+                        @else
+                          <span class="badge bg-info">SIPLah</span>
+                        @endif
                       @endif
                       @if (($metaBaris['kategori'] ?? 'barang') === 'non_barang')
                         <span class="badge bg-warning text-dark lencana-kategori-grup">Non-barang</span>
@@ -602,8 +614,9 @@
                     </div>
                     @if (!empty($b->is_beli_di_siplah))
                       {{-- Baris SIPLah tidak memakai editor penerima:
-                           status & nomor VA diatur lewat modal isi
-                           grup (klik uraian); di tabel hanya lencana. --}}
+                           status diatur lewat modal isi grup (klik
+                           uraian), nomor VA lewat klik lencana
+                           SIPLah atau modal isi grup. --}}
                     @else
                       <div class="mt-1">
                         <button type="button" class="btn btn-sm btn-outline-success py-0 px-2"
