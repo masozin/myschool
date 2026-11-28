@@ -1671,12 +1671,13 @@ class KelolaBosController extends Controller
     if ($kunciHalaman->isNotEmpty()) {
       $statistikPenerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
         ->whereIn('grup_kunci', $kunciHalaman)
-        ->selectRaw('grup_kunci, COUNT(*) AS jumlah, SUM(CASE WHEN selesai THEN 1 ELSE 0 END) AS jumlah_selesai')
+        ->selectRaw('grup_kunci, COUNT(*) AS jumlah, SUM(CASE WHEN selesai THEN 1 ELSE 0 END) AS jumlah_selesai, SUM(CASE WHEN jenis = \'orang\' THEN 1 ELSE 0 END) AS jumlah_orang')
         ->groupBy('grup_kunci')
         ->get()
         ->mapWithKeys(fn($r) => [$r->grup_kunci => [
           'jumlah' => (int) $r->jumlah,
           'jumlah_selesai' => (int) $r->jumlah_selesai,
+          'jumlah_orang' => (int) $r->jumlah_orang,
         ]])
         ->all();
     }
@@ -1722,6 +1723,7 @@ class KelolaBosController extends Controller
           'status_tampil' => $statusTampil,
           'nomor_va' => $meta->nomor_va ?? null,
           'kategori' => $this->kategoriGrup($grupPerKunci[$kunci] ?? [], $meta)['efektif'],
+          'jumlah_penerima_orang' => (int) ($stat['jumlah_orang'] ?? 0),
         ];
       }
     }
@@ -2201,6 +2203,62 @@ class KelolaBosController extends Controller
   }
 
   /**
+   * Susun data Tanda Terima satu grup non-barang: daftar
+   * penerima jenis 'orang' saja (baris toko tidak ikut —
+   * Tanda Terima untuk pembayaran ke orang). Judul
+   * kegiatan = alias grup manual bila ada, selain itu
+   * uraian BKU grup. Kolom identitas memakai NIK (data
+   * penerima/PTK menyimpan NIK, bukan NPWP).
+   */
+  private function dataTandaTerima(int $sekolahId, string $kunci, array $grup): array
+  {
+    $grup = array_values($grup);
+    $dasar = $this->dataKwitansi($sekolahId, $grup, 0);
+
+    $judul = !empty($dasar['grup_manual'])
+      ? $dasar['uraian']
+      : (count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian);
+
+    $penerima = BosSpjPenerima::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->where('jenis', 'orang')
+      ->orderBy('urutan')
+      ->orderBy('id')
+      ->get();
+
+    $fmtVolume = function ($v) {
+      if ($v === null) {
+        return null;
+      }
+      $s = number_format((float) $v, 2, ',', '.');
+      return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
+    };
+
+    $baris = $penerima->map(fn($p) => [
+      'nama' => $p->nama,
+      'pangkat_gol' => $p->pangkat_gol,
+      'nik' => $p->nik,
+      'volume' => $fmtVolume((float) $p->volume),
+      'satuan' => (float) $p->satuan,
+      'jumlah' => $p->jumlah,
+      'pph' => $p->pph,
+      'diterima' => $p->diterima,
+    ])->all();
+
+    return [
+      'kegiatan' => $judul,
+      'no_bukti' => $dasar['no_bukti'],
+      'kode_rekening' => $dasar['kode_rekening'],
+      'tanggal' => collect($grup)->max('tanggal_transaksi'),
+      'baris' => $baris,
+      'total_jumlah' => array_sum(array_column($baris, 'jumlah')),
+      'total_pph' => array_sum(array_column($baris, 'pph')),
+      'total_diterima' => array_sum(array_column($baris, 'diterima')),
+      'ttd' => $dasar['ttd'],
+    ];
+  }
+
+  /**
    * Deteksi kategori non-barang dari kode rekening
    * (struktur kode rekening belanja daerah yang dipakai
    * ARKAS). Non-barang = pembayaran ke ORANG (sasaran
@@ -2315,6 +2373,50 @@ class KelolaBosController extends Controller
       'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
     ])->setPaper('a4', 'portrait')
       ->stream('kwitansi-' . ($daftar[0]['no_bukti'] ?? $id) . '.pdf');
+  }
+
+  /**
+   * Cetak Tanda Terima untuk satu grup BKU — hanya grup
+   * berkategori efektif non-barang yang punya minimal
+   * satu penerima jenis 'orang'; selain itu 404.
+   */
+  public function cetakTandaTerima(Request $request, int $id)
+  {
+    $konteks = $this->konteksUmum($request);
+    $sekolahId = $konteks['sekolahId'];
+    if (!$sekolahId) {
+      abort(404);
+    }
+
+    $baris = BosKasUmum::where('id', $id)
+      ->where('sekolah_id', $sekolahId)
+      ->where('soft_delete', false)
+      ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+      ->first();
+    if (!$baris) {
+      abort(404);
+    }
+
+    $kunci = $this->kunciGrupEfektif($sekolahId, $baris);
+    $grup = $this->barisGrupKwitansi($sekolahId, $baris, $kunci);
+
+    $meta = BosSpjGrup::where('sekolah_id', $sekolahId)
+      ->where('grup_kunci', $kunci)
+      ->first();
+    if ($this->kategoriGrup($grup, $meta)['efektif'] !== 'non_barang') {
+      abort(404);
+    }
+
+    $data = $this->dataTandaTerima($sekolahId, $kunci, $grup);
+    if (empty($data['baris'])) {
+      abort(404);
+    }
+
+    return Pdf::loadView('content.kelola-bos.tanda-terima-pdf', [
+      'tandaTerima' => $data,
+      'sekolah' => $konteks['sekolah'] ?? Sekolah::with('detailTerbaru')->find($sekolahId),
+    ])->setPaper('a4', 'landscape')
+      ->stream('tanda-terima-' . ($data['no_bukti'] ?? $id) . '.pdf');
   }
 
   /** Cetak kwitansi semua transaksi belanja sesuai saringan halaman BKU. */

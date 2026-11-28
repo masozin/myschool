@@ -869,6 +869,11 @@ Route::controller(KelolaBosController::class)
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     Route::get('/bku/kwitansi/{id}', 'cetakKwitansi')->name('bku.kwitansi')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    // SPJ Tanda Terima (Fase 2) — cetak PDF tanda terima
+    // per grup non-barang dari baris belanja BKU;
+    // mengikuti akses baca BKU.
+    Route::get('/bku/tanda-terima/{id}', 'cetakTandaTerima')->name('bku.tanda-terima')
+      ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
     // SPJ Penerima (Fase 2) — editor daftar penerima per
     // grup transaksi BKU (modal di halaman BKU, semua
     // JSON). Baca mengikuti akses BKU; tulis hanya Admin

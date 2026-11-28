@@ -351,6 +351,11 @@
                       <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
                         class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                         title="Cetak kwitansi grup ini"><i class="icon-base ri ri-receipt-line"></i></a>
+                      @if (($metaGrup[$b->id]['kategori'] ?? 'barang') === 'non_barang' && ($metaGrup[$b->id]['jumlah_penerima_orang'] ?? 0) > 0)
+                        <a href="{{ route('kelola-bos.bku.tanda-terima', $b->id) }}" target="_blank"
+                          class="btn btn-sm btn-icon btn-text-success"
+                          title="Cetak Tanda Terima"><i class="icon-base ri ri-hand-coin-line"></i></a>
+                      @endif
                       <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
                         <span class="badge bg-primary">Grup Manual</span>
                         <span class="badge bg-label-secondary">{{ $gm['jenis'] === 'gabungan' ? 'Gabungan' : 'Pecahan' }}</span>
@@ -370,6 +375,11 @@
                       <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
                         class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                         title="Cetak kwitansi (per nota)"><i class="icon-base ri ri-receipt-line"></i></a>
+                      @if (($metaGrup[$b->id]['kategori'] ?? 'barang') === 'non_barang' && ($metaGrup[$b->id]['jumlah_penerima_orang'] ?? 0) > 0)
+                        <a href="{{ route('kelola-bos.bku.tanda-terima', $b->id) }}" target="_blank"
+                          class="btn btn-sm btn-icon btn-text-success"
+                          title="Cetak Tanda Terima"><i class="icon-base ri ri-hand-coin-line"></i></a>
+                      @endif
                       <div class="mt-1">
                         <span class="badge bg-label-secondary">{{ count($grupTampil['anggota']) }} baris</span>
                       </div>
@@ -378,7 +388,7 @@
                   <td>
                     @php
                       $namaGrupBaris = $namaPenerima[$b->id] ?? [];
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang'];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang', 'jumlah_penerima_orang' => 0];
                     @endphp
                     <span class="nama-tampil-baris" data-nama-toko="{{ $b->nama_toko ?? '' }}">
                       @if ($namaGrupBaris)
@@ -481,6 +491,11 @@
                     <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
                       class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                       title="Cetak kwitansi (per nota)"><i class="icon-base ri ri-receipt-line"></i></a>
+                    @if (($metaGrup[$b->id]['kategori'] ?? 'barang') === 'non_barang' && ($metaGrup[$b->id]['jumlah_penerima_orang'] ?? 0) > 0)
+                      <a href="{{ route('kelola-bos.bku.tanda-terima', $b->id) }}" target="_blank"
+                        class="btn btn-sm btn-icon btn-text-success"
+                        title="Cetak Tanda Terima"><i class="icon-base ri ri-hand-coin-line"></i></a>
+                    @endif
                   @endif
                 </td>
                 <td>
@@ -499,7 +514,7 @@
                   </span>
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     @php
-                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang'];
+                      $metaBaris = $metaGrup[$b->id] ?? ['status' => 'belum', 'status_tampil' => 'belum', 'nomor_va' => null, 'kategori' => 'barang', 'jumlah_penerima_orang' => 0];
                     @endphp
                     {{-- Lencana meta grup: SIPLah (dari nota), status
                          tampil (Selesai / Selesai Sebagian / Belum
