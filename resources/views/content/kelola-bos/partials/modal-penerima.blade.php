@@ -17,7 +17,13 @@
   Selesai Sebagian / Belum Selesai) sesuai status di
   tabel BKU; saklar status grup untuk grup tanpa
   penerima tetap ada di modal Isi Grup (klik uraian
-  nota). Baris bawaan (nama toko + nominal grup)
+  nota). Penyempurnaan berikutnya di hari yang sama:
+  modal berganti nama Penerimaan SPJ; kolom Status
+  tabel berupa SAKLAR selesai per penerima (peran
+  tulis); formulir kehilangan saklar Selesai, jenis
+  menjadi grup tombol radio di bagian atas, dan di
+  samping nama ada ikon tambah penerima ke database
+  (tabel penerima). Baris bawaan (nama toko + nominal grup)
   tampil sebagai penanda "Belum tersimpan" bila grup
   belum punya penerima; tombol Edit-nya membuka
   formulir berisi bawaan itu, Hapus hanya membuang
@@ -38,7 +44,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="ri ri-team-line me-2"></i>Penerima SPJ</h5>
+        <h5 class="modal-title"><i class="ri ri-team-line me-2"></i>Penerimaan SPJ</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
       </div>
       <div class="modal-body">
@@ -138,7 +144,7 @@
         @if ($bisaTulisPenerima)
           <div class="mb-3">
             <button type="button" class="btn btn-outline-primary btn-sm" id="btn-baris-penerima-baru">
-              <i class="ri ri-add-line me-1"></i>Tambah Penerima</button>
+              <i class="ri ri-add-line me-1"></i>Tambah Penerimaan</button>
             <span class="form-text ms-2">Isian lewat formulir sendiri — klik Tambah atau ikon Edit pada baris.</span>
           </div>
         @endif
@@ -152,55 +158,51 @@
 </div>
 
 {{--
-  Modal formulir penerima tersendiri: dibuka dari tombol
-  Tambah Penerima atau ikon Edit pada baris tampilan.
-  Formulirnya lega (bukan isian di sel tabel yang
-  sempit): nama combobox, jenis Orang/Toko, isian
-  perorangan, volume & satuan, potongan menurut
-  kategori grup, rekening & bank, saklar Selesai, dan
-  centang simpan ke tabel penerima (baris baru orang
-  yang belum tertaut saja). Disimpan lewat tombol
-  Simpan — endpoint POST / PUT yang sama seperti
-  sebelumnya, tanpa migrasi baru.
+  Modal formulir penerimaan tersendiri: dibuka dari
+  tombol Tambah Penerimaan atau ikon Edit pada baris
+  tampilan. Formulirnya lega (bukan isian di sel tabel
+  yang sempit): jenis berupa grup tombol radio
+  Orang/Toko di bagian atas, nama combobox dengan
+  ikon tambah ke database (tabel penerima) di
+  sampingnya, isian perorangan, volume & satuan,
+  potongan menurut kategori grup, rekening & bank.
+  Penanda selesai TIDAK diatur di sini — saklarnya
+  ada di kolom Status tabel tampilan. Disimpan lewat
+  tombol Simpan — endpoint POST / PUT yang sama
+  seperti sebelumnya, tanpa migrasi baru.
 --}}
 <div class="modal fade" id="modal-penerima-form" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="form-judul">Tambah Penerima</h5>
+        <h5 class="modal-title" id="form-judul">Tambah Penerimaan</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">
           <div class="col-12">
+            <label class="form-label d-block">Jenis Penerima</label>
+            <div class="btn-group" role="group" id="form-jenis-grup" aria-label="Jenis penerima">
+              <button type="button" class="btn btn-outline-primary" data-jenis="orang"><i
+                  class="ri ri-user-line me-1"></i>Orang</button>
+              <button type="button" class="btn btn-outline-primary" data-jenis="toko"><i
+                  class="ri ri-store-2-line me-1"></i>Toko</button>
+            </div>
+            <span id="form-lencana-asal" class="ms-2"></span>
+          </div>
+          <div class="col-12">
             <label class="form-label" for="form-nama">Nama Penerima</label>
             <div class="position-relative">
-              <input type="text" class="form-control" id="form-nama"
-                placeholder="Ketik nama atau pilih dari daftar (PTK, tabel penerima, toko)" autocomplete="off">
+              <div class="input-group">
+                <input type="text" class="form-control" id="form-nama"
+                  placeholder="Ketik nama atau pilih dari daftar (PTK, tabel penerima, toko)" autocomplete="off">
+                <button type="button" class="btn btn-outline-success d-none" id="form-tambah-induk"
+                  title="Tambah penerima ini ke database (tabel penerima)"><i class="ri ri-user-add-line"></i></button>
+              </div>
               <div class="list-group shadow d-none" id="form-daftar-nama"
                 style="position: fixed; z-index: 1095; max-height: 230px; overflow-y: auto;"></div>
             </div>
             <div class="small text-danger d-none" id="form-nama-galat">Nama penerima wajib diisi.</div>
-            <div class="mt-1"><span id="form-lencana-asal"></span></div>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label" for="form-jenis">Jenis</label>
-            <select class="form-select" id="form-jenis">
-              <option value="orang">Orang</option>
-              <option value="toko">Toko</option>
-            </select>
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <div class="form-check form-switch mb-2">
-              <input class="form-check-input" type="checkbox" id="form-selesai">
-              <label class="form-check-label" for="form-selesai">Selesai</label>
-            </div>
-          </div>
-          <div class="col-md-4 d-flex align-items-end" id="form-simpan-induk-wrap">
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="form-simpan-induk">
-              <label class="form-check-label small" for="form-simpan-induk">Simpan ke tabel penerima</label>
-            </div>
           </div>
           <div class="col-12" id="form-sub-orang">
             <div class="row g-3">
@@ -268,7 +270,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn btn-primary" id="form-btn-simpan">Simpan Penerima</button>
+        <button type="button" class="btn btn-primary" id="form-btn-simpan">Simpan Penerimaan</button>
       </div>
     </div>
   </div>
@@ -745,6 +747,25 @@
       return cocok ? (cocok.npwp || null) : null;
     }
 
+    // Sel status satu baris tampilan: peran tulis
+    // mendapat SAKLAR yang langsung menyimpan penanda
+    // selesai penerima lewat endpoint khusus (permintaan
+    // user: status di tabel tetap saklar, bukan hanya
+    // label); baris bawaan yang belum tersimpan
+    // saklarnya nonaktif; peran baca melihat lencana.
+    function selStatusHtml(p, isBawaan) {
+      if (!bisaTulis) {
+        return p.selesai ?
+          '<span class="badge bg-success">Selesai</span>' :
+          '<span class="badge bg-secondary">Belum</span>';
+      }
+      return '<div class="form-check form-switch mb-0">' +
+        '<input class="form-check-input" type="checkbox" role="switch" data-selesai-id="' +
+        (isBawaan ? '' : p.id) + '"' + (p.selesai ? ' checked' : '') +
+        (isBawaan ? ' disabled title="Simpan dulu lewat tombol Ubah untuk mengubah status"' : '') +
+        '></div>';
+    }
+
     // Markup satu baris tampilan penerima. p adalah
     // objek snapshot (atau baris bawaan yang belum
     // tersimpan — tanpa id, berpenanda "Belum
@@ -792,9 +813,7 @@
         '<td class="text-end">' + (Number(p.biaya_admin || 0) > 0 ? fmtRp(p.biaya_admin) : '-') + '</td>' +
         '<td class="text-end fw-semibold">' + fmtRp(diterima) + '</td>' +
         '<td class="small">' + rek + '</td>' +
-        '<td>' + (p.selesai ?
-          '<span class="badge bg-success">Selesai</span>' :
-          '<span class="badge bg-secondary">Belum</span>') + '</td>' +
+        '<td>' + selStatusHtml(p, isBawaan) + '</td>' +
         aksi + '</tr>';
     }
 
@@ -816,7 +835,7 @@
 
       if (!tampil.length) {
         tbody.innerHTML = '<tr><td colspan="' + jumlahKolomTampil() +
-          '" class="text-center text-muted">Belum ada penerima untuk grup ini.</td></tr>';
+          '" class="text-center text-muted">Belum ada penerimaan untuk grup ini.</td></tr>';
       } else {
         tbody.innerHTML = tampil.map(function(p, i) {
           return barisTampilHtml(p, i, adaBawaan && i === tampil.length - 1);
@@ -937,8 +956,35 @@
     // bila namanya cocok persis; centang simpan ke
     // tabel penerima hanya untuk baris baru orang yang
     // belum tertaut.
+    // Jenis penerima dipilih lewat grup tombol radio
+    // di bagian atas formulir (Orang / Toko).
+    function jenisFormAktif() {
+      var grup = $('form-jenis-grup');
+      var aktif = grup ? grup.querySelector('[data-jenis].active') : null;
+      return aktif ? aktif.getAttribute('data-jenis') : 'orang';
+    }
+
+    function pasangJenisForm(jenis) {
+      var grup = $('form-jenis-grup');
+      if (!grup) return;
+      grup.querySelectorAll('[data-jenis]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-jenis') === jenis);
+      });
+    }
+
+    // Ikon tambah ke database (tabel penerima) di
+    // samping nama: hanya tampil untuk penerima orang
+    // yang belum tertaut ke PTK / induk mana pun.
+    function segarkanTombolInduk() {
+      var btn = $('form-tambah-induk');
+      if (!btn) return;
+      var tampil = jenisFormAktif() === 'orang' &&
+        !formTautan.ptkId && !formTautan.penerimaId;
+      btn.classList.toggle('d-none', !tampil);
+    }
+
     function segarkanSubJenisForm() {
-      var jenis = $('form-jenis').value;
+      var jenis = jenisFormAktif();
       var subOrang = $('form-sub-orang');
       var subToko = $('form-sub-toko');
       if (subOrang) subOrang.classList.toggle('d-none', jenis === 'toko');
@@ -951,7 +997,12 @@
         }
       }
       var tertaut = !!(formTautan.ptkId || formTautan.penerimaId);
-      $('form-jenis').disabled = tertaut;
+      var grup = $('form-jenis-grup');
+      if (grup) {
+        grup.querySelectorAll('[data-jenis]').forEach(function(btn) {
+          btn.disabled = tertaut;
+        });
+      }
       var lencana = $('form-lencana-asal');
       if (lencana) {
         if (formTautan.ptkId) {
@@ -962,11 +1013,7 @@
           lencana.innerHTML = '';
         }
       }
-      var bungkusInduk = $('form-simpan-induk-wrap');
-      if (bungkusInduk) {
-        bungkusInduk.classList.toggle('d-none',
-          !!formEditId || tertaut || jenis !== 'orang');
-      }
+      segarkanTombolInduk();
     }
 
     // Buka formulir: p null = tambah baru (isian
@@ -982,11 +1029,11 @@
         penerimaId: d.penerima_id ? String(d.penerima_id) : '',
         namaTertaut: d.nama || ''
       };
-      $('form-judul').textContent = formEditId ? 'Ubah Penerima' : 'Tambah Penerima';
+      $('form-judul').textContent = formEditId ? 'Ubah Penerimaan' : 'Tambah Penerimaan';
       $('form-nama').value = d.nama || '';
       $('form-nama').classList.remove('is-invalid');
       $('form-nama-galat').classList.add('d-none');
-      $('form-jenis').value = d.jenis || 'orang';
+      pasangJenisForm(d.jenis || 'orang');
       $('form-nip').value = d.nip || '';
       $('form-pangkat').value = d.pangkat_gol || '';
       $('form-nik').value = d.nik || '';
@@ -998,9 +1045,6 @@
       $('form-admin').value = Number(d.biaya_admin || 0);
       $('form-rekening').value = d.no_rekening || '';
       $('form-bank').value = d.nama_bank || '';
-      $('form-selesai').checked = !!d.selesai;
-      var centangInduk = $('form-simpan-induk');
-      if (centangInduk) centangInduk.checked = false;
       segarkanSubJenisForm();
       terapkanKolomPajak();
       hitungForm();
@@ -1034,22 +1078,17 @@
         pph_rp: angka('form-pph'),
         sspd_rp: angka('form-sspd'),
         admin_rp: angka('form-admin'),
-        jenis: $('form-jenis').value || 'orang',
+        jenis: jenisFormAktif(),
         ptk_id: formTautan.ptkId ? Number(formTautan.ptkId) : null,
         penerima_id: formTautan.penerimaId ? Number(formTautan.penerimaId) : null
       };
-      var centangInduk = $('form-simpan-induk');
-      if (!formEditId && centangInduk && centangInduk.checked &&
-        payload.jenis === 'orang' && !formTautan.ptkId && !formTautan.penerimaId) {
-        payload.simpan_master = 1;
-      }
       return payload;
     }
 
     // Simpan formulir: baris baru lewat POST, baris
-    // tersimpan lewat PUT. Penanda selesai diatur
-    // lewat endpoint khusus sesudahnya karena bukan
-    // bagian aturan snapshot server.
+    // tersimpan lewat PUT. Penanda selesai tidak lagi
+    // diatur dari formulir — saklarnya ada di tabel
+    // tampilan (endpoint selesai khusus).
     async function simpanForm() {
       var inpNama = $('form-nama');
       if (!inpNama.value.trim()) {
@@ -1071,17 +1110,6 @@
           res = await kirim(urlDasar + '/' + barisId + '/penerima', 'POST', payload);
         }
         var d = res.data;
-        var selesaiForm = $('form-selesai').checked;
-        if (d && !!d.selesai !== selesaiForm) {
-          var resSelesai = await kirim(
-            urlDasar + '/' + barisId + '/penerima/' + d.id + '/selesai', 'PUT', {
-              selesai: selesaiForm
-            });
-          if (resSelesai.data) d = resSelesai.data;
-          data.grup.status_tampil = resSelesai.status_tampil;
-          data.grup.jumlah_penerima = resSelesai.jumlah_penerima;
-          data.grup.jumlah_selesai = resSelesai.jumlah_selesai;
-        }
         if (d) {
           if (formEditId) {
             var idxModel = (data.penerima || []).findIndex(function(p) {
@@ -1117,6 +1145,100 @@
         gambarTabel();
       } catch (e) {
         gagal(e);
+      }
+    }
+
+    // Saklar status di tabel tampilan: ubah penanda
+    // selesai satu penerima lewat endpoint khusus,
+    // lalu segarkan model lokal, label status kepala
+    // modal, dan lencana baris BKU. Gagal -> saklar
+    // dikembalikan ke posisi semula.
+    async function ubahSelesaiBaris(saklar) {
+      var id = saklar.getAttribute('data-selesai-id');
+      if (!id) return;
+      var tujuan = saklar.checked;
+      saklar.disabled = true;
+      try {
+        var res = await kirim(
+          urlDasar + '/' + barisId + '/penerima/' + id + '/selesai', 'PUT', {
+            selesai: tujuan
+          });
+        var target = (data.penerima || []).find(function(p) {
+          return String(p.id) === String(id);
+        });
+        if (target && res.data) target.selesai = !!res.data.selesai;
+        if (res.status_tampil !== undefined) {
+          data.grup.status_tampil = res.status_tampil;
+          data.grup.jumlah_penerima = res.jumlah_penerima;
+          data.grup.jumlah_selesai = res.jumlah_selesai;
+          gambarMeta();
+          segarkanMetaBaris();
+        } else {
+          segarkanStatusTurunan();
+        }
+        gambarTabel();
+      } catch (e) {
+        saklar.checked = !tujuan;
+        gagal(e);
+      } finally {
+        saklar.disabled = false;
+      }
+    }
+
+    // Ikon tambah ke database di samping nama:
+    // identitas yang sedang diisi formulir disimpan
+    // sebagai induk penerima baru (tabel penerima),
+    // lalu formulir tertaut kepadanya — lencana
+    // berubah menjadi Induk dan baris yang disimpan
+    // ikut menunjuk induk tersebut.
+    async function tambahKeInduk() {
+      var nama = $('form-nama').value.trim();
+      if (!nama) {
+        $('form-nama').classList.add('is-invalid');
+        $('form-nama-galat').classList.remove('d-none');
+        $('form-nama').focus();
+        return;
+      }
+      var btn = $('form-tambah-induk');
+      btn.disabled = true;
+      try {
+        function teks(id) {
+          var el = $(id);
+          return el && el.value.trim() ? el.value.trim() : null;
+        }
+        var res = await kirim(urlDasar + '/' + barisId + '/penerima-master', 'POST', {
+          nama: nama,
+          nip: teks('form-nip'),
+          pangkat_gol: teks('form-pangkat'),
+          nik: teks('form-nik'),
+          no_rekening: teks('form-rekening'),
+          nama_bank: teks('form-bank')
+        });
+        var m = res.data || {};
+        (data.sumber_penerima = data.sumber_penerima || []).push({
+          id: m.id,
+          nama: m.nama,
+          nik: m.nik || null,
+          nip: m.nip || null,
+          pangkat_gol: m.pangkat_gol || null,
+          no_rekening: m.no_rekening || null,
+          nama_bank: m.nama_bank || null
+        });
+        bangunSumberGabungan();
+        formTautan.penerimaId = m.id ? String(m.id) : '';
+        formTautan.namaTertaut = m.nama || nama;
+        segarkanSubJenisForm();
+        Swal.fire({
+          icon: 'success',
+          title: 'Tersimpan ke tabel penerima',
+          text: res.message || '',
+          timer: 1600,
+          showConfirmButton: false
+        });
+      } catch (e) {
+        gagal(e);
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -1191,7 +1313,7 @@
       formTautan.ptkId = s.sumber === 'PTK' ? String(s.id) : '';
       formTautan.penerimaId = s.sumber === 'Penerima' ? String(s.id) : '';
       formTautan.namaTertaut = s.nama || '';
-      $('form-jenis').value = s.jenis;
+      pasangJenisForm(s.jenis);
       segarkanSubJenisForm();
       sembunyikanPanelNama();
     }
@@ -1332,20 +1454,36 @@
         }
       });
 
+      // Saklar status pada baris tampilan: perubahan
+      // langsung disimpan lewat endpoint selesai.
+      $('penerima-tbody').addEventListener('change', function(e) {
+        var saklar = e.target.closest ? e.target.closest('[data-selesai-id]') : null;
+        if (saklar) ubahSelesaiBaris(saklar);
+      });
+
       // Formulir: hitung ulang jumlah & diterima saat
       // angka berubah; jenis mengatur sub-bidang.
       ['form-volume', 'form-satuan', 'form-ppn', 'form-pph', 'form-sspd', 'form-admin']
         .forEach(function(id) {
           $(id).addEventListener('input', hitungForm);
         });
-      $('form-jenis').addEventListener('change', function() {
-        if ($('form-jenis').value === 'toko') {
+      // Grup tombol jenis di atas formulir: klik
+      // mengganti jenis; memilih Toko melepaskan
+      // tautan PTK / induk (toko bukan perorangan).
+      $('form-jenis-grup').addEventListener('click', function(e) {
+        var btnJenis = e.target.closest ? e.target.closest('[data-jenis]') : null;
+        if (!btnJenis || btnJenis.disabled) return;
+        pasangJenisForm(btnJenis.getAttribute('data-jenis'));
+        if (btnJenis.getAttribute('data-jenis') === 'toko') {
           formTautan.ptkId = '';
           formTautan.penerimaId = '';
           formTautan.namaTertaut = $('form-nama').value.trim();
         }
         segarkanSubJenisForm();
       });
+
+      // Ikon tambah ke database di samping nama.
+      $('form-tambah-induk').addEventListener('click', tambahKeInduk);
 
       // Combobox nama di formulir: tampilkan panel
       // saat fokus / mengetik; ketikan yang menyimpang
