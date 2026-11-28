@@ -183,13 +183,38 @@
   </div>
 </div>
 
-<style>
-  /* Editor nama alias harus tampil di atas modal isi
-     grup saat dibuka dari daftar anggota grup. */
-  #modal-alias {
-    z-index: 1095;
-  }
-</style>
+{{--
+  Modal nama tampilan grup cepat: dibuka dari pensil
+  di samping uraian pada tabel BKU. Pensil di BKU
+  mengedit NAMA TAMPILAN GRUP (meta SPJ grup ini
+  saja) — berbeda dari pensil di Kertas Kerja yang
+  mengedit alias teks. Status meta dibaca segar dari
+  grup-anggota lalu dikirim apa adanya bersama nama
+  (endpoint meta grup mewajibkan status).
+--}}
+<div class="modal fade" id="modal-nama-grup" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ri ri-edit-line me-2"></i>Nama Tampilan Grup</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger py-2 px-3 d-none" id="nama-grup-gagal"></div>
+        <p class="small text-muted" id="nama-grup-info">Memuat…</p>
+        <label class="form-label" for="nama-grup-input">Nama tampilan grup ini</label>
+        <input type="text" id="nama-grup-input" class="form-control" maxlength="255"
+          placeholder="Kosongkan untuk memakai uraian asli" autocomplete="off">
+        <div class="form-text">Nama khusus grup/nota ini saja — tampil di BKU, kwitansi, dan
+          Tanda Terima menggantikan uraian, tanpa mengubah grup lain yang uraiannya sama.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="nama-grup-simpan">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
   (function() {
@@ -524,7 +549,7 @@
         isiGrupManualId = g.grup_manual_id || null;
         var barisPertamaGrup = res.baris && res.baris[0] ? res.baris[0] : null;
         isiGrupNamaBawaan = barisPertamaGrup ?
-          (barisPertamaGrup.alias || barisPertamaGrup.uraian || '') : '';
+          (barisPertamaGrup.uraian || '') : '';
         $('isi-grup-judul').textContent = g.nama_alias || g.nama ||
           isiGrupNamaBawaan || 'Isi Grup';
         var lencana = '';
@@ -540,23 +565,13 @@
         $('isi-grup-info').innerHTML = lencana + infoTeks;
         var html = '';
         (res.baris || []).forEach(function(r) {
-          // Nama tampil mengikuti alias (sama seperti
-          // tabel BKU); nama asli ARKAS tampil kecil di
-          // bawahnya bila berbeda. Peran tulis mendapat
-          // tombol pensil per item untuk membuka editor
-          // nama alias bersama (data-alias-edit).
-          var tombolAlias = res.bisa_tulis ?
-            ' <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 align-baseline" ' +
-            'title="Beri nama alias" data-alias-edit data-nama-asli="' +
-            lolosHtml(r.uraian || '') + '" data-alias="' + lolosHtml(r.alias || '') +
-            '"><i class="icon-base ri ri-pencil-line"></i></button>' :
-            '';
+          // Anggota grup selalu tampil dengan uraian asli
+          // ARKAS — alias teks hanya berlaku di Kertas
+          // Kerja, sedangkan penamaan di BKU memakai Nama
+          // Tampilan Grup untuk keseluruhan grup.
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
             '<td>' + lolosHtml(r.no_bukti || '-') + '</td>' +
-            '<td>' + lolosHtml(r.alias || r.uraian || '-') + tombolAlias +
-            (r.alias && r.alias !== r.uraian ?
-              '<div class="small text-muted">Asli: ' + lolosHtml(r.uraian || '') + '</div>' :
-              '') +
+            '<td>' + lolosHtml(r.uraian || '-') +
             (r.nama_rekening ?
               '<div class="small text-muted">' + lolosHtml(r.kode_rekening || '') + ' — ' +
               lolosHtml(r.nama_rekening) + '</div>' :
@@ -775,6 +790,67 @@
         tampilGalat('va-siplah-gagal', (errSimpanVa && errSimpanVa.message) || 'Gagal menyimpan nomor VA.');
       } finally {
         btnSimpanVa.disabled = false;
+      }
+    });
+
+    // Nama Tampilan Grup cepat dari pensil di tabel
+    // BKU: pensil di BKU mengedit nama tampilan grup
+    // ini saja (bukan alias teks — alias hanya di
+    // Kertas Kerja). Keadaan grup dibaca segar dari
+    // grup-anggota agar status meta yang wajib
+    // dikirim balik tidak basi.
+    var namaEditBarisId = null;
+    var namaEditStatus = 'belum';
+    var namaEditBawaan = '';
+
+    document.addEventListener('click', async function(e) {
+      var btnNama = e.target.closest('[data-nama-grup]');
+      if (!btnNama) return;
+      namaEditBarisId = parseInt(btnNama.getAttribute('data-id'), 10);
+      namaEditStatus = 'belum';
+      namaEditBawaan = '';
+      tampilGalat('nama-grup-gagal', '');
+      $('nama-grup-info').textContent = 'Memuat…';
+      $('nama-grup-input').value = '';
+      bootstrap.Modal.getOrCreateInstance($('modal-nama-grup')).show();
+      try {
+        var resNama = await kirimGrup(urlDasarGrup + '/' + namaEditBarisId + '/grup-anggota', 'GET');
+        var gNama = resNama.grup || {};
+        namaEditBarisId = gNama.baris_id || namaEditBarisId;
+        namaEditStatus = gNama.status || 'belum';
+        namaEditBawaan = (resNama.baris && resNama.baris[0]) ?
+          (resNama.baris[0].uraian || '') : '';
+        $('nama-grup-input').value = gNama.nama || '';
+        $('nama-grup-info').textContent = 'Uraian asli: ' + (namaEditBawaan || '-') +
+          ' • ' + (gNama.jumlah_baris || 1) + ' baris • total ' + fmtRp(gNama.total || 0);
+      } catch (errNama) {
+        $('nama-grup-info').textContent = '';
+        tampilGalat('nama-grup-gagal', (errNama && errNama.message) || 'Gagal memuat data grup.');
+      }
+    });
+
+    $('nama-grup-simpan').addEventListener('click', async function() {
+      if (!namaEditBarisId) return;
+      var btnSimpanNama = $('nama-grup-simpan');
+      tampilGalat('nama-grup-gagal', '');
+      btnSimpanNama.disabled = true;
+      try {
+        var resSimpanNama = await kirimGrup(
+          urlDasarGrup + '/' + namaEditBarisId + '/penerima-grup', 'PUT', {
+            status: namaEditStatus,
+            nama: $('nama-grup-input').value.trim() || null
+          });
+        var btnUraianNama = document.querySelector(
+          '[data-grup-anggota][data-id="' + namaEditBarisId + '"]');
+        if (btnUraianNama) {
+          btnUraianNama.textContent = resSimpanNama.nama || namaEditBawaan;
+        }
+        bootstrap.Modal.getOrCreateInstance($('modal-nama-grup')).hide();
+      } catch (errSimpanNama) {
+        tampilGalat('nama-grup-gagal', (errSimpanNama && errSimpanNama.message) ||
+          'Gagal menyimpan nama tampilan grup.');
+      } finally {
+        btnSimpanNama.disabled = false;
       }
     });
 

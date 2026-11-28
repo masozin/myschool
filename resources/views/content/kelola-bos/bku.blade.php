@@ -436,14 +436,12 @@
                         <span class="small text-muted">{{ count($grupTampil['anggota']) }} baris</span>
                       </div>
                     @else
-                      @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
                       <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                         data-grup-anggota data-id="{{ $b->id }}"
-                        title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
+                        title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $b->uraian }}</button>
                       @if ($bisaTulisAlias)
                         <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
-                          title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
-                          data-alias="{{ $aliasUraian ?? '' }}">
+                          title="Ubah nama tampilan grup" data-nama-grup data-id="{{ $b->id }}">
                           <i class="icon-base ri ri-pencil-line"></i></button>
                       @endif
                       <a href="{{ route('kelola-bos.bku.kwitansi', $b->id) }}" target="_blank"
@@ -558,22 +556,23 @@
                   </div>
                 </td>
                 <td>
-                  @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     {{-- Semua baris belanja: uraian bisa diklik
                          untuk membuka modal isi grup (rincian
                          belanja grup ini, keterangan SPJ, dan
-                         nomor VA untuk grup SIPLah). --}}
+                         nomor VA untuk grup SIPLah). Nama yang
+                         tampil: nama tampilan grup bila diisi,
+                         selain itu uraian asli ARKAS — alias
+                         teks hanya berlaku di Kertas Kerja. --}}
                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                       data-grup-anggota data-id="{{ $b->id }}"
-                      title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
+                      title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $b->uraian }}</button>
                   @else
-                    <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
+                    <span>{{ $b->uraian }}</span>
                   @endif
-                  @if ($bisaTulisAlias)
+                  @if ($bisaTulisAlias && in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
-                      title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
-                      data-alias="{{ $aliasUraian ?? '' }}">
+                      title="Ubah nama tampilan grup" data-nama-grup data-id="{{ $b->id }}">
                       <i class="icon-base ri ri-pencil-line"></i></button>
                   @endif
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
@@ -687,10 +686,6 @@
       </div>
     </div>
     </div>
-
-    @if ($bisaTulisAlias)
-      @include('content.kelola-bos.partials.modal-alias')
-    @endif
 
     @include('content.kelola-bos.partials.modal-penerima')
 
