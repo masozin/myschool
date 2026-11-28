@@ -1934,7 +1934,7 @@ class KelolaBosController extends Controller
       'daftarRekening' => $daftarRekening,
       'urut' => $urutKunci,
       'arah' => $arah,
-      'petaAlias' => [],
+      'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
       'bisaTulisPenerima' => $this->bisaTulisAlias(),
       'jumlahPenerima' => $jumlahPenerima,
@@ -3068,6 +3068,12 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Alias teks ikut dikirim sebagai cadangan tampilan
+    // (nama tampilan grup kosong -> alias -> uraian
+    // asli); mengedit alias tetap hanya dari Kertas
+    // Kerja.
+    $petaAliasGrup = $this->petaAlias($sekolahId, collect($grup)->pluck('uraian'));
+
     $baris = [];
     foreach ($grup as $r) {
       $baris[] = [
@@ -3075,6 +3081,7 @@ class KelolaBosController extends Controller
         'tanggal' => $r->tanggal_transaksi?->format('d-m-Y'),
         'no_bukti' => $r->no_bukti,
         'uraian' => $r->uraian,
+        'alias' => $petaAliasGrup[$r->uraian] ?? null,
         'kode_rekening' => $r->kode_rekening,
         'nama_rekening' => $r->kode_rekening
           ? ($namaPerKodeTahun[$r->kode_rekening . '|' . $r->tanggal_transaksi?->format('Y')] ?? null)

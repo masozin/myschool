@@ -549,7 +549,7 @@
         isiGrupManualId = g.grup_manual_id || null;
         var barisPertamaGrup = res.baris && res.baris[0] ? res.baris[0] : null;
         isiGrupNamaBawaan = barisPertamaGrup ?
-          (barisPertamaGrup.uraian || '') : '';
+          (barisPertamaGrup.alias || barisPertamaGrup.uraian || '') : '';
         $('isi-grup-judul').textContent = g.nama_alias || g.nama ||
           isiGrupNamaBawaan || 'Isi Grup';
         var lencana = '';
@@ -565,13 +565,18 @@
         $('isi-grup-info').innerHTML = lencana + infoTeks;
         var html = '';
         (res.baris || []).forEach(function(r) {
-          // Anggota grup selalu tampil dengan uraian asli
-          // ARKAS — alias teks hanya berlaku di Kertas
-          // Kerja, sedangkan penamaan di BKU memakai Nama
-          // Tampilan Grup untuk keseluruhan grup.
+          // Nama anggota mengikuti cadangan tampilan yang
+          // sama dengan tabel BKU: alias teks bila ada,
+          // selain itu uraian asli ARKAS (nama asli tampil
+          // kecil di bawahnya bila berbeda). Mengedit
+          // alias tetap hanya dari Kertas Kerja — di sini
+          // tidak ada pensil alias.
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
             '<td>' + lolosHtml(r.no_bukti || '-') + '</td>' +
-            '<td>' + lolosHtml(r.uraian || '-') +
+            '<td>' + lolosHtml(r.alias || r.uraian || '-') +
+            (r.alias && r.alias !== r.uraian ?
+              '<div class="small text-muted">Asli: ' + lolosHtml(r.uraian || '') + '</div>' :
+              '') +
             (r.nama_rekening ?
               '<div class="small text-muted">' + lolosHtml(r.kode_rekening || '') + ' — ' +
               lolosHtml(r.nama_rekening) + '</div>' :
@@ -819,9 +824,10 @@
         namaEditBarisId = gNama.baris_id || namaEditBarisId;
         namaEditStatus = gNama.status || 'belum';
         namaEditBawaan = (resNama.baris && resNama.baris[0]) ?
-          (resNama.baris[0].uraian || '') : '';
+          (resNama.baris[0].alias || resNama.baris[0].uraian || '') : '';
         $('nama-grup-input').value = gNama.nama || '';
-        $('nama-grup-info').textContent = 'Uraian asli: ' + (namaEditBawaan || '-') +
+        $('nama-grup-info').textContent = 'Uraian asli: ' +
+          ((resNama.baris && resNama.baris[0] ? resNama.baris[0].uraian : '') || '-') +
           ' • ' + (gNama.jumlah_baris || 1) + ' baris • total ' + fmtRp(gNama.total || 0);
       } catch (errNama) {
         $('nama-grup-info').textContent = '';
