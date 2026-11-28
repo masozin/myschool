@@ -1868,7 +1868,12 @@ class KelolaBosController extends Controller
     // Baris tanpa hubungan periode (mis. saldo awal)
     // tidak punya kegiatan.
     $kegiatanPerBaris = [];
-    $idsKegiatan = collect($baris)->pluck('id')->all();
+    // Id baris halaman diambil lewat getCollection():
+    // collect() atas paginator menghasilkan metadata
+    // halamannya (current_page, total, ...), BUKAN
+    // baris-barisnya — pola yang sama seperti pemakaian
+    // petaGrupManual & petaAlias di method ini.
+    $idsKegiatan = $baris->getCollection()->pluck('id')->all();
     foreach ($barisTampil as $itemTampil) {
       if (($itemTampil['tipe'] ?? '') === 'grup') {
         foreach ($itemTampil['grup']['anggota'] ?? [] as $anggotaTampil) {
