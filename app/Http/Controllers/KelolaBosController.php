@@ -17,6 +17,7 @@ use App\Models\BosSinkronToken;
 use App\Models\BosSpjGrup;
 use App\Models\BosSpjGrupAnggota;
 use App\Models\BosSpjGrupManual;
+use App\Models\BosSpjNamaBaris;
 use App\Models\BosSpjPenerima;
 use App\Models\Penerima;
 use App\Models\Ptk;
@@ -153,6 +154,25 @@ class KelolaBosController extends Controller
     return BosNamaAlias::where('sekolah_id', $sekolahId)
       ->whereIn('nama_sumber', $nama)
       ->pluck('alias', 'nama_sumber')
+      ->all();
+  }
+
+  /**
+   * Peta nama uraian BKU per baris: nama khusus yang
+   * diedit dari BKU untuk SATU baris (item) itu saja —
+   * lapisan nama paling spesifik, di atas alias teks.
+   *
+   * @return array<int, string> peta bos_kas_umum_id => nama
+   */
+  private function petaNamaBaris(int $sekolahId, $daftarId): array
+  {
+    $ids = collect($daftarId)->filter()->unique()->values();
+    if ($ids->isEmpty()) {
+      return [];
+    }
+    return BosSpjNamaBaris::where('sekolah_id', $sekolahId)
+      ->whereIn('bos_kas_umum_id', $ids)
+      ->pluck('nama', 'bos_kas_umum_id')
       ->all();
   }
 
@@ -1468,6 +1488,7 @@ class KelolaBosController extends Controller
         'urut' => 'tanggal',
         'arah' => 'desc',
         'petaAlias' => [],
+        'petaNamaBaris' => [],
         'bisaTulisAlias' => false,
         'bisaTulisPenerima' => false,
         'bisaUbahStatus' => false,
@@ -1955,6 +1976,7 @@ class KelolaBosController extends Controller
       'urut' => $urutKunci,
       'arah' => $arah,
       'petaAlias' => $this->petaAlias($sekolahId, $baris->getCollection()->pluck('uraian')),
+      'petaNamaBaris' => $this->petaNamaBaris($sekolahId, $baris->getCollection()->pluck('id')),
       'bisaTulisAlias' => $this->bisaTulisAlias(),
       'bisaTulisPenerima' => $this->bisaTulisAlias(),
       'bisaUbahStatus' => $this->bisaUbahStatus(),
@@ -2201,6 +2223,12 @@ class KelolaBosController extends Controller
       ? ($petaAliasKw[$pertama->uraian] ?? null)
       : null;
 
+    // Nama uraian BKU per baris (nama khusus item itu
+    // sendiri, diedit dari BKU): lapisan paling
+    // spesifik untuk rincian per item, dan untuk
+    // uraian kwitansi grup berisi satu baris.
+    $petaNamaBarisKw = $this->petaNamaBaris($sekolahId, collect($grup)->pluck('id'));
+
     $nota = null;
     if (!empty($pertama->id_kas_nota)) {
       $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
@@ -2233,15 +2261,16 @@ class KelolaBosController extends Controller
       'kode_rekening' => $kodeRekening,
       'uraian' => $grupManual
         ? $grupManual->nama
-        : ($namaTampilGrup ?? $aliasGrup ?? (count($grup) === 1
-          ? $pertama->uraian
-          : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut')),
+        : (count($grup) === 1
+          ? ($petaNamaBarisKw[$pertama->id] ?? $namaTampilGrup ?? $aliasGrup ?? $pertama->uraian)
+          : ($namaTampilGrup ?? $aliasGrup
+            ?? 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut')),
       'grup_manual' => (bool) $grupManual,
       'nama_alias' => $grupManual?->nama,
       'nama_grup' => $namaTampilGrup,
       'alias' => $aliasGrup,
       'rincian' => array_map(fn($b) => [
-        'uraian' => $petaAliasKw[$b->uraian] ?? $b->uraian,
+        'uraian' => $petaNamaBarisKw[$b->id] ?? $petaAliasKw[$b->uraian] ?? $b->uraian,
         'kode_rekening' => $b->kode_rekening,
         'volume' => $fmtVolume($b->volume),
         'saldo' => (float) $b->saldo,
@@ -3079,6 +3108,60 @@ class KelolaBosController extends Controller
   // grup manual mengembalikan baris-barisnya ke
   // pengelompokan nota / nomor bukti seperti semula.
 
+  /**
+   * Simpan / hapus nama uraian BKU satu baris: nama
+   * khusus item itu sendiri yang diedit dari BKU
+   * (pensil per item di modal isi grup / pensil baris
+   * tunggal di tabel). Nama terisi → updateOrCreate;
+   * nama kosong → catatan nama dihapus (tampilan
+   * kembali ke alias teks / uraian asli). Konteks
+   * sekolah selalu dari baris BKU di URL. Respons
+   * membawa nama tampil efektif baris itu (nama baris
+   * → alias teks → uraian asli) agar tampilan bisa
+   * disegarkan tanpa muat ulang.
+   */
+  public function namaBarisUbah(Request $request, int $id)
+  {
+    $sekolahId = $this->sekolahKonteksIdNullable();
+    $baris = $sekolahId
+      ? BosKasUmum::where('id', $id)
+        ->where('sekolah_id', $sekolahId)
+        ->where('soft_delete', false)
+        ->whereIn('id_ref_bku', self::JENIS_BELANJA)
+        ->first()
+      : null;
+    if (!$baris) {
+      return response()->json(['message' => 'Baris BKU belanja tidak ditemukan di sekolah aktif.'], 404);
+    }
+
+    $validated = $request->validate([
+      'nama' => ['nullable', 'string', 'max:255'],
+    ]);
+    $nama = isset($validated['nama']) ? trim((string) $validated['nama']) : '';
+
+    if ($nama === '') {
+      BosSpjNamaBaris::where('sekolah_id', $sekolahId)
+        ->where('bos_kas_umum_id', $id)
+        ->delete();
+      $tersimpan = null;
+    } else {
+      $tersimpan = BosSpjNamaBaris::updateOrCreate(
+        ['sekolah_id' => $sekolahId, 'bos_kas_umum_id' => $id],
+        ['nama' => $nama]
+      )->nama;
+    }
+
+    $petaAliasBaris = $this->petaAlias($sekolahId, [$baris->uraian]);
+    $namaTampil = $tersimpan ?? ($petaAliasBaris[$baris->uraian] ?? $baris->uraian);
+
+    return response()->json([
+      'success' => true,
+      'message' => $tersimpan ? 'Nama uraian BKU tersimpan.' : 'Nama uraian BKU dihapus.',
+      'nama' => $tersimpan,
+      'nama_tampil' => $namaTampil,
+    ]);
+  }
+
   /** Isi satu grup transaksi BKU (modal isi grup & modal pecah di halaman BKU). */
   public function grupAnggota(Request $request, int $id)
   {
@@ -3123,8 +3206,11 @@ class KelolaBosController extends Controller
     // Alias teks ikut dikirim sebagai cadangan tampilan
     // (nama tampilan grup kosong -> alias -> uraian
     // asli); mengedit alias tetap hanya dari Kertas
-    // Kerja.
+    // Kerja. Nama uraian BKU per baris (nama khusus
+    // item itu sendiri, diedit dari BKU) adalah lapisan
+    // paling spesifik untuk tampilan tiap item.
     $petaAliasGrup = $this->petaAlias($sekolahId, collect($grup)->pluck('uraian'));
+    $petaNamaBarisGrup = $this->petaNamaBaris($sekolahId, collect($grup)->pluck('id'));
 
     $baris = [];
     foreach ($grup as $r) {
@@ -3133,6 +3219,7 @@ class KelolaBosController extends Controller
         'tanggal' => $r->tanggal_transaksi?->format('d-m-Y'),
         'no_bukti' => $r->no_bukti,
         'uraian' => $r->uraian,
+        'nama_baris' => $petaNamaBarisGrup[$r->id] ?? null,
         'alias' => $petaAliasGrup[$r->uraian] ?? null,
         'kode_rekening' => $r->kode_rekening,
         'nama_rekening' => $r->kode_rekening

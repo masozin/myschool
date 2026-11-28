@@ -915,6 +915,12 @@ Route::controller(KelolaBosController::class)
     // akses BKU; penulisan hanya Admin & Operator Sekolah.
     Route::get('/bku/{id}/grup-anggota', 'grupAnggota')->name('bku.grup-anggota')
       ->middleware('role:Admin|Operator Sekolah|Kepala Sekolah|Bendahara');
+    // Nama uraian BKU per baris: nama khusus satu item
+    // belanja yang diedit dari BKU (hanya berlaku untuk
+    // item itu sendiri) — penulisan hanya Admin &
+    // Operator Sekolah, sejajar alias.
+    Route::put('/bku/{id}/nama-baris', 'namaBarisUbah')->name('bku.nama-baris')
+      ->middleware('role:Admin|Operator Sekolah');
     Route::post('/bku/grup-manual/gabung', 'grupManualGabung')->name('bku.grup-manual.gabung')
       ->middleware('role:Admin|Operator Sekolah');
     Route::post('/bku/grup-manual/pecah', 'grupManualPecah')->name('bku.grup-manual.pecah')

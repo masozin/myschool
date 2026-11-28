@@ -562,20 +562,24 @@
                     {{-- Semua baris belanja: uraian bisa diklik
                          untuk membuka modal isi grup (rincian
                          belanja grup ini, keterangan SPJ, dan
-                         nomor VA untuk grup SIPLah). Urutan
-                         nama tampil: nama tampilan grup, lalu
+                         nomor VA untuk grup SIPLah). Baris
+                         tunggal memakai nama uraian BKU-nya
+                         sendiri lebih dulu (nama khusus baris
+                         ini saja), lalu nama tampilan grup,
                          alias teks (cadangan tampilan —
                          mengeditnya hanya dari Kertas Kerja),
                          terakhir uraian asli ARKAS. --}}
                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                       data-grup-anggota data-id="{{ $b->id }}"
-                      title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
+                      title="Lihat rincian grup ini">{{ $petaNamaBaris[$b->id] ?? $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
                   @else
                     <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
                   @endif
                   @if ($bisaTulisAlias && in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
                     <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
-                      title="Ubah nama tampilan grup" data-nama-grup data-id="{{ $b->id }}">
+                      title="Ubah nama uraian BKU (khusus baris ini)" data-nama-baris data-dari="tabel"
+                      data-id="{{ $b->id }}" data-nama="{{ $petaNamaBaris[$b->id] ?? '' }}"
+                      data-uraian="{{ $b->uraian }}">
                       <i class="icon-base ri ri-pencil-line"></i></button>
                   @endif
                   @if (in_array((int) $b->id_ref_bku, [4, 15, 24, 35], true))
@@ -689,10 +693,6 @@
       </div>
     </div>
     </div>
-
-    @if ($bisaTulisAlias)
-      @include('content.kelola-bos.partials.modal-alias')
-    @endif
 
     @include('content.kelola-bos.partials.modal-penerima')
 

@@ -216,10 +216,43 @@
   </div>
 </div>
 
+{{--
+  Modal nama uraian BKU: dibuka dari pensil baris
+  tunggal di tabel BKU dan dari pensil per item di
+  modal isi grup. Nama yang disimpan melekat pada
+  baris (item) itu sendiri — hanya berlaku untuk item
+  tersebut, tidak untuk baris lain beruraian sama,
+  dan ikut terbawa bila baris berpindah grup.
+--}}
+<div class="modal fade" id="modal-nama-baris" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ri ri-edit-line me-2"></i>Nama Uraian BKU</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger py-2 px-3 d-none" id="nama-baris-gagal"></div>
+        <p class="small text-muted" id="nama-baris-info">Memuat…</p>
+        <label class="form-label" for="nama-baris-input">Nama uraian untuk item ini</label>
+        <input type="text" id="nama-baris-input" class="form-control" maxlength="255"
+          placeholder="Kosongkan untuk memakai nama bawaan" autocomplete="off">
+        <div class="form-text">Nama khusus item ini saja — tampil di BKU dan rincian
+          kwitansi menggantikan uraian item ini, tanpa mengubah item lain yang
+          uraiannya sama.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="nama-baris-simpan">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
-  /* Editor nama alias harus tampil di atas modal isi
-     grup saat dibuka dari daftar anggota grup. */
-  #modal-alias {
+  /* Editor nama uraian BKU harus tampil di atas modal
+     isi grup saat dibuka dari daftar anggota grup. */
+  #modal-nama-baris {
     z-index: 1095;
   }
 </style>
@@ -539,10 +572,12 @@
     var isiGrupNamaBawaan = ''; // nama bawaan grup (alias / uraian baris pertama)
     var isiGrupManualAktif = false; // grup yang sedang dibuka manual atau bukan
     var isiGrupStatusSaja = false; // Bendahara: keterangan SPJ hanya saklar status
+    var isiGrupSatuBaris = false; // grup bawaan satu baris: tanpa nama tampilan grup
 
     async function bukaIsiGrup(barisId) {
       isiGrupId = barisId;
       isiGrupManualId = null;
+      isiGrupSatuBaris = false;
       tampilGalat('isi-grup-galat', '');
       $('isi-grup-judul').textContent = 'Isi Grup';
       $('isi-grup-info').textContent = 'Memuat…';
@@ -558,9 +593,16 @@
         isiGrupManualId = g.grup_manual_id || null;
         var barisPertamaGrup = res.baris && res.baris[0] ? res.baris[0] : null;
         isiGrupNamaBawaan = barisPertamaGrup ?
-          (barisPertamaGrup.alias || barisPertamaGrup.uraian || '') : '';
-        $('isi-grup-judul').textContent = g.nama_alias || g.nama ||
-          isiGrupNamaBawaan || 'Isi Grup';
+          (barisPertamaGrup.nama_baris || barisPertamaGrup.alias ||
+            barisPertamaGrup.uraian || '') : '';
+        var judulIsiGrup = g.nama_alias || g.nama || isiGrupNamaBawaan;
+        // Grup satu baris: yang tampil adalah nama
+        // uraiannya sendiri (nama uraian BKU baris itu).
+        if (!g.manual && (g.jumlah_baris || 0) === 1 && barisPertamaGrup &&
+          barisPertamaGrup.nama_baris) {
+          judulIsiGrup = barisPertamaGrup.nama_baris;
+        }
+        $('isi-grup-judul').textContent = judulIsiGrup || 'Isi Grup';
         var lencana = '';
         if (g.manual) {
           lencana = '<span class="badge bg-primary">Grup Manual</span> ' +
@@ -574,26 +616,28 @@
         $('isi-grup-info').innerHTML = lencana + infoTeks;
         var html = '';
         (res.baris || []).forEach(function(r) {
-          // Nama anggota mengikuti cadangan tampilan yang
-          // sama dengan tabel BKU: alias teks bila ada,
-          // selain itu uraian asli ARKAS (nama asli tampil
-          // kecil di bawahnya bila berbeda). Peran tulis
-          // mendapat tombol pensil per item untuk mengedit
-          // nama alias item itu (rancangan awal user) —
-          // berbeda dari pensil di tabel BKU yang mengedit
-          // Nama Tampilan Grup.
-          var tombolAlias = res.bisa_tulis ?
+          // Nama anggota: nama uraian BKU baris itu
+          // sendiri lebih dulu (nama khusus item ini,
+          // diedit dari pensil per item di sini), lalu
+          // alias teks, terakhir uraian asli ARKAS (nama
+          // asli tampil kecil di bawahnya bila berbeda).
+          var namaItem = r.nama_baris || r.alias || r.uraian || '-';
+          var tombolNamaBaris = res.bisa_tulis ?
             ' <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 align-baseline" ' +
-            'title="Beri nama alias" data-alias-edit data-nama-asli="' +
-            lolosHtml(r.uraian || '') + '" data-alias="' + lolosHtml(r.alias || '') +
+            'title="Ubah nama uraian BKU (khusus item ini)" data-nama-baris data-dari="grup" ' +
+            'data-id="' + r.id + '" data-nama="' + lolosHtml(r.nama_baris || '') +
+            '" data-uraian="' + lolosHtml(r.uraian || '') +
             '"><i class="icon-base ri ri-pencil-line"></i></button>' :
             '';
           html += '<tr><td class="text-nowrap">' + lolosHtml(r.tanggal || '') + '</td>' +
             '<td>' + lolosHtml(r.no_bukti || '-') + '</td>' +
-            '<td>' + lolosHtml(r.alias || r.uraian || '-') + tombolAlias +
-            (r.alias && r.alias !== r.uraian ?
+            '<td><span data-item-nama="' + r.id + '">' + lolosHtml(namaItem) + '</span>' +
+            tombolNamaBaris +
+            '<span data-item-asli="' + r.id + '">' +
+            (namaItem !== (r.uraian || '') ?
               '<div class="small text-muted">Asli: ' + lolosHtml(r.uraian || '') + '</div>' :
               '') +
+            '</span>' +
             (r.nama_rekening ?
               '<div class="small text-muted">' + lolosHtml(r.kode_rekening || '') + ' — ' +
               lolosHtml(r.nama_rekening) + '</div>' :
@@ -650,10 +694,15 @@
             $('isi-grup-va-input').value = g.nomor_va || '';
           }
           // Nama tampilan grup hanya untuk grup bawaan
-          // ARKAS — grup manual sudah punya nama alias
-          // grupnya sendiri di bagian bawah modal.
+          // ARKAS berisi beberapa item — grup manual
+          // sudah punya nama alias grupnya sendiri di
+          // bagian bawah modal, dan grup satu baris
+          // memakai nama uraian BKU barisnya sendiri
+          // (pensil per item / pensil di tabel BKU).
           isiGrupManualAktif = !!g.manual;
-          $('isi-grup-nama-tampil-wrap').classList.toggle('d-none', isiGrupManualAktif || isiGrupStatusSaja);
+          isiGrupSatuBaris = !isiGrupManualAktif && (g.jumlah_baris || 0) === 1;
+          $('isi-grup-nama-tampil-wrap').classList.toggle('d-none',
+            isiGrupManualAktif || isiGrupStatusSaja || isiGrupSatuBaris);
           if (!isiGrupManualAktif) {
             $('isi-grup-nama-tampil').value = g.nama || '';
           }
@@ -746,13 +795,13 @@
         if (isiGrupSpjSiplah && !isiGrupStatusSaja) {
           payloadSpj.nomor_va = $('isi-grup-va-input').value.trim() || null;
         }
-        if (!isiGrupManualAktif && !isiGrupStatusSaja) {
+        if (!isiGrupManualAktif && !isiGrupStatusSaja && !isiGrupSatuBaris) {
           payloadSpj.nama = $('isi-grup-nama-tampil').value.trim() || null;
         }
         var res = await kirimGrup(urlDasarGrup + '/' + isiGrupSpjBarisId + '/penerima-grup', 'PUT', payloadSpj);
         isiGrupSpjStatus = res.status || isiGrupSpjStatus;
         segarkanMetaDiBaris(isiGrupSpjBarisId, res.status_tampil, res.nomor_va);
-        if (!isiGrupManualAktif) {
+        if (!isiGrupManualAktif && !isiGrupSatuBaris) {
           // Segarkan teks uraian baris tabel & judul
           // modal mengikuti nama tampilan tersimpan.
           var btnUraianGrup = document.querySelector(
@@ -882,6 +931,74 @@
           'Gagal menyimpan nama tampilan grup.');
       } finally {
         btnSimpanNama.disabled = false;
+      }
+    });
+
+    // ── Nama uraian BKU per baris ──
+    // Pensil baris tunggal di tabel BKU (data-dari=
+    // "tabel") dan pensil per item di modal isi grup
+    // (data-dari="grup") membuka modal yang sama. Nama
+    // tersimpan melekat pada baris itu sendiri lewat
+    // endpoint nama-baris; sesudah simpan, tampilan
+    // asal pensil disegarkan tanpa muat ulang.
+    var namaBarisId = null;
+    var namaBarisDari = null;
+    var namaBarisUraianAsli = '';
+    var namaBarisTombol = null;
+
+    document.addEventListener('click', function(e) {
+      var btnBaris = e.target.closest('[data-nama-baris]');
+      if (!btnBaris) return;
+      namaBarisId = parseInt(btnBaris.getAttribute('data-id'), 10);
+      namaBarisDari = btnBaris.getAttribute('data-dari') || 'tabel';
+      namaBarisUraianAsli = btnBaris.getAttribute('data-uraian') || '';
+      namaBarisTombol = btnBaris;
+      tampilGalat('nama-baris-gagal', '');
+      $('nama-baris-info').textContent = 'Uraian asli: ' + (namaBarisUraianAsli || '-');
+      $('nama-baris-input').value = btnBaris.getAttribute('data-nama') || '';
+      bootstrap.Modal.getOrCreateInstance($('modal-nama-baris')).show();
+    });
+
+    $('nama-baris-simpan').addEventListener('click', async function() {
+      if (!namaBarisId) return;
+      var btnSimpanBaris = $('nama-baris-simpan');
+      tampilGalat('nama-baris-gagal', '');
+      btnSimpanBaris.disabled = true;
+      try {
+        var resBaris = await kirimGrup(
+          urlDasarGrup + '/' + namaBarisId + '/nama-baris', 'PUT', {
+            nama: $('nama-baris-input').value.trim() || null
+          });
+        if (namaBarisTombol) {
+          namaBarisTombol.setAttribute('data-nama', resBaris.nama || '');
+        }
+        if (namaBarisDari === 'tabel') {
+          var btnUraianBaris = document.querySelector(
+            '[data-grup-anggota][data-id="' + namaBarisId + '"]');
+          if (btnUraianBaris) {
+            btnUraianBaris.textContent = resBaris.nama_tampil || namaBarisUraianAsli;
+          }
+        } else {
+          var spanNama = document.querySelector(
+            '[data-item-nama="' + namaBarisId + '"]');
+          if (spanNama) {
+            spanNama.textContent = resBaris.nama_tampil || namaBarisUraianAsli;
+          }
+          var spanAsli = document.querySelector(
+            '[data-item-asli="' + namaBarisId + '"]');
+          if (spanAsli) {
+            spanAsli.innerHTML = (resBaris.nama_tampil &&
+                resBaris.nama_tampil !== namaBarisUraianAsli) ?
+              '<div class="small text-muted">Asli: ' +
+              lolosHtml(namaBarisUraianAsli) + '</div>' : '';
+          }
+        }
+        bootstrap.Modal.getOrCreateInstance($('modal-nama-baris')).hide();
+      } catch (errBaris) {
+        tampilGalat('nama-baris-gagal', (errBaris && errBaris.message) ||
+          'Gagal menyimpan nama uraian BKU.');
+      } finally {
+        btnSimpanBaris.disabled = false;
       }
     });
 

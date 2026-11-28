@@ -467,6 +467,14 @@
   #modal-daftar-penerima {
     z-index: 1090;
   }
+
+  /* Panel pilihan nama formulir penerimaan: latar
+     padat (tidak transparan) agar teks di belakangnya
+     tidak tembus. */
+  #form-daftar-nama,
+  #form-daftar-nama .list-group-item {
+    background-color: var(--bs-body-bg);
+  }
 </style>
 
 <script>
