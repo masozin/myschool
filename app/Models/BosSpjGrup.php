@@ -41,6 +41,7 @@ class BosSpjGrup extends Model
     'sekolah_id',
     'grup_kunci',
     'status',
+    'nama',
     'nomor_va',
     'non_barang',
     'kategori',

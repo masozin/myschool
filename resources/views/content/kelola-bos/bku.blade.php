@@ -394,14 +394,29 @@
                   <td>
                     @php
                       $rekUnikGrup = collect($grupTampil['anggota'])->pluck('kode_rekening')->filter()->unique()->values();
+                      $kegGrup = collect($grupTampil['anggota'])
+                        ->map(fn($r) => $kegiatanPerBaris[$r->id] ?? null)
+                        ->filter()
+                        ->unique('kode')
+                        ->values();
                     @endphp
-                    @if ($rekUnikGrup->count() === 1)
-                      {{ $rekUnikGrup->first() }}
-                    @elseif ($rekUnikGrup->count() > 1)
-                      <span class="text-muted">Beragam</span>
-                    @else
-                      -
+                    @if ($kegGrup->count() === 1)
+                      <div>
+                        <span title="{{ $kegGrup->first()['nama'] ?? '' }}"
+                          style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $kegGrup->first()['kode'] }}</span>
+                      </div>
+                    @elseif ($kegGrup->count() > 1)
+                      <div class="text-muted">Keg. Beragam</div>
                     @endif
+                    <div>
+                      @if ($rekUnikGrup->count() === 1)
+                        {{ $rekUnikGrup->first() }}
+                      @elseif ($rekUnikGrup->count() > 1)
+                        <span class="text-muted">Beragam</span>
+                      @else
+                        -
+                      @endif
+                    </div>
                   </td>
                   <td>
                     @if ($gm)
@@ -424,7 +439,7 @@
                       @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
                       <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                         data-grup-anggota data-id="{{ $b->id }}"
-                        title="Lihat rincian grup ini">{{ $aliasUraian ?? $b->uraian }}</button>
+                        title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
                       @if ($bisaTulisAlias)
                         <button type="button" class="btn btn-sm btn-icon btn-text-secondary p-0 ms-1 align-baseline"
                           title="Beri nama alias" data-alias-edit data-nama-asli="{{ $b->uraian }}"
@@ -527,12 +542,20 @@
                 <td class="text-nowrap">{{ $b->tanggal_transaksi->format('d-m-Y') }}</td>
                 <td>{{ $b->no_bukti ?? '-' }}</td>
                 <td>
-                  @if ($b->kode_rekening)
-                    <span title="{{ $b->nama_rekening ?? '' }}"
-                      style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $b->kode_rekening }}</span>
-                  @else
-                    -
+                  @if (!empty($kegiatanPerBaris[$b->id]))
+                    <div>
+                      <span title="{{ $kegiatanPerBaris[$b->id]['nama'] ?? '' }}"
+                        style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $kegiatanPerBaris[$b->id]['kode'] }}</span>
+                    </div>
                   @endif
+                  <div>
+                    @if ($b->kode_rekening)
+                      <span title="{{ $b->nama_rekening ?? '' }}"
+                        style="text-decoration: underline dotted; text-underline-offset: 3px; cursor: help;">{{ $b->kode_rekening }}</span>
+                    @else
+                      -
+                    @endif
+                  </div>
                 </td>
                 <td>
                   @php $aliasUraian = $petaAlias[$b->uraian] ?? null; @endphp
@@ -543,7 +566,7 @@
                          nomor VA untuk grup SIPLah). --}}
                     <button type="button" class="btn btn-link p-0 text-start text-decoration-none"
                       data-grup-anggota data-id="{{ $b->id }}"
-                      title="Lihat rincian grup ini">{{ $aliasUraian ?? $b->uraian }}</button>
+                      title="Lihat rincian grup ini">{{ $metaGrup[$b->id]['nama'] ?? $aliasUraian ?? $b->uraian }}</button>
                   @else
                     <span @if ($aliasUraian) title="{{ $b->uraian }}" @endif>{{ $aliasUraian ?? $b->uraian }}</span>
                   @endif

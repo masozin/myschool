@@ -1732,6 +1732,7 @@ class KelolaBosController extends Controller
         $metaGrup[$barisId] = [
           'status' => $meta->status ?? 'belum',
           'status_tampil' => $statusTampil,
+          'nama' => $meta->nama ?? null,
           'nomor_va' => $meta->nomor_va ?? null,
           'kategori' => $this->kategoriGrup($grupPerKunci[$kunci] ?? [], $meta)['efektif'],
           'jumlah_penerima_orang' => (int) ($stat['jumlah_orang'] ?? 0),
@@ -1853,6 +1854,59 @@ class KelolaBosController extends Controller
       }
     }
 
+    // Kode & nama kegiatan per baris untuk kolom
+    // Rekening: baris BKU -> periode RAPBS (id_rapbs_
+    // periode) -> baris RAPBS (id_rapbs_arkas) -> ref
+    // kode (id_ref_kode + tahun), pola yang sama dengan
+    // realisasi Kertas Kerja. Baris tanpa hubungan
+    // periode (mis. saldo awal) tidak punya kegiatan.
+    $kegiatanPerBaris = [];
+    $idsKegiatan = collect($baris)->pluck('id')->all();
+    foreach ($barisTampil as $itemTampil) {
+      if (($itemTampil['tipe'] ?? '') === 'grup') {
+        foreach ($itemTampil['grup']['anggota'] ?? [] as $anggotaTampil) {
+          $idsKegiatan[] = $anggotaTampil->id;
+        }
+      }
+    }
+    $idsKegiatan = array_values(array_unique($idsKegiatan));
+    if ($idsKegiatan) {
+      $refKodeKegiatan = BosRefKode::query()
+        ->select('id_ref_kode', 'tahun')
+        ->selectRaw('MIN(id_kode) as id_kode, MIN(uraian_kode) as uraian_kode')
+        ->groupBy('id_ref_kode', 'tahun');
+      $barisKegiatan = BosKasUmum::query()
+        ->from('bos_kas_umum')
+        ->join('bos_rapbs_periode', function ($j) {
+          $j->on('bos_rapbs_periode.id_arkas', '=', 'bos_kas_umum.id_rapbs_periode')
+            ->on('bos_rapbs_periode.sekolah_id', '=', 'bos_kas_umum.sekolah_id');
+        })
+        ->join('bos_rapbs', function ($j) {
+          $j->on('bos_rapbs.id_arkas', '=', 'bos_rapbs_periode.id_rapbs_arkas')
+            ->on('bos_rapbs.sekolah_id', '=', 'bos_rapbs_periode.sekolah_id');
+        })
+        ->leftJoinSub($refKodeKegiatan, 'ref_kode_kegiatan', function ($j) {
+          $j->on('ref_kode_kegiatan.id_ref_kode', '=', 'bos_rapbs.id_ref_kode')
+            ->on('ref_kode_kegiatan.tahun', '=', 'bos_rapbs.id_ref_tahun_anggaran');
+        })
+        ->where('bos_kas_umum.sekolah_id', $sekolahId)
+        ->whereIn('bos_kas_umum.id', $idsKegiatan)
+        ->where('bos_rapbs.soft_delete', false)
+        ->get([
+          'bos_kas_umum.id as kas_id',
+          'ref_kode_kegiatan.id_kode as kode_kegiatan',
+          'ref_kode_kegiatan.uraian_kode as nama_kegiatan',
+        ]);
+      foreach ($barisKegiatan as $bk) {
+        if ($bk->kode_kegiatan !== null && $bk->kode_kegiatan !== '') {
+          $kegiatanPerBaris[$bk->kas_id] = [
+            'kode' => $bk->kode_kegiatan,
+            'nama' => $bk->nama_kegiatan,
+          ];
+        }
+      }
+    }
+
     return view('content.kelola-bos.bku', $konteks + [
       'baris' => $baris,
       'totalNominal' => $totalNominal,
@@ -1878,6 +1932,7 @@ class KelolaBosController extends Controller
       'kunciPerBaris' => $kunciPerBaris,
       'barisTampil' => $barisTampil,
       'pajakGrup' => $pajakGrup,
+      'kegiatanPerBaris' => $kegiatanPerBaris,
     ]);
   }
 
@@ -2091,6 +2146,17 @@ class KelolaBosController extends Controller
         ->find($anggotaManual->grup_manual_id);
     }
 
+    // Nama tampilan per grup (meta SPJ): menggantikan
+    // uraian kwitansi khusus grup ini bila diisi —
+    // di bawah nama grup manual, di atas uraian asli.
+    $namaTampilGrup = null;
+    if (!$grupManual) {
+      $metaNama = BosSpjGrup::where('sekolah_id', $sekolahId)
+        ->where('grup_kunci', $this->kunciGrupKwitansi($pertama))
+        ->first();
+      $namaTampilGrup = $metaNama?->nama ?: null;
+    }
+
     $nota = null;
     if (!empty($pertama->id_kas_nota)) {
       $nota = BosKasNota::where('id_arkas', $pertama->id_kas_nota)
@@ -2123,11 +2189,12 @@ class KelolaBosController extends Controller
       'kode_rekening' => $kodeRekening,
       'uraian' => $grupManual
         ? $grupManual->nama
-        : (count($grup) === 1
+        : ($namaTampilGrup ?? (count($grup) === 1
           ? $pertama->uraian
-          : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut'),
+          : 'Pembayaran belanja barang/jasa dengan rincian sebagai berikut')),
       'grup_manual' => (bool) $grupManual,
       'nama_alias' => $grupManual?->nama,
+      'nama_grup' => $namaTampilGrup,
       'rincian' => array_map(fn($b) => [
         'uraian' => $b->uraian,
         'kode_rekening' => $b->kode_rekening,
@@ -2166,7 +2233,7 @@ class KelolaBosController extends Controller
       return str_contains($s, ',') ? rtrim(rtrim($s, '0'), ',') : $s;
     };
 
-    $uraian = !empty($dasar['grup_manual'])
+    $uraian = (!empty($dasar['grup_manual']) || !empty($dasar['nama_grup']))
       ? $dasar['uraian']
       : (count($grup) === 1 ? $dasar['uraian'] : $grup[0]->uraian);
 
@@ -2890,6 +2957,7 @@ class KelolaBosController extends Controller
       'status' => 'required|in:' . implode(',', BosSpjGrup::STATUS),
       'nomor_va' => 'nullable|string|max:50',
       'kategori' => 'nullable|string|in:barang,barang_konsumsi,non_barang',
+      'nama' => 'nullable|string|max:255',
     ]);
 
     $nomorVa = isset($validated['nomor_va']) && trim((string) $validated['nomor_va']) !== ''
@@ -2913,6 +2981,13 @@ class KelolaBosController extends Controller
       $kat = $request->input('kategori');
       $atribut['kategori'] = ($kat === null || $kat === '') ? null : $kat;
     }
+    // Nama tampilan grup: hanya disentuh bila kuncinya
+    // dikirim; string kosong / null menghapus nama
+    // (kembali ke uraian / alias biasa).
+    if ($request->exists('nama')) {
+      $namaGrup = trim((string) ($request->input('nama') ?? ''));
+      $atribut['nama'] = $namaGrup === '' ? null : $namaGrup;
+    }
 
     $meta = BosSpjGrup::updateOrCreate(
       ['sekolah_id' => $sekolahId, 'grup_kunci' => $kunci],
@@ -2927,6 +3002,7 @@ class KelolaBosController extends Controller
       'success' => true,
       'message' => 'Keterangan grup SPJ diperbarui.',
       'status' => $meta->status,
+      'nama' => $meta->nama,
       'nomor_va' => $meta->nomor_va,
       'kategori' => $kategori['efektif'],
       'kategori_manual' => $kategori['manual'],
@@ -3032,6 +3108,7 @@ class KelolaBosController extends Controller
         'jumlah_baris' => count($grup),
         'baris_id' => $barisKonteks->id,
         'siplah' => (bool) ($notaGrup?->is_beli_di_siplah ?? false),
+        'nama' => $metaGrup?->nama,
         'status' => $metaGrup?->status ?? 'belum',
         'nomor_va' => $metaGrup?->nomor_va,
         'status_tampil' => $statusGrup['status_tampil'],

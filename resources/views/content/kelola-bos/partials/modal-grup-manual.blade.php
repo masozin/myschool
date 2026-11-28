@@ -107,6 +107,14 @@
               <label class="form-check-label small" for="isi-grup-status">Selesai</label>
             </div>
           </div>
+          <div id="isi-grup-nama-tampil-wrap" class="mt-2 d-none">
+            <label class="form-label small fw-semibold" for="isi-grup-nama-tampil">Nama Tampilan Grup</label>
+            <input type="text" id="isi-grup-nama-tampil" class="form-control form-control-sm"
+              placeholder="Kosongkan untuk memakai uraian / alias" maxlength="255">
+            <div class="small text-muted mt-1">Nama khusus grup ini saja — tampil di BKU, kwitansi,
+              dan Tanda Terima menggantikan uraian, tanpa mengubah grup lain yang uraiannya sama.
+              Berbeda dari alias teks yang berlaku untuk semua uraian yang sama persis.</div>
+          </div>
           <div id="isi-grup-va" class="mt-2 d-none">
             <label class="form-label small fw-semibold" for="isi-grup-va-input">Nomor VA SIPLah</label>
             <div class="d-flex gap-2">
@@ -495,6 +503,8 @@
     var isiGrupSpjStatus = 'belum'; // status meta terakhir dari payload grup
     var isiGrupSpjJumlahPenerima = 0; // jumlah penerima grup terakhir
     var isiGrupSpjSiplah = false; // grup terakhir SIPLah atau bukan
+    var isiGrupNamaBawaan = ''; // nama bawaan grup (alias / uraian baris pertama)
+    var isiGrupManualAktif = false; // grup yang sedang dibuka manual atau bukan
 
     async function bukaIsiGrup(barisId) {
       isiGrupId = barisId;
@@ -512,8 +522,11 @@
         var res = await kirimGrup(urlDasarGrup + '/' + barisId + '/grup-anggota', 'GET');
         var g = res.grup || {};
         isiGrupManualId = g.grup_manual_id || null;
-        $('isi-grup-judul').textContent = g.nama_alias ||
-          (res.baris && res.baris[0] ? (res.baris[0].alias || res.baris[0].uraian) : 'Isi Grup');
+        var barisPertamaGrup = res.baris && res.baris[0] ? res.baris[0] : null;
+        isiGrupNamaBawaan = barisPertamaGrup ?
+          (barisPertamaGrup.alias || barisPertamaGrup.uraian || '') : '';
+        $('isi-grup-judul').textContent = g.nama_alias || g.nama ||
+          isiGrupNamaBawaan || 'Isi Grup';
         var lencana = '';
         if (g.manual) {
           lencana = '<span class="badge bg-primary">Grup Manual</span> ' +
@@ -593,11 +606,19 @@
           if (isiGrupSpjSiplah) {
             $('isi-grup-va-input').value = g.nomor_va || '';
           }
-          // Tombol simpan hanya berguna bila ada yang bisa
-          // diubah: saklar status (grup tanpa penerima)
-          // atau isian VA (grup SIPLah).
-          var adaYangDisimpan = isiGrupSpjJumlahPenerima === 0 || isiGrupSpjSiplah;
-          $('isi-grup-spj-simpan').classList.toggle('d-none', !adaYangDisimpan);
+          // Nama tampilan grup hanya untuk grup bawaan
+          // ARKAS — grup manual sudah punya nama alias
+          // grupnya sendiri di bagian bawah modal.
+          isiGrupManualAktif = !!g.manual;
+          $('isi-grup-nama-tampil-wrap').classList.toggle('d-none', isiGrupManualAktif);
+          if (!isiGrupManualAktif) {
+            $('isi-grup-nama-tampil').value = g.nama || '';
+          }
+          // Tombol simpan selalu berguna: nama tampilan
+          // bisa diubah pada semua grup bawaan, selain
+          // saklar status (grup tanpa penerima) dan
+          // isian VA (grup SIPLah).
+          $('isi-grup-spj-simpan').classList.remove('d-none');
         } else {
           isiGrupSpjBarisId = null;
         }
@@ -662,7 +683,9 @@
     // status dari saklar (grup tanpa penerima) atau status
     // payload terakhir apa adanya (grup berpenerima —
     // status tampilnya diturunkan dari penerima, bukan
-    // dari meta); nomor VA hanya dikirim bila grup SIPLah.
+    // dari meta); nomor VA hanya dikirim bila grup SIPLah;
+    // nama tampilan dikirim untuk grup bawaan (bukan
+    // grup manual).
     $('isi-grup-spj-simpan').addEventListener('click', async function() {
       if (!isiGrupSpjBarisId) return;
       var btn = $('isi-grup-spj-simpan');
@@ -678,9 +701,22 @@
         if (isiGrupSpjSiplah) {
           payloadSpj.nomor_va = $('isi-grup-va-input').value.trim() || null;
         }
+        if (!isiGrupManualAktif) {
+          payloadSpj.nama = $('isi-grup-nama-tampil').value.trim() || null;
+        }
         var res = await kirimGrup(urlDasarGrup + '/' + isiGrupSpjBarisId + '/penerima-grup', 'PUT', payloadSpj);
         isiGrupSpjStatus = res.status || isiGrupSpjStatus;
         segarkanMetaDiBaris(isiGrupSpjBarisId, res.status_tampil, res.nomor_va);
+        if (!isiGrupManualAktif) {
+          // Segarkan teks uraian baris tabel & judul
+          // modal mengikuti nama tampilan tersimpan.
+          var btnUraianGrup = document.querySelector(
+            '[data-grup-anggota][data-id="' + isiGrupSpjBarisId + '"]');
+          if (btnUraianGrup) {
+            btnUraianGrup.textContent = res.nama || isiGrupNamaBawaan;
+          }
+          $('isi-grup-judul').textContent = res.nama || isiGrupNamaBawaan || 'Isi Grup';
+        }
         btn.textContent = 'Tersimpan';
         setTimeout(function() { btn.textContent = 'Simpan Keterangan'; }, 1500);
       } catch (e) {
